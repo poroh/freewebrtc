@@ -6,9 +6,9 @@
 // RTP Packet routines
 //
 
-#include "rtp/RTPPacket.hpp"
-#include "rtp/RTPPayloadMap.hpp"
-#include "rtp/details/RTPHeaderDetails.hpp"
+#include "rtp/rtp_packet.hpp"
+#include "rtp/rtp_payload_map.hpp"
+#include "rtp/details/rtp_header_details.hpp"
 
 namespace freewebrtc::rtp {
 

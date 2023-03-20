@@ -1,9 +1,9 @@
 
-set(TEST_NAME FreeWebRTCTests)
+set(TEST_NAME freewebrtc_tests)
 
 set(TEST_SOURCES
-    RTPParseTests.cpp
-    RTPTimestampTest.cpp
+    rtp_parse_tests.cpp
+    rtp_timestamp_tests.cpp
 )
 
 include(FetchContent)
@@ -16,7 +16,7 @@ FetchContent_MakeAvailable(googletest)
 add_executable(${TEST_NAME} ${TEST_SOURCES})
 
 # Link test executable with library and testing framework
-target_link_libraries(${TEST_NAME} PRIVATE FreeWebRTC)
+target_link_libraries(${TEST_NAME} PRIVATE freewebrtc)
 target_link_libraries(${TEST_NAME} PRIVATE gtest_main)
 
 include(GoogleTest)

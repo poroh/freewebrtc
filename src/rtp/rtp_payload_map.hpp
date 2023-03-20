@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include "rtp/RTPClockRate.hpp"
-#include "rtp/RTPPayloadType.hpp"
+#include "rtp/rtp_clock_rate.hpp"
+#include "rtp/rtp_payload_type.hpp"
 
 #include <unordered_map>
 

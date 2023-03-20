@@ -11,9 +11,9 @@
 #include <cstdint>
 #include <vector>
 
-#include "rtp/details/RTPHeaderDetails.hpp"
-#include "util/UtilFlat.hpp"
-#include "EndianHelpers.hpp"
+#include "rtp/details/rtp_header_details.hpp"
+#include "util/util_flat.hpp"
+#include "endian_helpers.hpp"
 
 namespace freewebrtc::test::rtp_helpers {
 

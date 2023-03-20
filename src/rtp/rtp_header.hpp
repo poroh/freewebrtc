@@ -10,12 +10,12 @@
 
 #include <vector>
 
-#include "rtp/RTPMarker.hpp"
-#include "rtp/RTPPayloadType.hpp"
-#include "rtp/RTPTimestamp.hpp"
-#include "rtp/RTPSequence.hpp"
-#include "rtp/RTPSSRC.hpp"
-#include "util/UtilBinaryView.hpp"
+#include "rtp/rtp_marker.hpp"
+#include "rtp/rtp_payload_type.hpp"
+#include "rtp/rtp_timestamp.hpp"
+#include "rtp/rtp_sequence.hpp"
+#include "rtp/rtp_ssrc.hpp"
+#include "util/util_binary_view.hpp"
 
 namespace freewebrtc::rtp {
 

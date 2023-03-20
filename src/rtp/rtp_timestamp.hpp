@@ -9,7 +9,7 @@
 #pragma once
 
 #include <cstdint>
-#include "rtp/RTPClockRate.hpp"
+#include "rtp/rtp_clock_rate.hpp"
 
 namespace freewebrtc::rtp {
 

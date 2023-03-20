@@ -3,16 +3,18 @@
 // All rights reserved.
 // Distributed under the terms of the MIT License. See the LICENSE file.
 //
-// RTP Marker bit
+// RTP Map
 //
 
-#pragma once
-
-#include "util/UtilTypedBool.hpp"
+#include "rtp/rtp_payload_map.hpp"
 
 namespace freewebrtc::rtp {
 
-struct MarkerTag;
-using MarkerBit = util::TypedBool<MarkerTag>;
+PayloadMap::PayloadMap(PairInitializer l)
+    : m_items(l.begin(), l.end())
+{}
 
-};
+
+}
+
+

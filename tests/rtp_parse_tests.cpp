@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
 
-#include "util/UtilFlat.hpp"
-#include "rtp/RTPPacket.hpp"
-#include "rtp/RTPPayloadMap.hpp"
-#include "helpers/RTPPacketHelpers.hpp"
-#include "helpers/EndianHelpers.hpp"
+#include "util/util_flat.hpp"
+#include "rtp/rtp_packet.hpp"
+#include "rtp/rtp_payload_map.hpp"
+#include "helpers/rtp_packet_helpers.hpp"
+#include "helpers/endian_helpers.hpp"
 
 namespace freewebrtc::test {
 

@@ -8,10 +8,10 @@
 
 #pragma once
 
-#include "util/UtilTypedBool.hpp"
-#include "util/UtilBinaryView.hpp"
-#include "stat/StatCounter.hpp"
-#include "rtp/RTPHeader.hpp"
+#include "util/util_typed_bool.hpp"
+#include "util/util_binary_view.hpp"
+#include "stat/stat_counter.hpp"
+#include "rtp/rtp_header.hpp"
 
 namespace freewebrtc::rtp {
 

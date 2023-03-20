@@ -1,17 +1,17 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(FreeWebRTC)
+project(freewebrtc)
 
 set(CMAKE_CXX_STANDARD 20)
 
-set(FreeWebRTC_VERSION_MAJOR 1)
-set(FreeWebRTC_VERSION_MINOR 0)
+set(freewebrtc_VERSION_MAJOR 1)
+set(freewebrtc_VERSION_MINOR 0)
 
 add_compile_options(-Werror -Wall -Wunused-variable -Wunused-parameter -pedantic)
 
 set(RTP_SOURCES
-    src/rtp/RTPPacket.cpp
-    src/rtp/RTPPayloadMap.cpp
+    src/rtp/rtp_packet.cpp
+    src/rtp/rtp_payload_map.cpp
 )
 file(GLOB RTP_HEADERS "src/rtp/*.hpp")
 
@@ -23,13 +23,13 @@ set(HEADERS
     ${RTP_HEADERS}
     )
 
-add_library(FreeWebRTC STATIC ${SOURCES} ${HEADERS})
+add_library(freewebrtc STATIC ${SOURCES} ${HEADERS})
 
 # Set include directories
-target_include_directories(FreeWebRTC PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_include_directories(freewebrtc PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # Set library installation directory
-install(TARGETS FreeWebRTC
+install(TARGETS freewebrtc
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib
         RUNTIME DESTINATION bin)

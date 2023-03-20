@@ -3,7 +3,7 @@
 // All rights reserved.
 // Distributed under the terms of the MIT License. See the LICENSE file.
 //
-// RTP Packet Helpers for unit tests
+// Helpers to create unit test packets
 //
 
 #pragma once
@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "util/UtilEndian.hpp"
+#include "util/util_endian.hpp"
 
 namespace freewebrtc::test::helpers {
 
