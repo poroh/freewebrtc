@@ -31,6 +31,7 @@ inline PayloadType::PayloadType(unsigned v)
     : m_value(v)
 {}
 
+
 inline uint8_t PayloadType::value() const noexcept {
     return m_value;
 }

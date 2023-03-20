@@ -38,6 +38,7 @@ public:
     uint8_t assured_read_u8(size_t offset) const;
     uint16_t assured_read_u16be(size_t offset) const;
     uint32_t assured_read_u32be(size_t offset) const;
+    ConstBinaryView assured_subview(size_t offset, size_t size) const;
 
     std::optional<uint8_t> read_u8(size_t offset) const;
     std::optional<uint16_t> read_u16be(size_t offset) const;
@@ -76,6 +77,10 @@ inline uint32_t ConstBinaryView::assured_read_u32be(size_t offset) const {
     return network_to_host_u32(value);
 }
 
+inline ConstBinaryView ConstBinaryView::assured_subview(size_t offset, size_t count) const {
+    return ConstBinaryView(data() + offset, count);
+}
+
 inline std::optional<uint8_t> ConstBinaryView::read_u8(size_t offset) const {
     if (offset > size() - sizeof(uint8_t)) {
         return std::nullopt;
@@ -105,7 +110,7 @@ inline std::optional<ConstBinaryView> ConstBinaryView::subview(size_t offset, si
     if (count > size() || offset > size() - count) {
         return std::nullopt;
     }
-    return ConstBinaryView(data() + offset, count);
+    return assured_subview(offset, count);
 }
 
 

@@ -16,7 +16,11 @@ struct ParseStat {
     stat::Counter success;
     stat::Counter error;
     stat::Counter invalid_size;
+    stat::Counter not_padded;
+    stat::Counter message_length_error;
+    stat::Counter magic_cookie_error;
     stat::Counter invalid_attr_size;
+    stat::Counter unknown_comprehension_required_attr;
 };
 
 }
