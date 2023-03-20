@@ -365,7 +365,7 @@ TEST_F(RTPPacketParserTest, too_short_packet) {
     EXPECT_FALSE(rtp::Packet::parse(util::ConstBinaryView(std::vector<uint8_t>{0x00, 0x01}),  map, stat).has_value());
     EXPECT_FALSE(rtp::Packet::parse(util::ConstBinaryView(std::vector<uint8_t>(rtp::details::RTP_FIXED_HEADER_LEN-1)), map, stat).has_value());
     EXPECT_EQ(stat.error.count(), 3);
-    EXPECT_EQ(stat.truncated.count(), 3);
+    EXPECT_EQ(stat.invalid_size.count(), 3);
 }
 
 }

@@ -15,12 +15,21 @@ set(RTP_SOURCES
 )
 file(GLOB RTP_HEADERS "src/rtp/*.hpp")
 
+
+set(STUN_SOURCES
+    src/stun/stun_message.cpp
+    src/stun/stun_attribute.cpp
+)
+file(GLOB STUN_HEADERS "src/stun/*.hpp")
+
 set(SOURCES
     ${RTP_SOURCES}
+    ${STUN_SOURCES}
 )
 
 set(HEADERS
     ${RTP_HEADERS}
+    ${STUN_HEADERS}
     )
 
 add_library(freewebrtc STATIC ${SOURCES} ${HEADERS})

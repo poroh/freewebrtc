@@ -16,7 +16,7 @@ std::optional<Packet> Packet::parse(const util::ConstBinaryView& vv, const Paylo
     using namespace details;
 
     if (vv.size() < RTP_FIXED_HEADER_LEN) {
-        stat.truncated.inc();
+        stat.invalid_size.inc();
         stat.error.inc();
         return std::nullopt;
     }

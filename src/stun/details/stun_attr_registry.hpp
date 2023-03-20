@@ -3,16 +3,13 @@
 // All rights reserved.
 // Distributed under the terms of the MIT License. See the LICENSE file.
 //
-// RTP Marker bit
+// STUN Attribute
 //
 
 #pragma once
 
-#include "util/util_typed_bool.hpp"
+namespace freewebrtc::stun::attr_registry {
 
-namespace freewebrtc::rtp {
-
-struct MarkerTag;
-using MarkerBit = util::TypedBool<MarkerTag>;
-
+static constexpr uint16_t MAPPED_ADDRESS = 0x0001;
 }
+

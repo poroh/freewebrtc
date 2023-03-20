@@ -20,7 +20,7 @@ class PayloadMap;
 struct ParseStat {
     stat::Counter success;
     stat::Counter error;
-    stat::Counter truncated;
+    stat::Counter invalid_size;
     stat::Counter invalid_version;
     stat::Counter invalid_csrc;
     stat::Counter invalid_extension;

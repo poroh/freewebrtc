@@ -4,6 +4,7 @@ set(TEST_NAME freewebrtc_tests)
 set(TEST_SOURCES
     rtp_parse_tests.cpp
     rtp_timestamp_tests.cpp
+    stun_parse_tests.cpp
 )
 
 include(FetchContent)

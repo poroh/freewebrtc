@@ -32,6 +32,8 @@ public:
     bool contains(const Interval& i) const;
     using Base::data;
     using Base::size;
+    using Base::begin;
+    using Base::end;
 
     uint8_t assured_read_u8(size_t offset) const;
     uint16_t assured_read_u16be(size_t offset) const;
