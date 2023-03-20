@@ -19,6 +19,7 @@ file(GLOB RTP_HEADERS "src/rtp/*.hpp")
 set(STUN_SOURCES
     src/stun/stun_message.cpp
     src/stun/stun_attribute.cpp
+    src/stun/details/stun_fingerprint.cpp
 )
 file(GLOB STUN_HEADERS "src/stun/*.hpp")
 

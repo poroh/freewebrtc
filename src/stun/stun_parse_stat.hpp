@@ -20,6 +20,9 @@ struct ParseStat {
     stat::Counter message_length_error;
     stat::Counter magic_cookie_error;
     stat::Counter invalid_attr_size;
+    stat::Counter fingerprint_not_last;
+    stat::Counter invalid_fingerprint;
+    stat::Counter invalid_fingerprint_size;
     stat::Counter unknown_comprehension_required_attr;
 };
 

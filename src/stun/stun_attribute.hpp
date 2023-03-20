@@ -46,6 +46,10 @@ struct MessageIntegityAttribute {
     static std::optional<MessageIntegityAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
+struct FingerprintAttribute {
+    uint32_t crc32;
+    static std::optional<FingerprintAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+};
 
 class Attribute {
 public:
@@ -54,6 +58,7 @@ public:
             XorMappedAddressAttribute,
             MappedAddressAttribute,
             MessageIntegityAttribute,
+            FingerprintAttribute,
             UnknownAttribute
         >;
 

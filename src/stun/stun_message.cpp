@@ -8,6 +8,7 @@
 
 #include "stun/stun_message.hpp"
 #include "stun/details/stun_attr_registry.hpp"
+#include "stun/details/stun_fingerprint.hpp"
 
 namespace freewebrtc::stun {
 
@@ -99,6 +100,7 @@ std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat
         const auto align_length = (length / sizeof(uint32_t) + align) * sizeof(uint32_t);
 
         const auto attr_type = AttributeType::from_uint16(type);
+        const auto next_attr_offset = attr_offset + align_length + STUN_ATTR_HEADER_SIZE;
         // RFC5389:
         // 15.4.  MESSAGE-INTEGRITY
         // With the exception of the FINGERPRINT attribute, which
@@ -119,10 +121,34 @@ std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat
                 // attribute.
                 integrity = util::ConstBinaryView::Interval{0, attr_offset};
             }
+            if (const auto *fingerprint = attr.as<FingerprintAttribute>(); fingerprint != nullptr) {
+                // 15.5.  FINGERPRINT
+                // When present, the FINGERPRINT attribute MUST be the last attribute in
+                // the message, and thus will appear after MESSAGE-INTEGRITY.
+                if (next_attr_offset < vv.size()) {
+                    stat.error.inc();
+                    stat.fingerprint_not_last.inc();
+                    return std::nullopt;
+                }
+                // Normative:
+                // The value of the attribute is computed as the CRC-32 of the STUN message
+                // up to (but excluding) the FINGERPRINT attribute itself, XOR'ed with
+                // the 32-bit value 0x5354554e (the XOR helps in cases where an
+                // application packet is also using CRC-32 in it).
+                //
+                // Implementation: we xored fingerprint with 0x5354554e in FingerprintAttribute so
+                // it fingerprint->crc32 must be equal to crc32 of the message without additional xor.
+                const uint32_t v = crc32(vv.assured_subview(0, attr_offset));
+                if (v != fingerprint->crc32) {
+                    stat.error.inc();
+                    stat.invalid_fingerprint.inc();
+                    return std::nullopt;
+                }
+            }
             attrs.emplace(std::move(*maybe_attr));
         }
 
-        attr_offset += align_length + STUN_ATTR_HEADER_SIZE;
+        attr_offset = next_attr_offset;
     }
 
     stat.success.inc();
