@@ -9,24 +9,37 @@
 #pragma once
 
 #include <cstdint>
-#include <variant>
-
-#include "rtp/RTPClock.hpp"
+#include "rtp/RTPClockRate.hpp"
 
 namespace freewebrtc::rtp {
 
 class Timestamp {
+    using ValueType = uint32_t;
 public:
-    static Timestamp from_uint32(uint32_t, RTPClock clock);
+    static Timestamp from_uint32(ValueType, ClockRate clock);
+    ValueType value() const noexcept;
 
 private:
-    using AudioUWB = std::chrono::time_point<AudioUWBClock>;
-    using AudioWB = std::chrono::time_point<AudioWBClock>;
-    using AudioNB = std::chrono::time_point<AudioNBClock>;
-    using Video = std::chrono::time_point<VideoClock>;
-
-    using Value = std::variant<AudioUWB, AudioWB, AudioNB, Video>;
-    Value m_value;
+    Timestamp(ValueType v, ClockRate c);
+    ValueType m_value;
+    ClockRate m_rate;
 };
+
+//
+// inlines
+//
+inline Timestamp::Timestamp(ValueType v, ClockRate cr)
+    : m_value(v)
+    , m_rate(cr)
+{}
+
+inline Timestamp Timestamp::from_uint32(ValueType v, ClockRate c) {
+    return Timestamp(v, c);
+}
+
+inline Timestamp::ValueType Timestamp::value() const noexcept {
+    return m_value;
+}
+
 
 }

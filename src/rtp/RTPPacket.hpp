@@ -3,7 +3,7 @@
 // All rights reserved.
 // Distributed under the terms of the MIT License. See the LICENSE file.
 //
-// RTP Packet Parser
+// RTP Packet-related functions
 //
 
 #pragma once

@@ -3,7 +3,7 @@
 // All rights reserved.
 // Distributed under the terms of the MIT License. See the LICENSE file.
 //
-// RTP Data structures
+// RTP Packet Header
 //
 
 #pragma once
@@ -25,7 +25,7 @@ struct Header {
     SequenceNumber sequence;
     SSRC ssrc;
     Timestamp timestamp;
-    std::vector<SSRC> cssrc;
+    std::vector<SSRC> csrcs;
     struct Extension {
         uint16_t profile_defined;
         util::ConstBinaryView::Interval data;

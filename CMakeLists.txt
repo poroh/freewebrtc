@@ -11,6 +11,7 @@ add_compile_options(-Werror -Wall -Wunused-variable -Wunused-parameter -pedantic
 
 set(RTP_SOURCES
     src/rtp/RTPPacket.cpp
+    src/rtp/RTPPayloadMap.cpp
 )
 file(GLOB RTP_HEADERS "src/rtp/*.hpp")
 

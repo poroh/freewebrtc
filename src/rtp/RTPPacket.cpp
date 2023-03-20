@@ -1,35 +1,19 @@
+//
+// Copyright (c) 2023 Dmitry Poroh
+// All rights reserved.
+// Distributed under the terms of the MIT License. See the LICENSE file.
+//
+// RTP Packet routines
+//
 
 #include "rtp/RTPPacket.hpp"
 #include "rtp/RTPPayloadMap.hpp"
+#include "rtp/details/RTPHeaderDetails.hpp"
 
 namespace freewebrtc::rtp {
 
 std::optional<Packet> Packet::parse(const util::ConstBinaryView& vv, const PayloadMap& ptmap, ParseStat& stat) noexcept {
-
-    //  0                   1                   2                   3
-    //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    // |V=2|P|X|  CC   |M|     PT      |       sequence number         |
-    // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    // |                           timestamp                           |
-    // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    // |           synchronization source (SSRC) identifier            |
-    // +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-    // |            contributing source (CSRC) identifiers             |
-    // |                             ....                              |
-    // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    static constexpr size_t  RTP_FIXED_HEADER_LEN = 12;
-    static constexpr uint8_t RTP_VERSION = 2;
-    static constexpr uint8_t RTP_VERSION_MASK = 0xC0;
-    static constexpr int     RTP_VERSION_SHIFT = 6;
-    static constexpr uint8_t RTP_PADDING_MASK = 0x20;
-    static constexpr uint8_t RTP_EXTENSION_MASK = 0x10;
-    static constexpr uint8_t RTP_CC_MASK = 0x0F;
-    static constexpr uint8_t RTP_MARKER_MASK = 0x80;
-    static constexpr uint8_t RTP_PAYLOAD_TYPE_MASK = 0x7F;
-    static constexpr size_t  RTP_SEQUENCE_NUMBER_OFFSET = 2;
-    static constexpr size_t  RTP_TIMESTAMP_OFFSET = 4;
-    static constexpr size_t  RTP_SSRC_OFFSET = 8;
+    using namespace details;
 
     if (vv.size() < RTP_FIXED_HEADER_LEN) {
         stat.truncated.inc();
@@ -52,8 +36,8 @@ std::optional<Packet> Packet::parse(const util::ConstBinaryView& vv, const Paylo
     const bool has_extension = (first_byte & RTP_EXTENSION_MASK) != 0;
     const unsigned num_cc = (first_byte & RTP_CC_MASK);
 
-    std::vector<SSRC> cssrc;
-    cssrc.reserve(num_cc);
+    std::vector<SSRC> csrcs;
+    csrcs.reserve(num_cc);
     for (unsigned i = 0; i < num_cc; ++i) {
         const auto maybe_csrc = vv.read_u32be(RTP_FIXED_HEADER_LEN + i * sizeof(uint32_t));
         if (!maybe_csrc.has_value()) {
@@ -61,7 +45,7 @@ std::optional<Packet> Packet::parse(const util::ConstBinaryView& vv, const Paylo
             stat.error.inc();
             return std::nullopt;
         }
-        cssrc.emplace_back(SSRC::from_uint32(*maybe_csrc));
+        csrcs.emplace_back(SSRC::from_uint32(*maybe_csrc));
     }
 
     const MarkerBit marker(second_byte & RTP_MARKER_MASK);
@@ -115,7 +99,7 @@ std::optional<Packet> Packet::parse(const util::ConstBinaryView& vv, const Paylo
     }
 
     const auto payload_offset = ext_offset + ext_size;
-    assert(vv.size() >= payload_offset); // guaranteed by extension checking or reading fixed header / cssrc
+    assert(vv.size() >= payload_offset); // guaranteed by extension checking or reading fixed header / csrcs
     const size_t payload_with_padding_size = vv.size() - payload_offset;
 
     size_t padding_size = 0;
@@ -146,7 +130,7 @@ std::optional<Packet> Packet::parse(const util::ConstBinaryView& vv, const Paylo
                 SequenceNumber::from_uint16(sequence_value),
                 SSRC::from_uint32(ssrc_value),
                 Timestamp::from_uint32(timestamp_value, rtp_clock),
-                std::move(cssrc),
+                std::move(csrcs),
                 maybe_extension},
         util::ConstBinaryView::Interval{payload_offset, payload_size}
     };

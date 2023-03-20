@@ -15,10 +15,45 @@ namespace freewebrtc::rtp {
 
 class PayloadType {
 public:
+    uint8_t value() const noexcept;
     static std::optional<PayloadType> from_uint8(uint8_t pt);
+    bool operator==(const PayloadType&) const noexcept;
 
 private:
-    uint8_t m_value;
+    explicit PayloadType(unsigned value);
+    unsigned m_value;
 };
 
+//
+// inlines
+//
+inline PayloadType::PayloadType(unsigned v)
+    : m_value(v)
+{}
+
+inline uint8_t PayloadType::value() const noexcept {
+    return m_value;
+}
+
+inline bool PayloadType::operator==(const PayloadType& other) const noexcept {
+    return m_value == other.m_value;
+}
+
+inline std::optional<PayloadType> PayloadType::from_uint8(uint8_t pt) {
+    if (pt <= 127) {
+        return PayloadType(pt);
+    }
+    return std::nullopt;
+}
+
+
+}
+
+namespace std {
+    template<>
+    struct hash<freewebrtc::rtp::PayloadType> {
+        size_t operator()(const freewebrtc::rtp::PayloadType& pt) const {
+            return hash<uint8_t>()(pt.value());
+        }
+    };
 }

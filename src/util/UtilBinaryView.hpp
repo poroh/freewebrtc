@@ -11,6 +11,7 @@
 #include <string_view>
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 #include "util/UtilEndian.hpp"
 
@@ -26,6 +27,7 @@ public:
         size_t count;
     };
     ConstBinaryView(const ByteT *, size_t count);
+    explicit ConstBinaryView(const std::vector<uint8_t>&);
 
     bool contains(const Interval& i) const;
     using Base::data;
@@ -46,6 +48,11 @@ public:
 //
 // inlines
 //
+inline ConstBinaryView::ConstBinaryView(const std::vector<uint8_t>& v)
+    : ConstBinaryView(v.data(), v.size())
+{}
+
+
 inline ConstBinaryView::ConstBinaryView(const ByteT *buf, size_t count)
     : Base(buf, count)
 {}

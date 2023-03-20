@@ -1,13 +1,371 @@
 #include <gtest/gtest.h>
 
+#include "util/UtilFlat.hpp"
+#include "rtp/RTPPacket.hpp"
+#include "rtp/RTPPayloadMap.hpp"
+#include "helpers/RTPPacketHelpers.hpp"
+#include "helpers/EndianHelpers.hpp"
+
 namespace freewebrtc::test {
 
 class RTPPacketParserTest : public ::testing::Test {
 };
 
+// ================================================================================
+// Positive cases
 
-TEST_F(RTPPacketParserTest, basic_test) {
+// Empty payload test:
+TEST_F(RTPPacketParserTest, empty_packet_test) {
+    rtp::ParseStat stat;
+    const auto pt = *rtp::PayloadType::from_uint8(0); // PCMU
+    const auto ssrc = rtp::SSRC::from_uint32(0xDEADBEEF);
+    const uint32_t timestamp_value = 160;
+    const uint16_t sequence_value = 0x1234;
+
+    rtp::PayloadMap map({std::make_pair(pt, rtp::PayloadMapItem{rtp::ClockRate(8000)})});
+    auto result =
+        rtp::Packet::parse(
+            util::ConstBinaryView(
+                util::flat_vec<uint8_t>(
+                    {
+                        rtp_helpers::first_word(pt.value(), sequence_value),
+                        helpers::uint32be(timestamp_value),
+                        helpers::uint32be(ssrc.value())
+                    }
+                )
+            ),
+            map,
+            stat);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(stat.success.count(), 1);
+    EXPECT_TRUE(!result->header.marker);
+    EXPECT_EQ(result->header.payload_type, pt);
+    EXPECT_EQ(result->header.sequence.value(), sequence_value);
+    EXPECT_EQ(result->header.ssrc, ssrc);
+    EXPECT_EQ(result->header.timestamp.value(), timestamp_value);
+    EXPECT_TRUE(result->header.csrcs.empty());
+    EXPECT_FALSE(result->header.extension.has_value());
+    ASSERT_EQ(result->payload.count, 0);
 }
 
+// Packet with 4 bytes padding
+TEST_F(RTPPacketParserTest, empty_packet_with_padding_test) {
+    rtp::ParseStat stat;
+    const auto pt = *rtp::PayloadType::from_uint8(0); // PCMU
+    const auto ssrc = rtp::SSRC::from_uint32(0xDEADBEEF);
+    const uint32_t timestamp_value = 160;
+    const uint16_t sequence_value = 0x1234;
+
+    rtp::PayloadMap map({std::make_pair(pt, rtp::PayloadMapItem{rtp::ClockRate(8000)})});
+    auto result =
+        rtp::Packet::parse(
+            util::ConstBinaryView(
+                util::flat_vec<uint8_t>(
+                    {
+                        rtp_helpers::first_word(pt.value(), sequence_value, false, true),
+                        helpers::uint32be(timestamp_value),
+                        helpers::uint32be(ssrc.value()),
+                        {0xa, 0xb, 0xc, 0x4}
+                    }
+                )
+            ),
+            map,
+            stat);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(stat.success.count(), 1);
+    ASSERT_EQ(result->payload.count, 0);
+}
+
+// 4-bytes payload test
+TEST_F(RTPPacketParserTest, four_bytes_payload_test) {
+    rtp::ParseStat stat;
+    const auto pt = *rtp::PayloadType::from_uint8(0); // PCMU
+    rtp::PayloadMap map({std::make_pair(pt, rtp::PayloadMapItem{rtp::ClockRate(8000)})});
+    auto result =
+        rtp::Packet::parse(
+            util::ConstBinaryView(
+                util::flat_vec<uint8_t>(
+                    {
+                        rtp_helpers::first_word(pt.value(), 0x1234),
+                        helpers::uint32be(160),
+                        helpers::uint32be(0xDEADBEEF),
+                        {1, 2, 3, 4}
+                    }
+                )
+            ),
+            map,
+            stat);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(stat.success.count(), 1);
+    ASSERT_EQ(result->payload.count, 4);
+    ASSERT_EQ(result->payload.offset, rtp::details::RTP_FIXED_HEADER_LEN);
+}
+
+// 4-bytes payload with 4 bytes padding test
+TEST_F(RTPPacketParserTest, four_bytes_payload_with_padding_test) {
+    rtp::ParseStat stat;
+    const auto pt = *rtp::PayloadType::from_uint8(0); // PCMU
+    rtp::PayloadMap map({std::make_pair(pt, rtp::PayloadMapItem{rtp::ClockRate(8000)})});
+    auto result =
+        rtp::Packet::parse(
+            util::ConstBinaryView(
+                util::flat_vec<uint8_t>(
+                    {
+                        rtp_helpers::first_word(pt.value(), 0x1234, false, true),
+                        helpers::uint32be(160),
+                        helpers::uint32be(0xDEADBEEF),
+                        {1, 2, 3, 4},
+                        {0xa, 0xb, 0xc, 4}
+                    }
+                )
+            ),
+            map,
+            stat);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(stat.success.count(), 1);
+    ASSERT_EQ(result->payload.count, 4);
+    ASSERT_EQ(result->payload.offset, rtp::details::RTP_FIXED_HEADER_LEN);
+}
+
+// Packet with 0-length extension
+TEST_F(RTPPacketParserTest, rtp_packet_with_empty_extension_test) {
+    rtp::ParseStat stat;
+    const auto pt = *rtp::PayloadType::from_uint8(0); // PCMU
+    rtp::PayloadMap map({std::make_pair(pt, rtp::PayloadMapItem{rtp::ClockRate(8000)})});
+    auto result =
+        rtp::Packet::parse(
+            util::ConstBinaryView(
+                util::flat_vec<uint8_t>(
+                    {
+                        rtp_helpers::first_word(pt.value(), 0x1234, false, false, true),
+                        helpers::uint32be(160),
+                        helpers::uint32be(0xDEADBEEF),
+                        rtp_helpers::extension_header(0xBEDE, 0x0),
+                    }
+                )
+            ),
+            map,
+            stat);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(stat.success.count(), 1);
+    EXPECT_EQ(result->payload.count, 0);
+    EXPECT_EQ(result->payload.offset, rtp::details::RTP_FIXED_HEADER_LEN + 4);
+    ASSERT_TRUE(result->header.extension.has_value());
+    EXPECT_EQ(result->header.extension->profile_defined, 0xBEDE);
+    EXPECT_EQ(result->header.extension->data.offset, rtp::details::RTP_FIXED_HEADER_LEN + 4);
+    EXPECT_EQ(result->header.extension->data.count, 0);
+}
+
+TEST_F(RTPPacketParserTest, rtp_packet_with_1word_extension_test) {
+    rtp::ParseStat stat;
+    const auto pt = *rtp::PayloadType::from_uint8(0); // PCMU
+    rtp::PayloadMap map({std::make_pair(pt, rtp::PayloadMapItem{rtp::ClockRate(8000)})});
+    auto result =
+        rtp::Packet::parse(
+            util::ConstBinaryView(
+                util::flat_vec<uint8_t>(
+                    {
+                        rtp_helpers::first_word(pt.value(), 0x1234, false, false, true),
+                        helpers::uint32be(160),
+                        helpers::uint32be(0xDEADBEEF),
+                        rtp_helpers::extension_header(0xBEDE, 0x1),
+                        {1, 2, 3, 4}
+                    }
+                )
+            ),
+            map,
+            stat);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(stat.success.count(), 1);
+    EXPECT_EQ(result->payload.count, 0);
+    EXPECT_EQ(result->payload.offset, rtp::details::RTP_FIXED_HEADER_LEN + 8);
+    ASSERT_TRUE(result->header.extension.has_value());
+    EXPECT_EQ(result->header.extension->profile_defined, 0xBEDE);
+    EXPECT_EQ(result->header.extension->data.offset, rtp::details::RTP_FIXED_HEADER_LEN + 4);
+    EXPECT_EQ(result->header.extension->data.count, 4);
+}
+
+// Packet with 3 csrc
+TEST_F(RTPPacketParserTest, packet_with_csrc_and_payload) {
+    rtp::ParseStat stat;
+    const auto pt = *rtp::PayloadType::from_uint8(0); // PCMU
+    const auto ssrc = rtp::SSRC::from_uint32(0xDEADBEEF);
+    const uint32_t timestamp_value = 160;
+    const uint16_t sequence_value = 0x1234;
+    const std::vector<rtp::SSRC> csrcs = {
+        rtp::SSRC::from_uint32(0x00C0FFEE),
+        rtp::SSRC::from_uint32(0xCAFEDEAD),
+        rtp::SSRC::from_uint32(0xBAADF00D)
+    };
+
+    rtp::PayloadMap map({std::make_pair(pt, rtp::PayloadMapItem{rtp::ClockRate(8000)})});
+    auto result =
+        rtp::Packet::parse(
+            util::ConstBinaryView(
+                util::flat_vec<uint8_t>(
+                    {
+                        rtp_helpers::first_word(pt.value(), sequence_value, false, false, false, csrcs.size()),
+                        helpers::uint32be(timestamp_value),
+                        helpers::uint32be(ssrc.value()),
+                        helpers::uint32be(csrcs[0].value()),
+                        helpers::uint32be(csrcs[1].value()),
+                        helpers::uint32be(csrcs[2].value()),
+                        { 1, 2, 3, 4}
+                    }
+                )
+            ),
+            map,
+            stat);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(stat.success.count(), 1);
+    EXPECT_TRUE(!result->header.marker);
+    EXPECT_EQ(result->header.csrcs, csrcs);
+    EXPECT_EQ(result->payload.count, 4);
+    EXPECT_EQ(result->payload.offset, rtp::details::RTP_FIXED_HEADER_LEN + csrcs.size() * sizeof(uint32_t));
+}
+
+// ================================================================================
+// Negative cases
+
+// RTP Version is set to 3
+TEST_F(RTPPacketParserTest, invalid_version_test) {
+    rtp::ParseStat stat;
+    const auto pt = *rtp::PayloadType::from_uint8(0); // PCMU
+    const auto ssrc = rtp::SSRC::from_uint32(0xDEADBEEF);
+    const uint32_t timestamp_value = 160;
+    const uint16_t sequence_value = 0x1234;
+
+    rtp::PayloadMap map({std::make_pair(pt, rtp::PayloadMapItem{rtp::ClockRate(8000)})});
+    auto firstw = rtp_helpers::first_word(pt.value(), sequence_value);
+    firstw[0] = 0xC0;
+    auto result =
+        rtp::Packet::parse(
+            util::ConstBinaryView(
+                util::flat_vec<uint8_t>(
+                    {
+                        firstw,
+                        helpers::uint32be(timestamp_value),
+                        helpers::uint32be(ssrc.value())
+                    }
+                )
+            ),
+            map,
+            stat);
+    ASSERT_TRUE(!result.has_value());
+    ASSERT_EQ(stat.error.count(), 1);
+    ASSERT_EQ(stat.invalid_version.count(), 1);
+}
+
+// Padding bit is set & empty payload (no padding length in last byte).
+TEST_F(RTPPacketParserTest, invalid_padding_test) {
+    rtp::ParseStat stat;
+    const auto pt = *rtp::PayloadType::from_uint8(0); // PCMU
+    const auto ssrc = rtp::SSRC::from_uint32(0xDEADBEEF);
+    const uint32_t timestamp_value = 160;
+    const uint16_t sequence_value = 0x1234;
+
+    rtp::PayloadMap map({std::make_pair(pt, rtp::PayloadMapItem{rtp::ClockRate(8000)})});
+    auto result =
+        rtp::Packet::parse(
+            util::ConstBinaryView(
+                util::flat_vec<uint8_t>(
+                    {
+                        rtp_helpers::first_word(pt.value(), sequence_value, false, true),
+                        helpers::uint32be(timestamp_value),
+                        helpers::uint32be(ssrc.value())
+                    }
+                )
+            ),
+            map,
+            stat);
+    ASSERT_TRUE(!result.has_value());
+    ASSERT_EQ(stat.error.count(), 1);
+    ASSERT_EQ(stat.invalid_padding.count(), 1);
+}
+
+// Extension bit set but no room for extension header
+TEST_F(RTPPacketParserTest, invalid_extension_no_header) {
+    rtp::ParseStat stat;
+    const auto pt = *rtp::PayloadType::from_uint8(0); // PCMU
+    rtp::PayloadMap map({std::make_pair(pt, rtp::PayloadMapItem{rtp::ClockRate(8000)})});
+    auto result =
+        rtp::Packet::parse(
+            util::ConstBinaryView(
+                util::flat_vec<uint8_t>(
+                    {
+                        rtp_helpers::first_word(pt.value(), 0x1234, false, false, true),
+                        helpers::uint32be(160),
+                        helpers::uint32be(0xDEADBEEF)
+                    }
+                )
+            ),
+            map,
+            stat);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(stat.error.count(), 1);
+    EXPECT_EQ(stat.invalid_extension.count(), 1);
+}
+
+// Extension bit set / extension header length out of bound of packet
+TEST_F(RTPPacketParserTest, invalid_extension_header_length) {
+    rtp::ParseStat stat;
+    const auto pt = *rtp::PayloadType::from_uint8(0); // PCMU
+    rtp::PayloadMap map({std::make_pair(pt, rtp::PayloadMapItem{rtp::ClockRate(8000)})});
+    auto result =
+        rtp::Packet::parse(
+            util::ConstBinaryView(
+                util::flat_vec<uint8_t>(
+                    {
+                        rtp_helpers::first_word(pt.value(), 0x1234, false, false, true),
+                        helpers::uint32be(160),
+                        helpers::uint32be(0xDEADBEEF),
+                        rtp_helpers::extension_header(0xBEDE, 0x1)
+                    }
+                )
+            ),
+            map,
+            stat);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(stat.error.count(), 1);
+    EXPECT_EQ(stat.invalid_extension.count(), 1);
+}
+
+// Packet with specified csrc but not enough room for it
+TEST_F(RTPPacketParserTest, invalid_number_of_csrc) {
+    rtp::ParseStat stat;
+    const auto pt = *rtp::PayloadType::from_uint8(0); // PCMU
+    const auto ssrc = rtp::SSRC::from_uint32(0xDEADBEEF);
+    const uint32_t timestamp_value = 160;
+    const uint16_t sequence_value = 0x1234;
+    rtp::PayloadMap map({std::make_pair(pt, rtp::PayloadMapItem{rtp::ClockRate(8000)})});
+    auto result =
+        rtp::Packet::parse(
+            util::ConstBinaryView(
+                util::flat_vec<uint8_t>(
+                    {
+                        rtp_helpers::first_word(pt.value(), sequence_value, false, false, false, 4),
+                        helpers::uint32be(timestamp_value),
+                        helpers::uint32be(ssrc.value())
+                    }
+                )
+            ),
+            map,
+            stat);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(stat.error.count(), 1);
+    EXPECT_EQ(stat.invalid_csrc.count(), 1);
+}
+
+// Too short packet
+TEST_F(RTPPacketParserTest, too_short_packet) {
+    rtp::ParseStat stat;
+    const auto pt = *rtp::PayloadType::from_uint8(0); // PCMU
+    rtp::PayloadMap map({std::make_pair(pt, rtp::PayloadMapItem{rtp::ClockRate(8000)})});
+    EXPECT_FALSE(rtp::Packet::parse(util::ConstBinaryView(std::vector<uint8_t>{0x00}),  map, stat).has_value());
+    EXPECT_FALSE(rtp::Packet::parse(util::ConstBinaryView(std::vector<uint8_t>{0x00, 0x01}),  map, stat).has_value());
+    EXPECT_FALSE(rtp::Packet::parse(util::ConstBinaryView(std::vector<uint8_t>(rtp::details::RTP_FIXED_HEADER_LEN-1)), map, stat).has_value());
+    EXPECT_EQ(stat.error.count(), 3);
+    EXPECT_EQ(stat.truncated.count(), 3);
+}
 
 }
