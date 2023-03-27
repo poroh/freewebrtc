@@ -23,6 +23,7 @@ struct ParseStat {
     stat::Counter fingerprint_not_last;
     stat::Counter invalid_fingerprint;
     stat::Counter invalid_fingerprint_size;
+    stat::Counter invalid_message_integrity;
     stat::Counter unknown_comprehension_required_attr;
 };
 

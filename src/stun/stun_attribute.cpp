@@ -36,11 +36,11 @@ std::optional<Attribute> Attribute::parse(const util::ConstBinaryView& vv, Attri
         //         return Attribute(type, *maybe_attr);
         //     }
         //     return std::nullopt;
-        // case attr_registry::MESSAGE_INTEGRITY:
-        //     if (auto maybe_attr = MessageIntegityAttribute::parse(vv, stat); maybe_attr.has_value()) {
-        //         return Attribute(type, *maybe_attr);
-        //     }
-        //     return std::nullopt;
+        case attr_registry::MESSAGE_INTEGRITY:
+            if (auto maybe_attr = MessageIntegityAttribute::parse(vv, stat); maybe_attr.has_value()) {
+                return Attribute(type, *maybe_attr);
+            }
+            return std::nullopt;
         case attr_registry::FINGERPRINT:
             if (auto maybe_attr = FingerprintAttribute::parse(vv, stat); maybe_attr.has_value()) {
                 return Attribute(type, *maybe_attr);
@@ -49,6 +49,16 @@ std::optional<Attribute> Attribute::parse(const util::ConstBinaryView& vv, Attri
         default:
             return Attribute(type, UnknownAttribute(vv));
     }
+}
+
+std::optional<MessageIntegityAttribute> MessageIntegityAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+    auto maybe_digest = Digest::Value::from_view(vv);
+    if (!maybe_digest.has_value()) {
+        stat.error.inc();
+        stat.invalid_message_integrity.inc();
+        return std::nullopt;
+    }
+    return MessageIntegityAttribute{Digest(std::move(*maybe_digest))};
 }
 
 std::optional<FingerprintAttribute> FingerprintAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {

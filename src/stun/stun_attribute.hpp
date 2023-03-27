@@ -16,6 +16,8 @@
 #include "net/ip/ip_address.hpp"
 #include "net/net_port.hpp"
 #include "stun/stun_attribute_type.hpp"
+#include "crypto/crypto_hmac.hpp"
+#include "crypto/crypto_hash.hpp"
 
 namespace freewebrtc::stun {
 
@@ -42,7 +44,8 @@ struct XorMappedAddressAttribute : public AddressAttribute {
 };
 
 struct MessageIntegityAttribute {
-    std::vector<uint8_t> digest;
+    using Digest = crypto::hmac::Digest<crypto::SHA1Hash>;
+    Digest digest;
     static std::optional<MessageIntegityAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 

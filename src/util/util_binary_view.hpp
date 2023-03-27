@@ -26,8 +26,11 @@ public:
         size_t offset;
         size_t count;
     };
-    ConstBinaryView(const ByteT *, size_t count);
+    ConstBinaryView(const void *, size_t count);
     explicit ConstBinaryView(const std::vector<uint8_t>&);
+
+    template<size_t SIZE>
+    explicit ConstBinaryView(const std::array<uint8_t, SIZE>&);
 
     bool contains(const Interval& i) const;
     using Base::data;
@@ -43,8 +46,9 @@ public:
     std::optional<uint8_t> read_u8(size_t offset) const;
     std::optional<uint16_t> read_u16be(size_t offset) const;
     std::optional<uint32_t> read_u32be(size_t offset) const;
+    std::optional<ConstBinaryView> subview(size_t offset) const;
     std::optional<ConstBinaryView> subview(size_t offset, size_t size) const;
-
+    std::optional<ConstBinaryView> subview(const Interval&) const;
 };
 
 
@@ -55,9 +59,13 @@ inline ConstBinaryView::ConstBinaryView(const std::vector<uint8_t>& v)
     : ConstBinaryView(v.data(), v.size())
 {}
 
+template<size_t SIZE>
+inline ConstBinaryView::ConstBinaryView(const std::array<uint8_t, SIZE>& v)
+    : ConstBinaryView(v.data(), v.size())
+{}
 
-inline ConstBinaryView::ConstBinaryView(const ByteT *buf, size_t count)
-    : Base(buf, count)
+inline ConstBinaryView::ConstBinaryView(const void *buf, size_t count)
+    : Base((ByteT *)buf, count)
 {}
 
 
@@ -106,6 +114,10 @@ inline bool ConstBinaryView::contains(const Interval& i) const {
     return i.offset + i.count <= size();
 }
 
+inline std::optional<ConstBinaryView> ConstBinaryView::subview(size_t offset) const {
+    return subview(offset, size() - offset);
+}
+
 inline std::optional<ConstBinaryView> ConstBinaryView::subview(size_t offset, size_t count) const {
     if (count > size() || offset > size() - count) {
         return std::nullopt;
@@ -113,5 +125,8 @@ inline std::optional<ConstBinaryView> ConstBinaryView::subview(size_t offset, si
     return assured_subview(offset, count);
 }
 
+inline std::optional<ConstBinaryView> ConstBinaryView::subview(const Interval& i) const {
+    return subview(i.offset, i.count);
+}
 
 }

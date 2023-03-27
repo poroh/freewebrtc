@@ -69,7 +69,7 @@ std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat
     const auto transaction_id = !is_rfc3489 ? vv.assured_subview(8, 12) : vv.assured_subview(4, 12);
 
     AttributeSet attrs;
-    std::optional<util::ConstBinaryView::Interval> integrity;
+    std::optional<util::ConstBinaryView::Interval> integrity_interval;
     size_t attr_offset = STUN_HEADER_SIZE;
     while (attr_offset < vv.size()) {
         // 0                   1                   2                   3
@@ -106,7 +106,7 @@ std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat
         // With the exception of the FINGERPRINT attribute, which
         // appears after MESSAGE-INTEGRITY, agents MUST ignore all
         // other attributes that follow MESSAGE-INTEGRITY.
-        if (!integrity.has_value() || type == attr_registry::FINGERPRINT) {
+        if (!integrity_interval.has_value() || type == attr_registry::FINGERPRINT) {
             auto maybe_attr = Attribute::parse(attr_view, attr_type, stat);
             if (!maybe_attr.has_value()) {
                 // statisitics is increased by Attribute::parse.
@@ -119,7 +119,7 @@ std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat
                 // including the header, up to and including the
                 // attribute preceding the MESSAGE-INTEGRITY
                 // attribute.
-                integrity = util::ConstBinaryView::Interval{0, attr_offset};
+                integrity_interval = util::ConstBinaryView::Interval{0, attr_offset};
             }
             if (const auto *fingerprint = attr.as<FingerprintAttribute>(); fingerprint != nullptr) {
                 // 15.5.  FINGERPRINT
@@ -159,9 +159,44 @@ std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat
             TransactionId(transaction_id)
          },
          std::move(attrs),
-         is_rfc3489
+         is_rfc3489,
+         integrity_interval
     };
 }
 
+ReturnValue<std::optional<bool>> Message::is_valid(const util::ConstBinaryView& data, const Password& password, crypto::SHA1Hash::Func h) const noexcept {
+    using MaybeBool = std::optional<bool>;
+    if (!integrity_interval.has_value()) {
+        return MaybeBool{std::nullopt};
+    }
+    const auto maybe_covered = data.subview(*integrity_interval);
+    if (!maybe_covered.has_value()) {
+        return MaybeBool{std::nullopt};
+    }
+    const auto* maybe_integrity = attribute_set.integrity();
+    if (maybe_integrity == nullptr) {
+        return MaybeBool{std::nullopt};
+    }
+    const auto& integrity = *maybe_integrity;
+    const auto& covered = *maybe_covered;
+    const auto without_4byte_header = covered.subview(4);
+    if (!without_4byte_header.has_value()) {
+        return MaybeBool{std::nullopt};
+    }
+    const size_t integrity_message_len = covered.size() + STUN_ATTR_HEADER_SIZE + crypto::SHA1Hash::size - STUN_HEADER_SIZE;
+    // Fake header for integrity checking:
+    std::array<uint8_t, 4> header =
+        {
+            data.data()[0],
+            data.data()[1],
+            uint8_t((integrity_message_len >> 8) & 0xFF),
+            uint8_t(integrity_message_len & 0xFF)
+        };
+    const auto digest = crypto::hmac::digest({util::ConstBinaryView(header), *without_4byte_header}, password.opad(), password.ipad(), h);
+    if (auto maybe_err = digest.error(); maybe_err.has_value()) {
+        return *maybe_err;
+    }
+    return MaybeBool{digest.value()->value == integrity.digest.value};
+}
 
 }

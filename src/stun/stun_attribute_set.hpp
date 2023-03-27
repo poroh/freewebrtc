@@ -12,16 +12,17 @@
 #include <unordered_map>
 
 #include "stun/stun_attribute.hpp"
+#include "stun/details/stun_attr_registry.hpp"
 
 namespace freewebrtc::stun {
 
 class AttributeSet {
 public:
     void emplace(Attribute&&);
+    const MessageIntegityAttribute* integrity() const noexcept;
 private:
     std::unordered_map<AttributeType, Attribute> m_map;
 };
-
 
 //
 // inlines
@@ -32,6 +33,5 @@ inline void AttributeSet::emplace(Attribute&& attr)  {
     }
     m_map.emplace(attr.type(), std::move(attr));
 }
-
 
 }

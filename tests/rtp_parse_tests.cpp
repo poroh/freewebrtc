@@ -1,3 +1,11 @@
+//
+// Copyright (c) 2023 Dmitry Poroh
+// All rights reserved.
+// Distributed under the terms of the MIT License. See the LICENSE file.
+//
+// RTP parsing tests
+//
+
 #include <gtest/gtest.h>
 
 #include "util/util_flat.hpp"

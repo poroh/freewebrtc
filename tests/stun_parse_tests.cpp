@@ -1,6 +1,15 @@
+//
+// Copyright (c) 2023 Dmitry Poroh
+// All rights reserved.
+// Distributed under the terms of the MIT License. See the LICENSE file.
+//
+// STUN parse tests
+//
+
 #include <gtest/gtest.h>
 
 #include "stun/stun_message.hpp"
+#include "crypto/openssl/openssl_hash.hpp"
 
 namespace freewebrtc::test {
 
@@ -15,7 +24,10 @@ TEST_F(STUNMessageParserTest, rfc5796_2_1_sample_request) {
     //
     // Software name:  "STUN test client" (without quotes)
     //
-    // Username:  "evtj:h6vY" (without quotes)
+    // Username:  "evtj:h6vY" (without quotes)/
+    //
+    // Password:  "VOkJxbRl1RmTxUk/WvJxBt" (without quotes)
+    //
     std::vector<uint8_t> request = {
           0x00, 0x01, 0x00, 0x58,  //    Request type and message length
           0x21, 0x12, 0xa4, 0x42,  //    Magic cookie
@@ -48,7 +60,11 @@ TEST_F(STUNMessageParserTest, rfc5796_2_1_sample_request) {
     stun::ParseStat stat;
     auto result = stun::Message::parse(util::ConstBinaryView(request), stat);
     ASSERT_TRUE(result.has_value());
-    
+    auto password = stun::Password::short_term(crypto::OpaqueString("VOkJxbRl1RmTxUk/WvJxBt"), crypto::openssl::sha1);
+    ASSERT_TRUE(password.value() != nullptr);
+    auto is_valid_result = result->is_valid(util::ConstBinaryView(request), *password.value(), crypto::openssl::sha1);
+    ASSERT_TRUE(!is_valid_result.error().has_value());
+    ASSERT_TRUE(is_valid_result.value() && is_valid_result.value()->has_value() && **is_valid_result.value());
 }
 
 // ================================================================================
