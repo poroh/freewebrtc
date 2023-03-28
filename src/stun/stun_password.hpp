@@ -18,7 +18,7 @@
 #include "util/util_return_value.hpp"
 #include "crypto/crypto_hash.hpp"
 #include "crypto/crypto_hmac.hpp"
-#include "crypto/crypto_opaque_string.hpp"
+#include "precis/precis_opaque_string.hpp"
 
 namespace freewebrtc::stun {
 
@@ -31,7 +31,7 @@ public:
     const crypto::hmac::IPadKey& ipad() const noexcept;
     const crypto::hmac::OPadKey& opad() const noexcept;
 
-    using OpaqueString = crypto::OpaqueString;
+    using OpaqueString = precis::OpaqueString;
 
     static ReturnValue<Password> short_term(const OpaqueString& password, crypto::SHA1Hash::Func);
     // TODO: Not implemented yet:

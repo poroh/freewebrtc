@@ -18,7 +18,7 @@
 #include "stun/stun_attribute_type.hpp"
 #include "crypto/crypto_hmac.hpp"
 #include "crypto/crypto_hash.hpp"
-#include "crypto/crypto_opaque_string.hpp"
+#include "precis/precis_opaque_string.hpp"
 
 namespace freewebrtc::stun {
 
@@ -45,7 +45,7 @@ struct XorMappedAddressAttribute : public AddressAttribute {
 };
 
 struct UsernameAttribute {
-    crypto::OpaqueString value;
+    precis::OpaqueString value;
     static std::optional<UsernameAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 

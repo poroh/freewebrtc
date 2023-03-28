@@ -57,7 +57,7 @@ std::optional<Attribute> Attribute::parse(const util::ConstBinaryView& vv, Attri
 }
 
 std::optional<UsernameAttribute> UsernameAttribute::parse(const util::ConstBinaryView& vv, ParseStat&) {
-    return UsernameAttribute{crypto::OpaqueString{std::string(vv.begin(), vv.end())}};
+    return UsernameAttribute{precis::OpaqueString{std::string(vv.begin(), vv.end())}};
 }
 
 std::optional<MessageIntegityAttribute> MessageIntegityAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
