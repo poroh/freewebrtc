@@ -20,10 +20,17 @@ public:
         SUCCESS_RESPONSE,
         ERROR_RESPONSE
     };
-    static Class from_msg_type(uint16_t);
+
+    static Class from_msg_type(uint16_t) noexcept;
+
+    static Class request() noexcept;
+    static Class indication() noexcept;
+    static Class success_response() noexcept;
+    static Class error_response() noexcept;
 
     Value value() const noexcept;
 
+    bool operator==(const Class&) const = default;
 private:
     explicit Class(Value);
     Value m_value;
@@ -40,7 +47,7 @@ inline Class::Value Class::value() const noexcept {
     return m_value;
 }
 
-inline Class Class::from_msg_type(uint16_t v) {
+inline Class Class::from_msg_type(uint16_t v) noexcept {
     //   0                 1
     //   2  3  4 5 6 7 8 9 0 1 2 3 4 5
     //  +--+--+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -49,12 +56,28 @@ inline Class Class::from_msg_type(uint16_t v) {
     //  +--+--+-+-+-+-+-+-+-+-+-+-+-+-+
     const auto c0 = (v >> 4) & 1;
     const auto c1 = (v >> 8) & 1;
-    switch (c0 | c1) {
+    switch (c0 | (c1 << 1)) {
         case 0: return Class(REQUEST);
         case 1: return Class(INDICATION);
         case 2: return Class(SUCCESS_RESPONSE);
         case 3: return Class(ERROR_RESPONSE);
     }
+    return Class(ERROR_RESPONSE);
+}
+
+inline Class Class::request() noexcept {
+    return Class(REQUEST);
+}
+
+inline Class Class::indication() noexcept  {
+    return Class(INDICATION);
+}
+
+inline Class Class::success_response() noexcept {
+    return Class(SUCCESS_RESPONSE);
+}
+
+inline Class Class::error_response() noexcept {
     return Class(ERROR_RESPONSE);
 }
 

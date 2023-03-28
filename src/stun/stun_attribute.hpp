@@ -31,22 +31,26 @@ struct UnknownAttribute {
     std::vector<uint8_t> data;
 };
 
-struct AddressAttribute {
-    net::ip::Address address;
+struct MappedAddressAttribute {
+    net::ip::Address addr;
     net::Port port;
-};
-
-struct MappedAddressAttribute : public AddressAttribute {
     static std::optional<MappedAddressAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
-struct XorMappedAddressAttribute : public AddressAttribute {
+struct XorMappedAddressAttribute {
+    net::ip::Address addr;
+    net::Port port;
     static std::optional<XorMappedAddressAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct UsernameAttribute {
     precis::OpaqueString name;
     static std::optional<UsernameAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+};
+
+struct SoftwareAttribute {
+    std::string name;
+    static std::optional<SoftwareAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct MessageIntegityAttribute {
@@ -67,6 +71,7 @@ public:
             XorMappedAddressAttribute,
             MappedAddressAttribute,
             UsernameAttribute,
+            SoftwareAttribute,
             MessageIntegityAttribute,
             FingerprintAttribute,
             UnknownAttribute

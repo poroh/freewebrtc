@@ -26,5 +26,11 @@ static constexpr uint16_t SOFTWARE         = 0x8022;
 static constexpr uint16_t ALTERNATE_SERVER = 0x8023;
 static constexpr uint16_t FINGERPRINT      = 0x8028;
 
+
+// RFC8489 14.1.  MAPPED-ADDRESS
+// Address family
+static constexpr uint8_t FAMILY_IPV4 = 0x01;
+static constexpr uint8_t FAMILY_IPV6 = 0x02;
+
 }
 

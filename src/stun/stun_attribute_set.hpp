@@ -23,6 +23,7 @@ public:
     using MaybeAttr = std::optional<std::reference_wrapper<const Attr>>;
     MaybeAttr<MessageIntegityAttribute> integrity() const noexcept;
     MaybeAttr<UsernameAttribute> username() const noexcept;
+    MaybeAttr<SoftwareAttribute> software() const noexcept;
 private:
     std::unordered_map<AttributeType, Attribute> m_map;
 };

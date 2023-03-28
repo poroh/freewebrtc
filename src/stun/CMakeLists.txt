@@ -9,6 +9,7 @@ set(SOURCES
     stun_attribute_set.cpp
     stun_message.cpp
     stun_password.cpp
+    stun_method.cpp
     details/stun_fingerprint.cpp
 )
 file(GLOB HEADERS "*.hpp")

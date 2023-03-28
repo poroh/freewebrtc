@@ -14,9 +14,11 @@ namespace freewebrtc::stun {
 
 class Method {
 public:
-    static Method from_msg_type(uint16_t);
+    static Method from_msg_type(uint16_t) noexcept;
+    static Method binding() noexcept;
 
     unsigned value() const;
+    bool operator==(const Method&) const noexcept = default;
 private:
     explicit Method(unsigned);
     unsigned m_value;
@@ -29,7 +31,7 @@ inline Method::Method(unsigned v)
     : m_value(v)
 {}
 
-inline Method Method::from_msg_type(uint16_t v) {
+inline Method Method::from_msg_type(uint16_t v) noexcept {
     //   0                 1
     //   2  3  4 5 6 7 8 9 0 1 2 3 4 5
     //  +--+--+-+-+-+-+-+-+-+-+-+-+-+-+

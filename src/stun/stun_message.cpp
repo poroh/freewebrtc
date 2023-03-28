@@ -9,6 +9,7 @@
 #include "stun/stun_message.hpp"
 #include "stun/details/stun_attr_registry.hpp"
 #include "stun/details/stun_fingerprint.hpp"
+#include "stun/details/stun_constants.hpp"
 
 namespace freewebrtc::stun {
 
@@ -17,9 +18,6 @@ namespace freewebrtc::stun {
 static constexpr size_t STUN_HEADER_SIZE = 20;
 // Size of attribute header
 static constexpr size_t STUN_ATTR_HEADER_SIZE = 4;
-// The magic cookie field MUST contain the fixed value 0x2112A442 in
-// network byte order.
-static constexpr uint32_t MAGIC_COOKIE = 0x2112A442;
 
 std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
     if (vv.size() < STUN_HEADER_SIZE) {
@@ -59,8 +57,8 @@ std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat
     }
 
     const auto cls = Class::from_msg_type(msg_type);
-    const IsRFC3489 is_rfc3489{cls.value() == Class::REQUEST && magic_cookie != MAGIC_COOKIE};
-    if (!is_rfc3489 && magic_cookie != MAGIC_COOKIE) {
+    const IsRFC3489 is_rfc3489{cls.value() == Class::REQUEST && magic_cookie != details::MAGIC_COOKIE};
+    if (!is_rfc3489 && magic_cookie != details::MAGIC_COOKIE) {
         stat.error.inc();
         stat.magic_cookie_error.inc();
         return std::nullopt;

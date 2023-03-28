@@ -59,7 +59,11 @@ TEST_F(STUNMessageParserTest, rfc5796_2_1_sample_request) {
     };
     stun::ParseStat stat;
     auto result = stun::Message::parse(util::ConstBinaryView(request), stat);
+    EXPECT_EQ(stat.success.count(), 1);
     ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->is_rfc3489);
+    EXPECT_EQ(result->header.cls, stun::Class::request());
+    EXPECT_EQ(result->header.method, stun::Method::binding());
     auto password = stun::Password::short_term(precis::OpaqueString("VOkJxbRl1RmTxUk/WvJxBt"), crypto::openssl::sha1);
     ASSERT_TRUE(password.value().has_value());
     auto is_valid_result = result->is_valid(util::ConstBinaryView(request), *password.value(), crypto::openssl::sha1);
@@ -68,7 +72,61 @@ TEST_F(STUNMessageParserTest, rfc5796_2_1_sample_request) {
     auto username = result->attribute_set.username();
     ASSERT_TRUE(username.has_value());
     EXPECT_EQ(username->get().name.value, "evtj:h6vY");
+    auto software = result->attribute_set.software();
+    ASSERT_TRUE(software.has_value());
+    EXPECT_EQ(software->get().name, "STUN test client");
 }
+
+TEST_F(STUNMessageParserTest, rfc5796_2_2_sample_response) {
+    // 2.2.  Sample IPv4 Response
+    //
+    // Password:  "VOkJxbRl1RmTxUk/WvJxBt" (without quotes)
+    //
+    // Software name:  "test vector" (without quotes)
+    //
+    // Mapped address:  192.0.2.1 port 32853
+    std::vector<uint8_t> response = {
+        0x01, 0x01, 0x00, 0x3c,  //    Response type and message length
+        0x21, 0x12, 0xa4, 0x42,  //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01,  // }
+        0xbc, 0x34, 0xd6, 0x86,  // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae,  // }
+        0x80, 0x22, 0x00, 0x0b,  //    SOFTWARE attribute header
+        0x74, 0x65, 0x73, 0x74,  // }
+        0x20, 0x76, 0x65, 0x63,  // }  UTF-8 server name
+        0x74, 0x6f, 0x72, 0x20,  // }
+        0x00, 0x20, 0x00, 0x08,  //    XOR-MAPPED-ADDRESS attribute header
+        0x00, 0x01, 0xa1, 0x47,  //    Address family (IPv4) and xor'd mapped port number
+        0xe1, 0x12, 0xa6, 0x43,  //    Xor'd mapped IPv4 address
+        0x00, 0x08, 0x00, 0x14,  //    MESSAGE-INTEGRITY attribute header
+        0x2b, 0x91, 0xf5, 0x99,  // }
+        0xfd, 0x9e, 0x90, 0xc3,  // }
+        0x8c, 0x74, 0x89, 0xf9,  // }  HMAC-SHA1 fingerprint
+        0x2a, 0xf9, 0xba, 0x53,  // }
+        0xf0, 0x6b, 0xe7, 0xd7,  // }
+        0x80, 0x28, 0x00, 0x04,  //    FINGERPRINT attribute header
+        0xc0, 0x7d, 0x4c, 0x96,  //    CRC32 fingerprint
+    };
+
+    stun::ParseStat stat;
+    auto result = stun::Message::parse(util::ConstBinaryView(response), stat);
+    EXPECT_EQ(stat.success.count(), 1);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->is_rfc3489);
+    EXPECT_EQ(result->header.cls, stun::Class::success_response());
+    EXPECT_EQ(result->header.method, stun::Method::binding());
+
+    auto password = stun::Password::short_term(precis::OpaqueString("VOkJxbRl1RmTxUk/WvJxBt"), crypto::openssl::sha1);
+    ASSERT_TRUE(password.value().has_value());
+    auto is_valid_result = result->is_valid(util::ConstBinaryView(response), *password.value(), crypto::openssl::sha1);
+    ASSERT_TRUE(!is_valid_result.error().has_value());
+    EXPECT_TRUE(is_valid_result.value().has_value() && is_valid_result.value()->get().has_value() && *is_valid_result.value()->get());
+
+    auto software = result->attribute_set.software();
+    ASSERT_TRUE(software.has_value());
+    EXPECT_EQ(software->get().name, "test vector");
+}
+
 
 // ================================================================================
 // Negative cases

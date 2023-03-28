@@ -24,4 +24,11 @@ AttributeSet::MaybeAttr<UsernameAttribute> AttributeSet::username() const noexce
     return std::nullopt;
 }
 
+AttributeSet::MaybeAttr<SoftwareAttribute> AttributeSet::software() const noexcept {
+    if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::SOFTWARE)); it != m_map.end()) {
+        return *it->second.as<SoftwareAttribute>();
+    }
+    return std::nullopt;
+}
+
 }

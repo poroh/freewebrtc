@@ -9,11 +9,10 @@
 
 #pragma once
 
+#include "net/ip/details/ip_address_tpl.hpp"
+
 namespace freewebrtc::net::ip {
 
-class AddressV6 {
-public:
-private:
-};
+using AddressV6 = details::Address<16>;
 
 }

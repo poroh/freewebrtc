@@ -1,18 +1,17 @@
-
 //
 // Copyright (c) 2023 Dmitry Poroh
 // All rights reserved.
 // Distributed under the terms of the MIT License. See the LICENSE file.
 //
-// IP v4 address
+// STUN Attributes Registry
 //
 
 #pragma once
 
-#include "net/ip/details/ip_address_tpl.hpp"
+#include <cstdint>
 
-namespace freewebrtc::net::ip {
+namespace freewebrtc::stun::method_registry {
 
-using AddressV4 = details::Address<4>;
+static constexpr uint16_t BINDING = 0x001;
 
 }
