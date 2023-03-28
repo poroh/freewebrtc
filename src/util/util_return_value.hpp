@@ -26,9 +26,12 @@ public:
     ReturnValue(const ReturnValue&) = default;
     ReturnValue(ReturnValue&&) = default;
 
-    std::optional<Error> error() const noexcept;
-    const Value *value() const noexcept;
-    Value *value() noexcept;
+    using MaybeError = std::optional<Error>;
+    MaybeError error() const noexcept;
+    using MaybeValue = std::optional<std::reference_wrapper<Value>>;
+    using MaybeConstValue = std::optional<std::reference_wrapper<const Value>>;
+    MaybeConstValue value() const noexcept;
+    MaybeValue value() noexcept;
 
 private:
     std::variant<Value, Error> m_result;
@@ -60,13 +63,17 @@ ReturnValue<V>::error() const noexcept {
 }
 
 template<typename V>
-inline const V *ReturnValue<V>::value() const noexcept {
-    return std::get_if<V>(&m_result);
+inline typename ReturnValue<V>::MaybeConstValue
+ReturnValue<V>::value() const noexcept {
+    auto v = std::get_if<V>(&m_result);
+    return v != nullptr ? MaybeConstValue{*v} : std::nullopt;
 }
 
 template<typename V>
-inline V *ReturnValue<V>::value() noexcept {
-    return std::get_if<V>(&m_result);
+inline typename ReturnValue<V>::MaybeValue
+ReturnValue<V>::value() noexcept {
+    auto v = std::get_if<V>(&m_result);
+    return v != nullptr ? MaybeValue{*v} : std::nullopt;
 }
 
 }

@@ -61,10 +61,10 @@ TEST_F(STUNMessageParserTest, rfc5796_2_1_sample_request) {
     auto result = stun::Message::parse(util::ConstBinaryView(request), stat);
     ASSERT_TRUE(result.has_value());
     auto password = stun::Password::short_term(precis::OpaqueString("VOkJxbRl1RmTxUk/WvJxBt"), crypto::openssl::sha1);
-    ASSERT_TRUE(password.value() != nullptr);
+    ASSERT_TRUE(password.value().has_value());
     auto is_valid_result = result->is_valid(util::ConstBinaryView(request), *password.value(), crypto::openssl::sha1);
     ASSERT_TRUE(!is_valid_result.error().has_value());
-    EXPECT_TRUE(is_valid_result.value() && is_valid_result.value()->has_value() && **is_valid_result.value());
+    EXPECT_TRUE(is_valid_result.value().has_value() && is_valid_result.value()->get().has_value() && *is_valid_result.value()->get());
     auto username = result->attribute_set.username();
     ASSERT_TRUE(username.has_value());
     EXPECT_EQ(username->get().name.value, "evtj:h6vY");

@@ -72,7 +72,7 @@ inline ReturnValue<PadKey<xorv>> PadKey<xorv>::from_key(const util::ConstBinaryV
         if (auto maybe_err = hash.error(); maybe_err.has_value()) {
             return *maybe_err;
         }
-        v = hash.value()->view();
+        v = hash.value()->get().view();
     }
     Data data = {0};
     std::copy(v.begin(), v.end(), data.begin());
@@ -92,7 +92,7 @@ HMACReturnValue<HashFunc> digest(const std::vector<util::ConstBinaryView>& data,
     if (inner.error().has_value()) {
         return *inner.error();
     }
-    auto outer = h({opad.view(), inner.value()->view()});
+    auto outer = h({opad.view(), inner.value()->get().view()});
     if (outer.error().has_value()) {
         return *outer.error();
     }

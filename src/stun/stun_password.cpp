@@ -17,7 +17,7 @@ ReturnValue<Password> Password::short_term(const OpaqueString& password, crypto:
     if (ipad.error().has_value() || opad.error().has_value()) {
         return ipad.error().value_or(*opad.error());
     }
-    return Password(std::move(*ipad.value()), std::move(*opad.value()));
+    return Password(std::move(ipad.value()->get()), std::move(opad.value()->get()));
 }
 
 Password::Password(crypto::hmac::IPadKey&& ipad, crypto::hmac::OPadKey&& opad)
