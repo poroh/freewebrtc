@@ -19,8 +19,10 @@ namespace freewebrtc::stun {
 class AttributeSet {
 public:
     void emplace(Attribute&&);
-    const MessageIntegityAttribute* integrity() const noexcept;
-    const UsernameAttribute* username() const noexcept;
+    template<typename Attr>
+    using MaybeAttr = std::optional<std::reference_wrapper<const Attr>>;
+    MaybeAttr<MessageIntegityAttribute> integrity() const noexcept;
+    MaybeAttr<UsernameAttribute> username() const noexcept;
 private:
     std::unordered_map<AttributeType, Attribute> m_map;
 };

@@ -66,8 +66,8 @@ TEST_F(STUNMessageParserTest, rfc5796_2_1_sample_request) {
     ASSERT_TRUE(!is_valid_result.error().has_value());
     EXPECT_TRUE(is_valid_result.value() && is_valid_result.value()->has_value() && **is_valid_result.value());
     auto username = result->attribute_set.username();
-    ASSERT_TRUE(username != nullptr);
-    EXPECT_EQ(username->value.value, "evtj:h6vY");
+    ASSERT_TRUE(username.has_value());
+    EXPECT_EQ(username->get().name.value, "evtj:h6vY");
 }
 
 // ================================================================================

@@ -173,8 +173,8 @@ ReturnValue<std::optional<bool>> Message::is_valid(const util::ConstBinaryView& 
     if (!maybe_covered.has_value()) {
         return MaybeBool{std::nullopt};
     }
-    const auto* maybe_integrity = attribute_set.integrity();
-    if (maybe_integrity == nullptr) {
+    const auto maybe_integrity = attribute_set.integrity();
+    if (!maybe_integrity.has_value()) {
         return MaybeBool{std::nullopt};
     }
     const auto& integrity = *maybe_integrity;
@@ -196,7 +196,7 @@ ReturnValue<std::optional<bool>> Message::is_valid(const util::ConstBinaryView& 
     if (auto maybe_err = digest.error(); maybe_err.has_value()) {
         return *maybe_err;
     }
-    return MaybeBool{digest.value()->value == integrity.digest.value};
+    return MaybeBool{digest.value()->value == integrity.get().digest.value};
 }
 
 }

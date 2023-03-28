@@ -45,7 +45,7 @@ struct XorMappedAddressAttribute : public AddressAttribute {
 };
 
 struct UsernameAttribute {
-    precis::OpaqueString value;
+    precis::OpaqueString name;
     static std::optional<UsernameAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 

@@ -10,18 +10,18 @@
 
 namespace freewebrtc::stun {
 
-const MessageIntegityAttribute* AttributeSet::integrity() const noexcept {
+AttributeSet::MaybeAttr<MessageIntegityAttribute> AttributeSet::integrity() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::MESSAGE_INTEGRITY)); it != m_map.end()) {
-        return it->second.as<MessageIntegityAttribute>();
+        return *it->second.as<MessageIntegityAttribute>();
     }
-    return nullptr;
+    return std::nullopt;
 }
 
-const UsernameAttribute* AttributeSet::username() const noexcept {
+AttributeSet::MaybeAttr<UsernameAttribute> AttributeSet::username() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::USERNAME)); it != m_map.end()) {
-        return it->second.as<UsernameAttribute>();
+        return *it->second.as<UsernameAttribute>();
     }
-    return nullptr;
+    return std::nullopt;
 }
 
 }
