@@ -14,77 +14,80 @@
 
 namespace freewebrtc::crypto::openssl {
 
-
 class MessageDigest {
 public:
-    explicit MessageDigest(const EVP_MD *md)
-        : m_ctx(EVP_MD_CTX_new(), &EVP_MD_CTX_free)
-        , m_md(md)
-    {}
-    std::optional<std::error_code> init() {
-        if (m_ctx == nullptr) {
-            return std::make_error_code(std::errc::not_enough_memory);
-        }
-        ERR_clear_error();
-        if (EVP_DigestInit_ex(m_ctx.get(), m_md, NULL) != 1) {
-            return make_error_code(ERR_get_error());
-        }
-        return std::nullopt;
-    }
-    std::optional<std::error_code> update(const util::ConstBinaryView& view) {
-        ERR_clear_error();
-        if (EVP_DigestUpdate(m_ctx.get(), view.data(), view.size()) != 1) {
-            return make_error_code(ERR_get_error());
-        }
-        return std::nullopt;
-    }
-    std::optional<std::error_code> finalize(uint8_t *result) {
-        ERR_clear_error();
-        if (EVP_DigestFinal_ex(m_ctx.get(), result, NULL) != 1) {
-            return make_error_code(ERR_get_error());
-        }
-        return std::nullopt;
-    }
+    explicit MessageDigest(const EVP_MD *md);
+
+    template<typename Hash>
+    typename Hash::Result calc(const typename Hash::Input& input);
+
 private:
+    std::optional<std::error_code> init();
+    std::optional<std::error_code> update(const util::ConstBinaryView& view);
+    std::optional<std::error_code> finalize(uint8_t *result);
+
     using EVPMDContextPtr = std::unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)>;
     EVPMDContextPtr m_ctx;
     const EVP_MD * const m_md;
 };
 
+
 crypto::SHA1Hash::Result sha1(const crypto::SHA1Hash::Input& input) {
-    MessageDigest md(EVP_sha1());
-
-    if (auto maybe_err = md.init(); maybe_err.has_value()) {
-        return *maybe_err;
-    }
-
-    for (const auto& chunk: input) {
-        md.update(chunk);
-    }
-
-    SHA1Hash::Value v;
-    if (auto maybe_err = md.finalize(v.data()); maybe_err.has_value()) {
-        return *maybe_err;
-    }
-    return crypto::SHA1Hash{std::move(v)};
+    return MessageDigest(EVP_sha1()).calc<crypto::SHA1Hash>(input);
 }
 
 crypto::MD5Hash::Result md5(const crypto::MD5Hash::Input& input) {
-    MessageDigest md(EVP_md5());
+    return MessageDigest(EVP_md5()).calc<crypto::MD5Hash>(input);
+}
 
-    if (auto maybe_err = md.init(); maybe_err.has_value()) {
+// MessageDigest implementation
+MessageDigest::MessageDigest(const EVP_MD *md)
+    : m_ctx(EVP_MD_CTX_new(), &EVP_MD_CTX_free)
+    , m_md(md)
+{}
+
+template<typename Hash>
+typename Hash::Result MessageDigest::calc(const typename Hash::Input& input) {
+    if (auto maybe_err = init(); maybe_err.has_value()) {
         return *maybe_err;
     }
 
     for (const auto& chunk: input) {
-        md.update(chunk);
+        update(chunk);
     }
 
-    MD5Hash::Value v;
-    if (auto maybe_err = md.finalize(v.data()); maybe_err.has_value()) {
+    typename Hash::Value v;
+    if (auto maybe_err = finalize(v.data()); maybe_err.has_value()) {
         return *maybe_err;
     }
-    return crypto::MD5Hash{std::move(v)};
+    return Hash{std::move(v)};
+}
+
+std::optional<std::error_code> MessageDigest::init() {
+    if (m_ctx == nullptr) {
+        return std::make_error_code(std::errc::not_enough_memory);
+    }
+    ERR_clear_error();
+    if (EVP_DigestInit_ex(m_ctx.get(), m_md, NULL) != 1) {
+        return make_error_code(ERR_get_error());
+    }
+    return std::nullopt;
+}
+
+std::optional<std::error_code> MessageDigest::update(const util::ConstBinaryView& view) {
+    ERR_clear_error();
+    if (EVP_DigestUpdate(m_ctx.get(), view.data(), view.size()) != 1) {
+        return make_error_code(ERR_get_error());
+    }
+    return std::nullopt;
+}
+
+std::optional<std::error_code> MessageDigest::finalize(uint8_t *result) {
+    ERR_clear_error();
+    if (EVP_DigestFinal_ex(m_ctx.get(), result, NULL) != 1) {
+        return make_error_code(ERR_get_error());
+    }
+    return std::nullopt;
 }
 
 }
