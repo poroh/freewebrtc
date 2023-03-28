@@ -20,6 +20,7 @@ class AttributeSet {
 public:
     void emplace(Attribute&&);
     const MessageIntegityAttribute* integrity() const noexcept;
+    const UsernameAttribute* username() const noexcept;
 private:
     std::unordered_map<AttributeType, Attribute> m_map;
 };

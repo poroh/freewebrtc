@@ -17,4 +17,11 @@ const MessageIntegityAttribute* AttributeSet::integrity() const noexcept {
     return nullptr;
 }
 
+const UsernameAttribute* AttributeSet::username() const noexcept {
+    if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::USERNAME)); it != m_map.end()) {
+        return it->second.as<UsernameAttribute>();
+    }
+    return nullptr;
+}
+
 }

@@ -36,6 +36,11 @@ std::optional<Attribute> Attribute::parse(const util::ConstBinaryView& vv, Attri
         //         return Attribute(type, *maybe_attr);
         //     }
         //     return std::nullopt;
+        case attr_registry::USERNAME:
+            if (auto maybe_attr = UsernameAttribute::parse(vv, stat); maybe_attr.has_value()) {
+                return Attribute(type, *maybe_attr);
+            }
+            return std::nullopt;
         case attr_registry::MESSAGE_INTEGRITY:
             if (auto maybe_attr = MessageIntegityAttribute::parse(vv, stat); maybe_attr.has_value()) {
                 return Attribute(type, *maybe_attr);
@@ -49,6 +54,10 @@ std::optional<Attribute> Attribute::parse(const util::ConstBinaryView& vv, Attri
         default:
             return Attribute(type, UnknownAttribute(vv));
     }
+}
+
+std::optional<UsernameAttribute> UsernameAttribute::parse(const util::ConstBinaryView& vv, ParseStat&) {
+    return UsernameAttribute{crypto::OpaqueString{std::string(vv.begin(), vv.end())}};
 }
 
 std::optional<MessageIntegityAttribute> MessageIntegityAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
