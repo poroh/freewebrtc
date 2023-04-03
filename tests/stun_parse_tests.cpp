@@ -190,8 +190,80 @@ TEST_F(STUNMessageParserTest, rfc5796_2_3_sample_ipv6_response) {
               net::ip::Address::from_string("2001:db8:1234:5678:11:2233:4455:6677"));
 }
 
+TEST_F(STUNMessageParserTest, message_without_attributes) {
+    const std::vector<uint8_t> tid{0xb7, 0xe7, 0xa7, 0x01,
+            0xbc, 0x34, 0xd6, 0x86,
+            0xfa, 0x87, 0xdf, 0xae
+    };
+    std::vector<std::vector<uint8_t>>
+        response = {
+           {
+              0x01, 0x01, 0x00, 0x00, //    Response type and message length
+              0x21, 0x12, 0xa4, 0x42, //    Magic cookie
+           },
+           tid
+    };
+    stun::ParseStat stat;
+    const auto result = stun::Message::parse(util::ConstBinaryView(util::flat_vec(response)), stat);
+    EXPECT_EQ(stat.success.count(), 1);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->is_rfc3489);
+    EXPECT_EQ(result->header.cls, stun::Class::success_response());
+    EXPECT_EQ(result->header.method, stun::Method::binding());
+    EXPECT_EQ(result->header.transaction_id.view(),
+              util::ConstBinaryView(tid));
+}
+
 // ================================================================================
 // Negative cases
+
+TEST_F(STUNMessageParserTest, very_short_messages) {
+
+    std::vector<std::vector<uint8_t>> cases = {
+        {},
+        {0x01, 0x01, 0x00, 0x04},
+        {
+            0x01, 0x01, 0x00, 0x00, //    Response type and message length
+            0x21, 0x12, 0xa4, 0x42, //    Magic cookie
+            0xb7, 0xe7, 0xa7, 0x01, // }
+            0xbc, 0x34, 0xd6, 0x86, // }  Transaction ID
+            0xfa, 0x87, 0xdf, // }
+        }
+    };
+    stun::ParseStat stat;
+    EXPECT_FALSE(stun::Message::parse(util::ConstBinaryView(cases[0]), stat).has_value());
+    EXPECT_FALSE(stun::Message::parse(util::ConstBinaryView(cases[1]), stat).has_value());
+    EXPECT_FALSE(stun::Message::parse(util::ConstBinaryView(cases[2]), stat).has_value());
+    EXPECT_EQ(stat.error.count(), cases.size());
+    EXPECT_EQ(stat.invalid_size.count(), 3);
+}
+
+TEST_F(STUNMessageParserTest, invalid_message_size) {
+
+    std::vector<std::vector<uint8_t>> cases = {
+        {
+            0x01, 0x01, 0x00, 0x01, //    Response type and message length
+            0x21, 0x12, 0xa4, 0x42, //    Magic cookie
+            0xb7, 0xe7, 0xa7, 0x01, // }
+            0xbc, 0x34, 0xd6, 0x86, // }  Transaction ID
+            0xfa, 0x87, 0xdf, 0xae// }
+        },
+        {
+            0x01, 0x01, 0x00, 0x04, //    Response type and message length
+            0x21, 0x12, 0xa4, 0x42, //    Magic cookie
+            0xb7, 0xe7, 0xa7, 0x01, // }
+            0xbc, 0x34, 0xd6, 0x86, // }  Transaction ID
+            0xfa, 0x87, 0xdf, 0xae// }
+        }
+    };
+    stun::ParseStat stat;
+    EXPECT_FALSE(stun::Message::parse(util::ConstBinaryView(cases[0]), stat).has_value());
+    EXPECT_FALSE(stun::Message::parse(util::ConstBinaryView(cases[1]), stat).has_value());
+    EXPECT_EQ(stat.error.count(), cases.size());
+    EXPECT_EQ(stat.not_padded.count(), 1);
+    EXPECT_EQ(stat.message_length_error.count(), 1);
+}
+
 
 }
 

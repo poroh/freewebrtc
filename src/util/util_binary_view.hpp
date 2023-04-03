@@ -49,6 +49,8 @@ public:
     std::optional<ConstBinaryView> subview(size_t offset) const;
     std::optional<ConstBinaryView> subview(size_t offset, size_t size) const;
     std::optional<ConstBinaryView> subview(const Interval&) const;
+
+    bool operator==(const ConstBinaryView&) const noexcept;
 };
 
 
@@ -128,5 +130,10 @@ inline std::optional<ConstBinaryView> ConstBinaryView::subview(size_t offset, si
 inline std::optional<ConstBinaryView> ConstBinaryView::subview(const Interval& i) const {
     return subview(i.offset, i.count);
 }
+
+inline bool ConstBinaryView::operator==(const ConstBinaryView& other) const noexcept {
+    return static_cast<const Base&>(*this) == static_cast<const Base&>(other);
+}
+
 
 }
