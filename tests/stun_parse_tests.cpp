@@ -133,6 +133,62 @@ TEST_F(STUNMessageParserTest, rfc5796_2_2_sample_response) {
               net::ip::Address::from_string("192.0.2.1"));
 }
 
+TEST_F(STUNMessageParserTest, rfc5796_2_3_sample_ipv6_response) {
+    // This response uses the following parameter:
+    //
+    // Password:  "VOkJxbRl1RmTxUk/WvJxBt" (without quotes)
+    //
+    // Software name:  "test vector" (without quotes)
+    //
+    // Mapped address:  2001:db8:1234:5678:11:2233:4455:6677 port 32853
+    std::vector<uint8_t> response = {
+        0x01, 0x01, 0x00, 0x48, //    Response type and message length
+        0x21, 0x12, 0xa4, 0x42, //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01, // }
+        0xbc, 0x34, 0xd6, 0x86, // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae, // }
+        0x80, 0x22, 0x00, 0x0b, //    SOFTWARE attribute header
+        0x74, 0x65, 0x73, 0x74, // }
+        0x20, 0x76, 0x65, 0x63, // }  UTF-8 server name
+        0x74, 0x6f, 0x72, 0x20, // }
+        0x00, 0x20, 0x00, 0x14, //    XOR-MAPPED-ADDRESS attribute header
+        0x00, 0x02, 0xa1, 0x47, //    Address family (IPv6) and xor'd mapped port number
+        0x01, 0x13, 0xa9, 0xfa, // }
+        0xa5, 0xd3, 0xf1, 0x79, // }  Xor'd mapped IPv6 address
+        0xbc, 0x25, 0xf4, 0xb5, // }
+        0xbe, 0xd2, 0xb9, 0xd9, // }
+        0x00, 0x08, 0x00, 0x14, //    MESSAGE-INTEGRITY attribute header
+        0xa3, 0x82, 0x95, 0x4e, // }
+        0x4b, 0xe6, 0x7b, 0xf1, // }
+        0x17, 0x84, 0xc9, 0x7c, // }  HMAC-SHA1 fingerprint
+        0x82, 0x92, 0xc2, 0x75, // }
+        0xbf, 0xe3, 0xed, 0x41, // }
+        0x80, 0x28, 0x00, 0x04, //    FINGERPRINT attribute header
+        0xc8, 0xfb, 0x0b, 0x4c  //    CRC32 fingerprint
+    };
+
+    stun::ParseStat stat;
+    auto result = stun::Message::parse(util::ConstBinaryView(response), stat);
+    EXPECT_EQ(stat.success.count(), 1);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->is_rfc3489);
+
+    auto password = stun::Password::short_term(precis::OpaqueString("VOkJxbRl1RmTxUk/WvJxBt"), crypto::openssl::sha1);
+    ASSERT_TRUE(password.value().has_value());
+    auto is_valid_result = result->is_valid(util::ConstBinaryView(response), *password.value(), crypto::openssl::sha1);
+    ASSERT_TRUE(!is_valid_result.error().has_value());
+    EXPECT_TRUE(is_valid_result.value().has_value() && is_valid_result.value()->get().has_value() && *is_valid_result.value()->get());
+
+    auto software = result->attribute_set.software();
+    ASSERT_TRUE(software.has_value());
+    EXPECT_EQ(software->get(), "test vector");
+
+    auto xor_mapped = result->attribute_set.xor_mapped();
+    ASSERT_TRUE(xor_mapped.has_value());
+    EXPECT_EQ(xor_mapped->get().port.value(), 32853);
+    EXPECT_EQ(xor_mapped->get().addr.to_address(result->header.transaction_id),
+              net::ip::Address::from_string("2001:db8:1234:5678:11:2233:4455:6677"));
+}
 
 // ================================================================================
 // Negative cases
