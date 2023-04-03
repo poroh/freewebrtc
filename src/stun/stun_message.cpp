@@ -194,7 +194,7 @@ ReturnValue<std::optional<bool>> Message::is_valid(const util::ConstBinaryView& 
     if (auto maybe_err = digest.error(); maybe_err.has_value()) {
         return *maybe_err;
     }
-    return MaybeBool{digest.value()->get().value == integrity.get().digest.value};
+    return MaybeBool{digest.value()->get().value == integrity.get().value};
 }
 
 }

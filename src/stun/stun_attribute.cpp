@@ -32,11 +32,11 @@ std::optional<Attribute> Attribute::parse(const util::ConstBinaryView& vv, Attri
         //         return Attribute(type, *maybe_attr);
         //     }
         //     return std::nullopt;
-        // case attr_registry::XOR_MAPPED_ADDRESS:
-        //     if (auto maybe_attr = XorMappedAddressAttribute::parse(vv, stat); maybe_attr.has_value()) {
-        //         return Attribute(type, *maybe_attr);
-        //     }
-        //     return std::nullopt;
+        case attr_registry::XOR_MAPPED_ADDRESS:
+            if (auto maybe_attr = XorMappedAddressAttribute::parse(vv, stat); maybe_attr.has_value()) {
+                return Attribute(type, *maybe_attr);
+            }
+            return std::nullopt;
         case attr_registry::USERNAME:
             if (auto maybe_attr = UsernameAttribute::parse(vv, stat); maybe_attr.has_value()) {
                 return Attribute(type, *maybe_attr);
@@ -70,7 +70,7 @@ std::optional<XorMappedAddressAttribute> XorMappedAddressAttribute::parse(const 
     // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     // |                X-Address (Variable)
     // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    auto maybe_family = vv.read_u8(1);
+    auto maybe_family = Family::from_uint8(vv.read_u8(1));
     auto maybe_xport = vv.read_u16be(2);
     const auto maybe_xaddr_view = vv.subview(4);
     if (!maybe_family.has_value() || !maybe_xport.has_value() || !maybe_xaddr_view.has_value()) {
@@ -81,29 +81,14 @@ std::optional<XorMappedAddressAttribute> XorMappedAddressAttribute::parse(const 
     // X-Port is computed by XOR'ing the mapped port with the most
     // significant 16 bits of the magic cookie.
     auto port = net::Port(*maybe_xport ^ (details::MAGIC_COOKIE >> 16));
-    switch (*maybe_family) {
-        case attr_registry::FAMILY_IPV4: {
-            auto maybe_xaddr = net::ip::AddressV4::from_view(*maybe_xaddr_view);
-            if (!maybe_xaddr.has_value()) {
-                stat.error.inc();
-                stat.invalid_ip_address.inc();
-                return std::nullopt;
-            }
-            return XorMappedAddressAttribute{*maybe_xaddr, port};
-        }
-        case attr_registry::FAMILY_IPV6: {
-            auto maybe_xaddr = net::ip::AddressV6::from_view(*maybe_xaddr_view);
-            if (!maybe_xaddr.has_value()) {
-                stat.error.inc();
-                stat.invalid_ip_address.inc();
-                return std::nullopt;
-            }
-            return XorMappedAddressAttribute{*maybe_xaddr, port};
-        }
+    auto maybe_xaddr = XoredAddress::from_view(*maybe_family, *maybe_xaddr_view);
+    if (!maybe_xaddr.has_value()) {
+        stat.error.inc();
+        stat.invalid_ip_address.inc();
+        return std::nullopt;
     }
-    return std::nullopt;
+    return XorMappedAddressAttribute{*maybe_xaddr, port};
 }
-
 
 std::optional<SoftwareAttribute> SoftwareAttribute::parse(const util::ConstBinaryView& vv, ParseStat&) {
     return SoftwareAttribute{std::string(vv.begin(), vv.end())};

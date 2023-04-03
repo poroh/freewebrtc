@@ -16,6 +16,7 @@
 #include "net/ip/ip_address.hpp"
 #include "net/net_port.hpp"
 #include "stun/stun_attribute_type.hpp"
+#include "stun/stun_address.hpp"
 #include "crypto/crypto_hmac.hpp"
 #include "crypto/crypto_hash.hpp"
 #include "precis/precis_opaque_string.hpp"
@@ -38,7 +39,7 @@ struct MappedAddressAttribute {
 };
 
 struct XorMappedAddressAttribute {
-    net::ip::Address addr;
+    XoredAddress addr;
     net::Port port;
     static std::optional<XorMappedAddressAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };

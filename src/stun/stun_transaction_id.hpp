@@ -16,6 +16,7 @@ class TransactionId {
 public:
     explicit TransactionId(const util::ConstBinaryView&);
     TransactionId(TransactionId&&) = default;
+    util::ConstBinaryView view() const noexcept;
 private:
     std::vector<uint8_t> m_value;
 };
@@ -27,5 +28,10 @@ private:
 inline TransactionId::TransactionId(const util::ConstBinaryView& vv)
     : m_value(vv.begin(), vv.end())
 {}
+
+
+inline util::ConstBinaryView TransactionId::view() const noexcept {
+    return util::ConstBinaryView(m_value);
+}
 
 }

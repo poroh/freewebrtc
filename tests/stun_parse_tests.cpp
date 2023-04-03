@@ -71,10 +71,10 @@ TEST_F(STUNMessageParserTest, rfc5796_2_1_sample_request) {
     EXPECT_TRUE(is_valid_result.value().has_value() && is_valid_result.value()->get().has_value() && *is_valid_result.value()->get());
     auto username = result->attribute_set.username();
     ASSERT_TRUE(username.has_value());
-    EXPECT_EQ(username->get().name.value, "evtj:h6vY");
+    EXPECT_EQ(username->get().value, "evtj:h6vY");
     auto software = result->attribute_set.software();
     ASSERT_TRUE(software.has_value());
-    EXPECT_EQ(software->get().name, "STUN test client");
+    EXPECT_EQ(software->get(), "STUN test client");
 }
 
 TEST_F(STUNMessageParserTest, rfc5796_2_2_sample_response) {
@@ -124,14 +124,18 @@ TEST_F(STUNMessageParserTest, rfc5796_2_2_sample_response) {
 
     auto software = result->attribute_set.software();
     ASSERT_TRUE(software.has_value());
-    EXPECT_EQ(software->get().name, "test vector");
+    EXPECT_EQ(software->get(), "test vector");
+
+    auto xor_mapped = result->attribute_set.xor_mapped();
+    ASSERT_TRUE(xor_mapped.has_value());
+    EXPECT_EQ(xor_mapped->get().port.value(), 32853);
+    EXPECT_EQ(xor_mapped->get().addr.to_address(result->header.transaction_id),
+              net::ip::Address::from_string("192.0.2.1"));
 }
 
 
 // ================================================================================
 // Negative cases
-
-
 
 }
 

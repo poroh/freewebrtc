@@ -10,25 +10,33 @@
 
 namespace freewebrtc::stun {
 
-AttributeSet::MaybeAttr<MessageIntegityAttribute> AttributeSet::integrity() const noexcept {
+AttributeSet::MaybeAttr<MessageIntegityAttribute::Digest> AttributeSet::integrity() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::MESSAGE_INTEGRITY)); it != m_map.end()) {
-        return *it->second.as<MessageIntegityAttribute>();
+        return it->second.as<MessageIntegityAttribute>()->digest;
     }
     return std::nullopt;
 }
 
-AttributeSet::MaybeAttr<UsernameAttribute> AttributeSet::username() const noexcept {
+AttributeSet::MaybeAttr<precis::OpaqueString> AttributeSet::username() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::USERNAME)); it != m_map.end()) {
-        return *it->second.as<UsernameAttribute>();
+        return it->second.as<UsernameAttribute>()->name;
     }
     return std::nullopt;
 }
 
-AttributeSet::MaybeAttr<SoftwareAttribute> AttributeSet::software() const noexcept {
+AttributeSet::MaybeAttr<std::string> AttributeSet::software() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::SOFTWARE)); it != m_map.end()) {
-        return *it->second.as<SoftwareAttribute>();
+        return it->second.as<SoftwareAttribute>()->name;
     }
     return std::nullopt;
 }
+
+AttributeSet::MaybeAttr<XorMappedAddressAttribute> AttributeSet::xor_mapped() const noexcept {
+    if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::XOR_MAPPED_ADDRESS)); it != m_map.end()) {
+        return *it->second.as<XorMappedAddressAttribute>();
+    }
+    return std::nullopt;
+}
+
 
 }

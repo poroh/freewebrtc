@@ -8,6 +8,7 @@ set(SUBLIBS
     rtp
     crypto
     stun
+    net
 )
 
 add_library(freewebrtc INTERFACE)
@@ -16,7 +17,12 @@ foreach (sublib IN LISTS SUBLIBS)
     add_subdirectory(${sublib})
     if (TARGET ${sublib})
         target_link_libraries(freewebrtc INTERFACE ${sublib})
-        target_include_directories(${sublib} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+        get_target_property(target_type ${sublib} TYPE)
+        if(target_type STREQUAL "INTERFACE_LIBRARY")
+            target_include_directories(${sublib} INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+        else()
+            target_include_directories(${sublib} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+        endif()
     endif()
 endforeach()
 

@@ -21,9 +21,10 @@ public:
     void emplace(Attribute&&);
     template<typename Attr>
     using MaybeAttr = std::optional<std::reference_wrapper<const Attr>>;
-    MaybeAttr<MessageIntegityAttribute> integrity() const noexcept;
-    MaybeAttr<UsernameAttribute> username() const noexcept;
-    MaybeAttr<SoftwareAttribute> software() const noexcept;
+    MaybeAttr<MessageIntegityAttribute::Digest> integrity() const noexcept;
+    MaybeAttr<precis::OpaqueString> username() const noexcept;
+    MaybeAttr<std::string> software() const noexcept;
+    MaybeAttr<XorMappedAddressAttribute> xor_mapped() const noexcept;
 private:
     std::unordered_map<AttributeType, Attribute> m_map;
 };

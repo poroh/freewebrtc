@@ -1,4 +1,3 @@
-
 //
 // Copyright (c) 2023 Dmitry Poroh
 // All rights reserved.
@@ -13,6 +12,8 @@
 #pragma once
 
 #include <variant>
+#include <optional>
+#include <string_view>
 #include "net/ip/ip_address_v4.hpp"
 #include "net/ip/ip_address_v6.hpp"
 
@@ -27,8 +28,32 @@ public:
     Address(AddressV4&&);
     Address(AddressV6&&);
 
+    static std::optional<Address> from_string(const std::string_view&);
+
+    bool operator==(const Address&) const noexcept = default;
 private:
     Value m_value;
 };
+
+
+//
+// implementation
+//
+
+inline Address::Address(const AddressV4& v)
+    : m_value(v)
+{}
+
+inline Address::Address(const AddressV6& v)
+    : m_value(v)
+{}
+
+inline Address::Address(AddressV4&& v)
+    : m_value(std::move(v))
+{}
+
+inline Address::Address(AddressV6&& v)
+    : m_value(std::move(v))
+{}
 
 }

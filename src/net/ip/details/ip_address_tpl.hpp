@@ -17,12 +17,16 @@ namespace freewebrtc::net::ip::details {
 template<size_t SIZE>
 class Address {
 public:
+    using Value = std::array<uint8_t, SIZE>;
+
+    static constexpr size_t size();
     static std::optional<Address> from_view(const util::ConstBinaryView&);
 
-    util::ConstBinaryView view() const noexcept;
-private:
-    using Value = std::array<uint8_t, SIZE>;
     Address(Value&&);
+    util::ConstBinaryView view() const noexcept;
+
+    bool operator==(const Address&) const noexcept = default;
+private:
     std::array<uint8_t, SIZE> m_value;
 };
 
@@ -33,6 +37,11 @@ template<size_t SIZE>
 inline Address<SIZE>::Address(Value&& v)
     : m_value(std::move(v))
 {}
+
+template<size_t SIZE>
+constexpr size_t Address<SIZE>::size() {
+    return SIZE;
+}
 
 template<size_t SIZE>
 inline util::ConstBinaryView Address<SIZE>::view() const noexcept {

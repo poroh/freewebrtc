@@ -15,8 +15,21 @@ namespace freewebrtc::net {
 class Port {
 public:
     explicit Port(uint16_t);
+
+    uint16_t value() const noexcept;
 private:
     uint16_t m_value;
 };
 
-};
+//
+// implementation
+//
+inline Port::Port(uint16_t p)
+    : m_value(p)
+{}
+
+inline uint16_t Port::value() const noexcept {
+    return m_value;
+}
+
+}
