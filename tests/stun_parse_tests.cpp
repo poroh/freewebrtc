@@ -227,7 +227,7 @@ TEST_F(STUNMessageParserTest, very_short_messages) {
             0x21, 0x12, 0xa4, 0x42, //    Magic cookie
             0xb7, 0xe7, 0xa7, 0x01, // }
             0xbc, 0x34, 0xd6, 0x86, // }  Transaction ID
-            0xfa, 0x87, 0xdf, // }
+            0xfa, 0x87, 0xdf,       // }
         }
     };
     stun::ParseStat stat;
@@ -239,21 +239,21 @@ TEST_F(STUNMessageParserTest, very_short_messages) {
 }
 
 TEST_F(STUNMessageParserTest, invalid_message_size) {
-
+    auto Note = [](uint8_t v) { return v; };
     std::vector<std::vector<uint8_t>> cases = {
         {
-            0x01, 0x01, 0x00, 0x01, //    Response type and message length
-            0x21, 0x12, 0xa4, 0x42, //    Magic cookie
-            0xb7, 0xe7, 0xa7, 0x01, // }
-            0xbc, 0x34, 0xd6, 0x86, // }  Transaction ID
-            0xfa, 0x87, 0xdf, 0xae// }
+            0x01, 0x01, 0x00, Note(0x01), //    Response type and message length
+            0x21, 0x12, 0xa4, 0x42,       //    Magic cookie
+            0xb7, 0xe7, 0xa7, 0x01,       // }
+            0xbc, 0x34, 0xd6, 0x86,       // }  Transaction ID
+            0xfa, 0x87, 0xdf, 0xae        // }
         },
         {
-            0x01, 0x01, 0x00, 0x04, //    Response type and message length
-            0x21, 0x12, 0xa4, 0x42, //    Magic cookie
-            0xb7, 0xe7, 0xa7, 0x01, // }
-            0xbc, 0x34, 0xd6, 0x86, // }  Transaction ID
-            0xfa, 0x87, 0xdf, 0xae// }
+            0x01, 0x01, 0x00, Note(0x04), //    Response type and message length
+            0x21, 0x12, 0xa4, 0x42,       //    Magic cookie
+            0xb7, 0xe7, 0xa7, 0x01,       // }
+            0xbc, 0x34, 0xd6, 0x86,       // }  Transaction ID
+            0xfa, 0x87, 0xdf, 0xae        // }
         }
     };
     stun::ParseStat stat;
@@ -264,6 +264,182 @@ TEST_F(STUNMessageParserTest, invalid_message_size) {
     EXPECT_EQ(stat.message_length_error.count(), 1);
 }
 
-
+TEST_F(STUNMessageParserTest, invalid_attribute_size) {
+    auto Note = [](uint8_t v) { return v; };
+    std::vector<std::vector<uint8_t>> cases = {
+        {
+            0x01, 0x01, 0x00, 0x04,       //    Response type and message length
+            0x21, 0x12, 0xa4, 0x42,       //    Magic cookie
+            0xb7, 0xe7, 0xa7, 0x01,       // }
+            0xbc, 0x34, 0xd6, 0x86,       // }  Transaction ID
+            0xfa, 0x87, 0xdf, 0xae,       // }
+            0x80, 0x22, 0x00, Note(0x0b), //    SOFTWARE attribute header
+        }
+    };
+    stun::ParseStat stat;
+    EXPECT_FALSE(stun::Message::parse(util::ConstBinaryView(cases[0]), stat).has_value());
+    EXPECT_EQ(stat.error.count(), cases.size());
+    EXPECT_EQ(stat.invalid_attr_size.count(), 1);
 }
 
+TEST_F(STUNMessageParserTest, fingerprint_not_last) {
+    std::vector<uint8_t> vector = {
+        0x01, 0x01, 0x00, 0x4c, //    Response type and message length
+        0x21, 0x12, 0xa4, 0x42, //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01, // }
+        0xbc, 0x34, 0xd6, 0x86, // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae, // }
+        0x80, 0x22, 0x00, 0x0b, //    SOFTWARE attribute header
+        0x74, 0x65, 0x73, 0x74, // }
+        0x20, 0x76, 0x65, 0x63, // }  UTF-8 server name
+        0x74, 0x6f, 0x72, 0x20, // }
+        0x00, 0x20, 0x00, 0x14, //    XOR-MAPPED-ADDRESS attribute header
+        0x00, 0x02, 0xa1, 0x47, //    Address family (IPv6) and xor'd mapped port number
+        0x01, 0x13, 0xa9, 0xfa, // }
+        0xa5, 0xd3, 0xf1, 0x79, // }  Xor'd mapped IPv6 address
+        0xbc, 0x25, 0xf4, 0xb5, // }
+        0xbe, 0xd2, 0xb9, 0xd9, // }
+        0x00, 0x08, 0x00, 0x14, //    MESSAGE-INTEGRITY attribute header
+        0xa3, 0x82, 0x95, 0x4e, // }
+        0x4b, 0xe6, 0x7b, 0xf1, // }
+        0x17, 0x84, 0xc9, 0x7c, // }  HMAC-SHA1 fingerprint
+        0x82, 0x92, 0xc2, 0x75, // }
+        0xbf, 0xe3, 0xed, 0x41, // }
+        0x80, 0x28, 0x00, 0x04, //    FINGERPRINT attribute header
+        0xc8, 0xfb, 0x0b, 0x4c, //    CRC32 fingerprint
+        0x80, 0x22, 0x00, 0x00, //    SOFTWARE attribute header
+    };
+    stun::ParseStat stat;
+    EXPECT_FALSE(stun::Message::parse(util::ConstBinaryView(vector), stat).has_value());
+    EXPECT_EQ(stat.error.count(), 1);
+    EXPECT_EQ(stat.fingerprint_not_last.count(), 1);
+}
+
+TEST_F(STUNMessageParserTest, truncated_message_integrity) {
+    std::vector<uint8_t> vector = {
+        0x01, 0x01, 0x00, 0x38, //    Response type and message length
+        0x21, 0x12, 0xa4, 0x42, //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01, // }
+        0xbc, 0x34, 0xd6, 0x86, // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae, // }
+        0x80, 0x22, 0x00, 0x0b, //    SOFTWARE attribute header
+        0x74, 0x65, 0x73, 0x74, // }
+        0x20, 0x76, 0x65, 0x63, // }  UTF-8 server name
+        0x74, 0x6f, 0x72, 0x20, // }
+        0x00, 0x20, 0x00, 0x14, //    XOR-MAPPED-ADDRESS attribute header
+        0x00, 0x02, 0xa1, 0x47, //    Address family (IPv6) and xor'd mapped port number
+        0x01, 0x13, 0xa9, 0xfa, // }
+        0xa5, 0xd3, 0xf1, 0x79, // }  Xor'd mapped IPv6 address
+        0xbc, 0x25, 0xf4, 0xb5, // }
+        0xbe, 0xd2, 0xb9, 0xd9, // }
+        0x00, 0x08, 0x00, 0x0c, //    MESSAGE-INTEGRITY attribute header
+        0xa3, 0x82, 0x95, 0x4e, // }
+        0x4b, 0xe6, 0x7b, 0xf1, // }
+        0x17, 0x84, 0xc9, 0x7c, // }  HMAC-SHA1 fingerprint
+    };
+    stun::ParseStat stat;
+    EXPECT_FALSE(stun::Message::parse(util::ConstBinaryView(vector), stat).has_value());
+    EXPECT_EQ(stat.error.count(), 1);
+    EXPECT_EQ(stat.invalid_message_integrity.count(), 1);
+}
+
+TEST_F(STUNMessageParserTest, truncated_xor_mapped_address_no_header) {
+    std::vector<uint8_t> response = {
+        0x01, 0x01, 0x00, 0x18,  //    Response type and message length
+        0x21, 0x12, 0xa4, 0x42,  //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01,  // }
+        0xbc, 0x34, 0xd6, 0x86,  // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae,  // }
+        0x80, 0x22, 0x00, 0x0b,  //    SOFTWARE attribute header
+        0x74, 0x65, 0x73, 0x74,  // }
+        0x20, 0x76, 0x65, 0x63,  // }  UTF-8 server name
+        0x74, 0x6f, 0x72, 0x20,  // }
+        0x00, 0x20, 0x00, 0x01,  //    XOR-MAPPED-ADDRESS attribute header
+        0x00, 0x00, 0x00, 0x00,  //    Address family (IPv4) and xor'd mapped port number
+    };
+    stun::ParseStat stat;
+    EXPECT_FALSE(stun::Message::parse(util::ConstBinaryView(response), stat).has_value());
+    EXPECT_EQ(stat.error.count(), 1);
+    EXPECT_EQ(stat.invalid_xor_mapped_address.count(), 1);
+}
+
+TEST_F(STUNMessageParserTest, truncated_xor_mapped_address_no_ipv6_address) {
+    std::vector<uint8_t> response = {
+        0x01, 0x01, 0x00, 0x18, //    Response type and message length
+        0x21, 0x12, 0xa4, 0x42, //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01, // }
+        0xbc, 0x34, 0xd6, 0x86, // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae, // }
+        0x80, 0x22, 0x00, 0x0b, //    SOFTWARE attribute header
+        0x74, 0x65, 0x73, 0x74, // }
+        0x20, 0x76, 0x65, 0x63, // }  UTF-8 server name
+        0x74, 0x6f, 0x72, 0x20, // }
+        0x00, 0x20, 0x00, 0x04, //    XOR-MAPPED-ADDRESS attribute header
+        0x00, 0x02, 0xa1, 0x47  //    Address family (IPv6) and xor'd mapped port number
+    };
+    stun::ParseStat stat;
+    EXPECT_FALSE(stun::Message::parse(util::ConstBinaryView(response), stat).has_value());
+    EXPECT_EQ(stat.error.count(), 1);
+    EXPECT_EQ(stat.invalid_ip_address.count(), 1);
+}
+
+TEST_F(STUNMessageParserTest, truncated_xor_mapped_address_truncated_ipv6_address) {
+    std::vector<uint8_t> response = {
+        0x01, 0x01, 0x00, 0x1c, //    Response type and message length
+        0x21, 0x12, 0xa4, 0x42, //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01, // }
+        0xbc, 0x34, 0xd6, 0x86, // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae, // }
+        0x80, 0x22, 0x00, 0x0b, //    SOFTWARE attribute header
+        0x74, 0x65, 0x73, 0x74, // }
+        0x20, 0x76, 0x65, 0x63, // }  UTF-8 server name
+        0x74, 0x6f, 0x72, 0x20, // }
+        0x00, 0x20, 0x00, 0x04, //    XOR-MAPPED-ADDRESS attribute header
+        0x00, 0x02, 0xa1, 0x47, //    Address family (IPv6) and xor'd mapped port number
+        0x01, 0x13, 0xa9, 0xfa  // }
+    };
+    stun::ParseStat stat;
+    EXPECT_FALSE(stun::Message::parse(util::ConstBinaryView(response), stat).has_value());
+    EXPECT_EQ(stat.error.count(), 1);
+    EXPECT_EQ(stat.invalid_ip_address.count(), 1);
+}
+
+TEST_F(STUNMessageParserTest, invalid_integrity_sha1_hmac) {
+    auto Change = [](uint8_t v) { return v+1; };
+    // This is response from RFC5796 2.2 without FINGERPRINT attribute
+    std::vector<uint8_t> response = {
+        0x01, 0x01, 0x00, 0x34,         //    Response type and message length
+        0x21, 0x12, 0xa4, 0x42,         //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01,         // }
+        0xbc, 0x34, 0xd6, 0x86,         // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae,         // }
+        0x80, 0x22, 0x00, 0x0b,         //    SOFTWARE attribute header
+        0x74, 0x65, 0x73, 0x74,         // }
+        0x20, 0x76, 0x65, 0x63,         // }  UTF-8 server name
+        0x74, 0x6f, 0x72, 0x20,         // }
+        0x00, 0x20, 0x00, 0x08,         //    XOR-MAPPED-ADDRESS attribute header
+        0x00, 0x01, 0xa1, 0x47,         //    Address family (IPv4) and xor'd mapped port number
+        0xe1, 0x12, 0xa6, 0x43,         //    Xor'd mapped IPv4 address
+        0x00, 0x08, 0x00, 0x14,         //    MESSAGE-INTEGRITY attribute header
+        0x2b, 0x91, 0xf5, 0x99,         // }
+        0xfd, 0x9e, 0x90, 0xc3,         // }
+        0x8c, 0x74, 0x89, 0xf9,         // }  HMAC-SHA1 fingerprint
+        0x2a, 0xf9, 0xba, 0x53,         // }
+        0xf0, 0x6b, 0xe7, Change(0xd8)  // }
+    };
+
+    stun::ParseStat stat;
+    auto result = stun::Message::parse(util::ConstBinaryView(response), stat);
+    EXPECT_EQ(stat.success.count(), 1);
+    ASSERT_TRUE(result.has_value());
+
+    auto password = stun::Password::short_term(precis::OpaqueString("VOkJxbRl1RmTxUk/WvJxBt"), crypto::openssl::sha1);
+    ASSERT_TRUE(password.value().has_value());
+    auto is_valid_result = result->is_valid(util::ConstBinaryView(response), *password.value(), crypto::openssl::sha1);
+    ASSERT_TRUE(!is_valid_result.error().has_value());
+    ASSERT_TRUE(is_valid_result.value().has_value() && is_valid_result.value()->get().has_value());
+    EXPECT_FALSE(*is_valid_result.value()->get());
+}
+
+
+}

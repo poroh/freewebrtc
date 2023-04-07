@@ -19,7 +19,6 @@ UnknownAttribute::UnknownAttribute(const util::ConstBinaryView& vv)
     : data(vv.begin(), vv.end())
 {}
 
-
 Attribute::Attribute(AttributeType t, Value&& v)
     : m_type(t)
     , m_value(std::move(v))
