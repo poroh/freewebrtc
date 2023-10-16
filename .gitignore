@@ -1,3 +1,7 @@
 # Artifact directories
 _build
 
+**/node_modules/**
+**/build/**
+
+

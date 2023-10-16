@@ -1,0 +1,18 @@
+{
+    "name": "Echo backend example",
+    "version": "1.0.0",
+    "description": "Echo backend example for freewebrtc",
+    "main": "ts/echo.ts",
+    "scripts": {
+        "build": "node-gyp rebuild --verbose",
+        "start": "ts-node ts/echo.ts",
+        "tsc": "tsc"
+    },
+    "dependencies": {
+        "ts-node": "^10.4.0"
+    },
+    "devDependencies": {
+        "typescript": "^4.5.4"
+    },
+    "gypfile": true
+}

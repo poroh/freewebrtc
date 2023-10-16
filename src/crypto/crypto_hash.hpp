@@ -37,7 +37,7 @@ public:
 
     Hash(const Hash&) = default;
     Hash(Hash&&) = default;
-    Hash& operator=(const Hash&) const = default;
+    Hash& operator=(const Hash&) = default;
 
     const Value& value() const noexcept;
     bool operator==(const Hash&) const noexcept;
