@@ -40,13 +40,12 @@ export function webrtcProcessSDP(sdp: SDP) {
             if (!bundlesAreEqual(bundle, result)) {
                 throw new Error(`ICE attributes of medias are not equal: ${JSON.stringify(medias)}`);
             }
-
+            result.ice.candidates = result.ice.candidates.concat(bundle.ice.candidates);
         });
         return result;
     });
     return {transports};
 }
-
 
 function bundledMediaGroups(sdp: SDP): MediaDescriptor[][] {
     // Bundle MID groups

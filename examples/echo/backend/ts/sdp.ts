@@ -77,6 +77,7 @@ export type SDP = V
     & Bandwidth
     & Time
     & Zone
+    & Key
     & Attribute
     & Medias;
 
@@ -116,6 +117,36 @@ export function parseSDP(sdp: string): ParseResult<SDP> {
         return makeParseError(`Not fully parsed: rest: ${result.rest}`);
     }
     return result as ParseResult<SDP>;
+}
+
+export function serializeSDP(sdp: SDP): string {
+    const o = sdp.origin;
+    return ['v=0',
+            `o=${o.username} ${o.sess.id} ${o.sess.version} ${o.net} ${o.address.type} ${o.address.value}`,
+            `s=${sdp.name}`,
+            sdp.information ? `i=${sdp.information}` : [],
+            sdp.uri ? `u=${sdp.uri}` : [],
+            sdp.emails.map((e) => `e=${e}`),
+            sdp.phones.map((p) => `p=${p}`),
+            sdp.connection ? `c=${sdp.connection.net} ${sdp.connection.address.type} ${sdp.connection.address.value}` : [],
+            sdp.bandwidth.map(({type, value}) => `b=${type}:${value}`),
+            `t=${sdp.time}`,
+            sdp.zone ? `z=${sdp.zone}` : [],
+            sdp.key ? `k=${sdp.key}` : [],
+            sdp.attrs.map((a) => `a=${a}`),
+            sdp.media.map((media) => {
+                return [
+                    `m=${media.media} ${media.port}${media.integer || ''} ${media.proto} ${media.formats.join(' ')}`,
+                    media.information ? `i=${media.information}` : [],
+                    media.connection.map((c) => `c=${c.net} ${c.address.type} ${c.address.value}`),
+                    media.bandwidth.map(({type, value}) => `b=${type}:${value}`),
+                    media.key ? `k=${media.key}` : [],
+                    media.attrs.map((a) => `a=${a}`),
+                ];
+            })
+        ]
+        .flat(4)
+        .join('\r\n') + '\r\n';
 }
 
 function makeParseSuccess<T>(obj: T, rest: string): ParseSuccess<T> {
