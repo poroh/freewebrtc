@@ -47,7 +47,7 @@ type Zone = { zone?: string; }
 type Key = { key?: string; }
 type Attribute = { attrs: string[] };
 type Medias = { media: MediaDescriptor[] };
-type MediaDescriptor = Media
+export type MediaDescriptor = Media
     & Information
     & MediaConnection
     & Bandwidth
