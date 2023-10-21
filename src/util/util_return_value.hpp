@@ -21,6 +21,7 @@ public:
     using Error = std::error_code;
 
     ReturnValue(Value&&);
+    ReturnValue(const Value&);
     ReturnValue(std::error_code&&);
     ReturnValue(const std::error_code&);
     ReturnValue(const ReturnValue&) = default;
@@ -33,6 +34,11 @@ public:
     MaybeConstValue value() const noexcept;
     MaybeValue value() noexcept;
 
+    // Apply function to Value if it ReturnValue is value
+    // and return result as ReturnValue of result of the function.
+    template<typename Fmap>
+    auto fmap(Fmap&& f) -> ReturnValue<decltype(f(std::declval<V>()))>;
+
 private:
     std::variant<Value, Error> m_result;
 };
@@ -40,6 +46,12 @@ private:
 //
 // inlines
 //
+
+template<typename V>
+inline ReturnValue<V>::ReturnValue(const Value& v)
+    : m_result(v)
+{}
+
 template<typename V>
 inline ReturnValue<V>::ReturnValue(Value&& v)
     : m_result(std::move(v))
@@ -74,6 +86,15 @@ inline typename ReturnValue<V>::MaybeValue
 ReturnValue<V>::value() noexcept {
     auto v = std::get_if<V>(&m_result);
     return v != nullptr ? MaybeValue{*v} : std::nullopt;
+}
+
+template<typename V>
+template<typename Fmap>
+auto ReturnValue<V>::fmap(Fmap&& f) -> ReturnValue<decltype(f(std::declval<V>()))> {
+    if (error().has_value()) {
+        return error().value();
+    }
+    return f(value()->get());
 }
 
 }

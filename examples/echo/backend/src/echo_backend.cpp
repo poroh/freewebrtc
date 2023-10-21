@@ -1,81 +1,42 @@
 #include <node_api.h>
 #include "stun/stun_message.hpp"
+#include "napi_stun_message.hpp"
 
-namespace echo_backend {
+namespace freewebrtc::napi {
 
-napi_value parse_stun(napi_env env, napi_callback_info info) {
-    size_t argc = 1;
-    napi_value args[1];
-    if (auto status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr); status != napi_ok) {
+napi_value parse_stun(napi_env inenv, napi_callback_info info) {
+
+    Env env(inenv);
+
+    auto ci_result = env.create_callback_info(info);
+    if (ci_result.error().has_value()) {
         return nullptr;
     }
 
-    bool is_buffer;
-    if (auto status = napi_is_buffer(env, args[0], &is_buffer); status != napi_ok) {
-        return nullptr;
+    const auto& ci = ci_result.value().value().get();
+    if (ci.args.size() == 0) {
+        return env.throw_error("First argument must be a buffer");
     }
-    if (!is_buffer) {
-        napi_throw_type_error(env, nullptr, "Argument should be a buffer");
+
+    auto as_buffer_result = ci.args[0].as_buffer();
+    if (env.maybe_throw_error(as_buffer_result)) {
         return nullptr;
     }
 
-    void *data;
-    size_t length;
-    if (auto status = napi_get_buffer_info(env, args[0], &data, &length); status != napi_ok) {
-        return nullptr;
-    }
+    const auto& view = as_buffer_result.value()->get();
+
     freewebrtc::stun::ParseStat parsestat;
-    auto maybe_msg = freewebrtc::stun::Message::parse(freewebrtc::util::ConstBinaryView(data, length), parsestat);
+    auto maybe_msg = freewebrtc::stun::Message::parse(view, parsestat);
     if (!maybe_msg.has_value()) {
-        napi_value err_obj;
-        if (auto status = napi_create_object(env, &err_obj); status != napi_ok) {
-            return nullptr;
-        }
-        napi_value error;
-        if (auto status = napi_create_string_utf8(env, "Cannot parse", NAPI_AUTO_LENGTH, &error); status != napi_ok) {
-            return nullptr;
-        }
-
-        if (auto status = napi_set_named_property(env, err_obj, "error", error); status != napi_ok) {
-            return nullptr;
-        }
-        return err_obj;
+        return env.throw_error("Failed to parse STUN packet");
     }
+    const auto& msg = maybe_msg.value();
 
-    napi_value obj;
-    if (auto status = napi_create_object(env, &obj); status != napi_ok) {
+    auto napi_msg_result = stun_message(env, msg);
+    if (env.maybe_throw_error(napi_msg_result)) {
         return nullptr;
     }
-
-    const auto& v = *maybe_msg;
-    napi_value cls;
-    switch (v.header.cls.value()) {
-    case freewebrtc::stun::Class::REQUEST:
-        if (auto status = napi_create_string_utf8(env, "request", NAPI_AUTO_LENGTH, &cls); status != napi_ok) {
-            return nullptr;
-        }
-        break;
-    case freewebrtc::stun::Class::INDICATION:
-        if (auto status = napi_create_string_utf8(env, "indication", NAPI_AUTO_LENGTH, &cls); status != napi_ok) {
-            return nullptr;
-        }
-        break;
-    case freewebrtc::stun::Class::SUCCESS_RESPONSE:
-        if (auto status = napi_create_string_utf8(env, "success_response", NAPI_AUTO_LENGTH, &cls); status != napi_ok) {
-            return nullptr;
-        }
-        break;
-    case freewebrtc::stun::Class::ERROR_RESPONSE:
-        if (auto status = napi_create_string_utf8(env, "error_response", NAPI_AUTO_LENGTH, &cls); status != napi_ok) {
-            return nullptr;
-        }
-        break;
-    }
-
-    if (auto status = napi_set_named_property(env, obj, "class", cls); status != napi_ok) {
-        return nullptr;
-    }
-    return obj;
+    return napi_msg_result.value()->get().to_napi();
 
 }
 
