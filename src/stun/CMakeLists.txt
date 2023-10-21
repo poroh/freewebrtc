@@ -15,5 +15,8 @@ set(SOURCES
 )
 file(GLOB HEADERS "*.hpp")
 
-add_library(stun ${SOURCES} ${HEADERS})
+list(TRANSFORM SOURCES PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/)
+
+target_sources(freewebrtc PRIVATE ${SOURCES} ${HEADERS})
+
 

@@ -49,8 +49,9 @@ if(OPENSSL_FOUND)
 
    file(GLOB HEADERS "*.hpp")
 
-   add_library(crypto_openssl STATIC ${SOURCES} ${HEADERS})
-   target_include_directories(crypto_openssl PUBLIC ${OPENSSL_ROOT_DIR}/include)
+   add_library(freewebrtc_openssl STATIC ${SOURCES} ${HEADERS})
+   target_include_directories(freewebrtc_openssl PUBLIC ${OPENSSL_ROOT_DIR}/include)
+   target_include_directories(freewebrtc_openssl PRIVATE ${CMAKE_SOURCE_DIR}/src)
 else()
    message(STATUS "OpenSSL not found bindings building omitted")
 endif()

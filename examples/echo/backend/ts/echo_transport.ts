@@ -8,6 +8,7 @@
 
 import { createSocket, Socket, RemoteInfo } from 'dgram';
 import { AddressInfo } from "net";
+const echob = require('../build/Release/echo_backend');
 
 export class EchoTransport {
     private readonly socket: Socket;
@@ -27,7 +28,8 @@ export class EchoTransport {
         });
     }
     receive(msg: Buffer, rinfo: RemoteInfo) {
-        console.log(msg);
+        console.log(echob.parseSTUN(msg));
+        //console.log(msg);
     }
 };
 

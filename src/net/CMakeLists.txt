@@ -8,12 +8,6 @@ set(SUBLIBS
     ip
 )
 
-add_library(net INTERFACE)
-
 foreach (sublib IN LISTS SUBLIBS)
     add_subdirectory(${sublib})
-    if (TARGET ${sublib})
-        target_link_libraries(net INTERFACE ${sublib})
-        target_include_directories(${sublib} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
-    endif()
 endforeach()

@@ -11,6 +11,8 @@ add_compile_options(-Werror -Wall -Wunused-variable -Wunused-parameter -pedantic
 
 add_subdirectory(src)
 
+target_include_directories(freewebrtc PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
 # Set library installation directory
 install(TARGETS freewebrtc
         ARCHIVE DESTINATION lib
