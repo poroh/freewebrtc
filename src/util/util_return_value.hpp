@@ -36,10 +36,17 @@ public:
 
     // Apply function to Value if it ReturnValue is value
     // and return result as ReturnValue of result of the function.
+    // If Fmap returns ReturnValue<SomeType> then return value of fmap is
+    // ReturnValue<SomeType> instead of ResultValue<ResultValue<SomeType>>
     template<typename Fmap>
     auto fmap(Fmap&& f) -> ReturnValue<decltype(f(std::declval<V>()))>;
 
 private:
+    template<typename T>
+    ReturnValue<T> fmap_helper(ReturnValue<T>&& v);
+    template<typename T>
+    ReturnValue<T> fmap_helper(T&& v);
+
     std::variant<Value, Error> m_result;
 };
 
@@ -89,12 +96,27 @@ ReturnValue<V>::value() noexcept {
 }
 
 template<typename V>
+template<typename T>
+ReturnValue<T> ReturnValue<V>::fmap_helper(ReturnValue<T>&& v) {
+    if (v.error().has_value()) {
+        return v.error().value();
+    }
+    return std::move(v.value().value().get());
+};
+
+template<typename V>
+template<typename T>
+ReturnValue<T> ReturnValue<V>::fmap_helper(T&& v) {
+    return v;
+};
+
+template<typename T>
 template<typename Fmap>
-auto ReturnValue<V>::fmap(Fmap&& f) -> ReturnValue<decltype(f(std::declval<V>()))> {
+auto ReturnValue<T>::fmap(Fmap&& f) -> ReturnValue<decltype(f(std::declval<T>()))> {
     if (error().has_value()) {
         return error().value();
     }
-    return f(value()->get());
+    return fmap_helper(f(value()->get()));
 }
 
 }

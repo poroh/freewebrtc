@@ -57,13 +57,16 @@ public:
 
     ReturnValue<CallbackInfo> create_callback_info(napi_callback_info) const noexcept;
 
-    using ValueInit = std::variant<Value, ReturnValue<Value>>;
+    using ValueInit = std::variant<Value, ReturnValue<Value>, std::optional<ReturnValue<Value>>>;
     using ObjectSpec = std::vector<std::pair<std::string, ValueInit>>;
 
     ReturnValue<Object> create_object() const noexcept;
     ReturnValue<Object> create_object(const ObjectSpec&) const noexcept;
 
     ReturnValue<Value> create_string(const std::string_view&) const noexcept;
+    ReturnValue<Value> create_buffer(const util::ConstBinaryView& view) const noexcept;
+    ReturnValue<Value> create_boolean(bool value) const noexcept;
+    ReturnValue<Value> create_int32(int32_t value) const noexcept;
 
     napi_value throw_error(const std::string& message) const noexcept;
 

@@ -88,12 +88,17 @@ ReturnValue<Object> Env::create_object(const ObjectSpec& spec) const noexcept {
     for (const auto& p: spec) {
         const auto& k = p.first;
         const auto& v = p.second;
-        using RVV = ReturnValue<Value>;
-        auto rvv = std::visit(
+        using MaybeRVV = std::optional<ReturnValue<Value>>;
+        auto mrvv = std::visit(
             util::overloaded {
-                [](const ReturnValue<Value>& rv) -> RVV { return rv; },
-                [](const Value& vv)  -> RVV { return vv; }
+                [](const ReturnValue<Value>& rv) -> MaybeRVV { return rv; },
+                [](const Value& vv)  -> MaybeRVV { return vv; },
+                [](const MaybeRVV& mrvv) { return mrvv; }
             }, v);
+        if (!mrvv.has_value()) {
+            continue;
+        }
+        const auto& rvv = mrvv.value();
         if (rvv.error().has_value()) {
             return rvv.error().value();
         }
@@ -111,6 +116,32 @@ ReturnValue<Value> Env::create_string(const std::string_view& str) const noexcep
         return make_error_code(status);
     }
     return Value(m_env, result);
+}
+
+ReturnValue<Value> Env::create_buffer(const util::ConstBinaryView& view) const noexcept {
+    napi_value buffer;
+    void *data;
+    if (napi_status status = napi_create_buffer(m_env, view.size(), &data, &buffer); status != napi_ok) {
+        return make_error_code(status);
+    }
+    memcpy(data, view.data(), view.size());
+    return Value(m_env, buffer);
+}
+
+ReturnValue<Value> Env::create_boolean(bool value) const noexcept {
+    napi_value boolean;
+    if (napi_status status = napi_get_boolean(m_env, value, &boolean); status != napi_ok) {
+        return make_error_code(status);
+    }
+    return Value(m_env, boolean);
+}
+
+ReturnValue<Value> Env::create_int32(int32_t value) const noexcept {
+    napi_value int32;
+    if (napi_status status = napi_create_int32(m_env, value, &int32); status != napi_ok) {
+        return make_error_code(status);
+    }
+    return Value(m_env, int32);
 }
 
 }

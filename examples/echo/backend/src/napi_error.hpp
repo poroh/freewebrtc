@@ -23,7 +23,8 @@ std::error_code make_error_code(napi_status status);
 
 enum class WrapperError {
     OK = 0,
-    INVALID_TYPE = 1
+    INVALID_TYPE = 1,
+    UNKNOWN_STUN_METHOD = 2
 };
 
 class NapiWrapperErrorCategory : public std::error_category {

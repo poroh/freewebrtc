@@ -16,6 +16,7 @@
 #include <string_view>
 #include "net/ip/ip_address_v4.hpp"
 #include "net/ip/ip_address_v6.hpp"
+#include "util/util_return_value.hpp"
 
 namespace freewebrtc::net::ip {
 
@@ -30,6 +31,7 @@ public:
 
     static std::optional<Address> from_string(const std::string_view&);
 
+    ReturnValue<std::string> to_string() const;
     bool operator==(const Address&) const noexcept = default;
 private:
     Value m_value;

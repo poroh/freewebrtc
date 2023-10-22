@@ -8,6 +8,7 @@
 #include <string>
 
 #include "net/ip/ip_address.hpp"
+#include "util/util_variant_overloaded.hpp"
 
 namespace freewebrtc::net::ip {
 
@@ -39,6 +40,23 @@ std::optional<Address> Address::from_string(const std::string_view& v) {
     }
     return from_string_v6(v);
 }
+
+ReturnValue<std::string> Address::to_string() const {
+    const auto& p = std::visit(util::overloaded {
+            [](const AddressV4& v) { return std::make_pair(v.view(), AF_INET); },
+            [](const AddressV6& v) { return std::make_pair(v.view(), AF_INET6); },
+        }, m_value);
+    std::vector<char> buffer(INET6_ADDRSTRLEN);
+    const char *result = nullptr;
+    while ((result = inet_ntop(p.second, p.first.data(), buffer.data(), buffer.size())) == nullptr) {
+        if (errno != ENOSPC) {
+            return std::error_code(errno, std::generic_category());
+        }
+        buffer.resize(buffer.size() * 2);
+    }
+    return std::string(result);
+}
+
 
 }
 

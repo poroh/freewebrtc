@@ -15,5 +15,4 @@ Method Method::binding() noexcept {
     return Method(method_registry::BINDING);
 }
 
-
 }
