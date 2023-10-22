@@ -13,6 +13,7 @@
 namespace freewebrtc::napi {
 
 ReturnValue<Value> stun_attributes(const Env& env, const stun::TransactionId& tid, const stun::AttributeSet& attrs) {
+    using MaybeRVV = std::optional<ReturnValue<Value>>;
     return
         env.create_object({
                 { "username",
@@ -35,7 +36,20 @@ ReturnValue<Value> stun_attributes(const Env& env, const stun::TransactionId& ti
                                         { "port", env.create_int32(v.get().port.value()) }
                                     })
                                 .fmap([](const Object& obj) -> Value { return obj.to_value(); });
-                        })}
+                        })},
+                { "priority",
+                        util::fmap(attrs.priority(), [&](const auto& v) {
+                            return env.create_uint32(v.get());
+                        })},
+                { "ice-controlling",
+                        util::fmap(attrs.ice_controlling(), [&](const auto& v) {
+                            return env.create_bigint_uint64(v.get());
+                        })},
+                { "ice-controlled",
+                        util::fmap(attrs.ice_controlled(), [&](const auto& v) {
+                            return env.create_bigint_uint64(v.get());
+                        })},
+                { "use-candidate", attrs.has_use_candidate() ? MaybeRVV(env.create_boolean(true)) : std::nullopt }
             })
         .fmap([](const Object& obj) -> Value { return obj.to_value(); });
 }

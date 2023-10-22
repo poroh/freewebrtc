@@ -11,6 +11,7 @@
 #include "stun/details/stun_attr_registry.hpp"
 #include "stun/details/stun_fingerprint.hpp"
 #include "stun/details/stun_constants.hpp"
+#include "util/util_fmap.hpp"
 
 namespace freewebrtc::stun {
 
@@ -24,39 +25,20 @@ Attribute::Attribute(AttributeType t, Value&& v)
 {}
 
 std::optional<Attribute> Attribute::parse(const util::ConstBinaryView& vv, AttributeType type, ParseStat& stat) {
+    auto create_attr_fun = [=](auto&& attr) { return Attribute(type, attr); };
     switch (type.value()) {
-        // case attr_registry::MAPPED_ADDRESS:
-        //     if (auto maybe_attr = MappedAddressAttribute::parse(vv, stat); maybe_attr.has_value()) {
-        //         return Attribute(type, *maybe_attr);
-        //     }
-        //     return std::nullopt;
-        case attr_registry::XOR_MAPPED_ADDRESS:
-            if (auto maybe_attr = XorMappedAddressAttribute::parse(vv, stat); maybe_attr.has_value()) {
-                return Attribute(type, *maybe_attr);
-            }
-            return std::nullopt;
-        case attr_registry::USERNAME:
-            if (auto maybe_attr = UsernameAttribute::parse(vv, stat); maybe_attr.has_value()) {
-                return Attribute(type, *maybe_attr);
-            }
-            return std::nullopt;
-        case attr_registry::SOFTWARE:
-            if (auto maybe_attr = SoftwareAttribute::parse(vv, stat); maybe_attr.has_value()) {
-                return Attribute(type, *maybe_attr);
-            }
-            return std::nullopt;
-        case attr_registry::MESSAGE_INTEGRITY:
-            if (auto maybe_attr = MessageIntegityAttribute::parse(vv, stat); maybe_attr.has_value()) {
-                return Attribute(type, *maybe_attr);
-            }
-            return std::nullopt;
-        case attr_registry::FINGERPRINT:
-            if (auto maybe_attr = FingerprintAttribute::parse(vv, stat); maybe_attr.has_value()) {
-                return Attribute(type, *maybe_attr);
-            }
-            return std::nullopt;
-        default:
-            return Attribute(type, UnknownAttribute(vv));
+    // case attr_registry::MAPPED_ADDRESS:  return util::fmap(MappedAddressAttribute::parse(vv, stat),    std::move(create_attr_fun));
+    case attr_registry::XOR_MAPPED_ADDRESS: return util::fmap(XorMappedAddressAttribute::parse(vv, stat), std::move(create_attr_fun));
+    case attr_registry::USERNAME:           return util::fmap(UsernameAttribute::parse(vv, stat),         std::move(create_attr_fun));
+    case attr_registry::SOFTWARE:           return util::fmap(SoftwareAttribute::parse(vv, stat),         std::move(create_attr_fun));
+    case attr_registry::MESSAGE_INTEGRITY:  return util::fmap(MessageIntegityAttribute::parse(vv, stat),  std::move(create_attr_fun));
+    case attr_registry::FINGERPRINT:        return util::fmap(FingerprintAttribute::parse(vv, stat),      std::move(create_attr_fun));
+    case attr_registry::PRIORITY:           return util::fmap(PriorityAttribute::parse(vv, stat),         std::move(create_attr_fun));
+    case attr_registry::ICE_CONTROLLING:    return util::fmap(IceControllingAttribute::parse(vv, stat),   std::move(create_attr_fun));
+    case attr_registry::ICE_CONTROLLED:     return util::fmap(IceControlledAttribute::parse(vv, stat),   std::move(create_attr_fun));
+    case attr_registry::USE_CANDIDATE:      return util::fmap(UseCandidateAttribute::parse(vv, stat),     std::move(create_attr_fun));
+    default:
+        return Attribute(type, UnknownAttribute(vv));
     }
 }
 
@@ -114,6 +96,49 @@ std::optional<FingerprintAttribute> FingerprintAttribute::parse(const util::Cons
         return std::nullopt;
     }
     return FingerprintAttribute{*maybe_crc32 ^ FINGERPRINT_XOR};
+}
+
+std::optional<PriorityAttribute> PriorityAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+    auto maybe_priority = vv.read_u32be(0);
+    if (!maybe_priority.has_value()) {
+        stat.error.inc();
+        stat.invalid_priority_size.inc();
+        return std::nullopt;
+    }
+    return PriorityAttribute{*maybe_priority};
+}
+
+std::optional<IceControllingAttribute> IceControllingAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+    auto maybe_tiebreaker = vv.read_u64be(0);
+    if (!maybe_tiebreaker.has_value()) {
+        stat.error.inc();
+        stat.invalid_ice_controlling_size.inc();
+        return std::nullopt;
+    }
+    return IceControllingAttribute{*maybe_tiebreaker};
+}
+
+std::optional<IceControlledAttribute> IceControlledAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+    auto maybe_tiebreaker = vv.read_u64be(0);
+    if (!maybe_tiebreaker.has_value()) {
+        stat.error.inc();
+        stat.invalid_ice_controlled_size.inc();
+        return std::nullopt;
+    }
+    return IceControlledAttribute{*maybe_tiebreaker};
+}
+
+std::optional<UseCandidateAttribute> UseCandidateAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+    // The USE-CANDIDATE attribute indicates that the candidate pair
+    // resulting from this check will be used for transmission of data.  The
+    // attribute has no content (the Length field of the attribute is zero);
+    // it serves as a flag.
+    if (vv.size() != 0) {
+        stat.error.inc();
+        stat.invalid_use_candidate_size.inc();
+        return std::nullopt;
+    }
+    return UseCandidateAttribute{};
 }
 
 }

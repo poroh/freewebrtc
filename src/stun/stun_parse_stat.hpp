@@ -26,6 +26,10 @@ struct ParseStat {
     stat::Counter invalid_message_integrity;
     stat::Counter invalid_xor_mapped_address;
     stat::Counter invalid_ip_address;
+    stat::Counter invalid_priority_size;
+    stat::Counter invalid_ice_controlling_size;
+    stat::Counter invalid_ice_controlled_size;
+    stat::Counter invalid_use_candidate_size;
     stat::Counter unknown_comprehension_required_attr;
 };
 

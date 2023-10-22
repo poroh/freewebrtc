@@ -1,4 +1,3 @@
-
 //
 // Copyright (c) 2023 Dmitry Poroh
 // All rights reserved.
@@ -25,6 +24,10 @@ public:
     MaybeAttr<precis::OpaqueString> username() const noexcept;
     MaybeAttr<std::string> software() const noexcept;
     MaybeAttr<XorMappedAddressAttribute> xor_mapped() const noexcept;
+    MaybeAttr<uint32_t> priority() const noexcept;
+    MaybeAttr<uint64_t> ice_controlling() const noexcept;
+    MaybeAttr<uint64_t> ice_controlled() const noexcept;
+    bool has_use_candidate() const noexcept;
 private:
     std::unordered_map<AttributeType, Attribute> m_map;
 };

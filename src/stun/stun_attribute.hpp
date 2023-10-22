@@ -65,6 +65,25 @@ struct FingerprintAttribute {
     static std::optional<FingerprintAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
+struct PriorityAttribute {
+    uint32_t priority;
+    static std::optional<PriorityAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+};
+
+struct UseCandidateAttribute {
+    static std::optional<UseCandidateAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+};
+
+struct IceControllingAttribute {
+    uint64_t tiebreaker;
+    static std::optional<IceControllingAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+};
+
+struct IceControlledAttribute {
+    uint64_t tiebreaker;
+    static std::optional<IceControlledAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+};
+
 class Attribute {
 public:
     using Value =
@@ -75,6 +94,10 @@ public:
             SoftwareAttribute,
             MessageIntegityAttribute,
             FingerprintAttribute,
+            PriorityAttribute,
+            IceControllingAttribute,
+            IceControlledAttribute,
+            UseCandidateAttribute,
             UnknownAttribute
         >;
 

@@ -41,11 +41,13 @@ public:
     uint8_t assured_read_u8(size_t offset) const;
     uint16_t assured_read_u16be(size_t offset) const;
     uint32_t assured_read_u32be(size_t offset) const;
+    uint64_t assured_read_u64be(size_t offset) const;
     ConstBinaryView assured_subview(size_t offset, size_t size) const;
 
     std::optional<uint8_t> read_u8(size_t offset) const;
     std::optional<uint16_t> read_u16be(size_t offset) const;
     std::optional<uint32_t> read_u32be(size_t offset) const;
+    std::optional<uint64_t> read_u64be(size_t offset) const;
     std::optional<ConstBinaryView> subview(size_t offset) const;
     std::optional<ConstBinaryView> subview(size_t offset, size_t size) const;
     std::optional<ConstBinaryView> subview(const Interval&) const;
@@ -87,29 +89,42 @@ inline uint32_t ConstBinaryView::assured_read_u32be(size_t offset) const {
     return network_to_host_u32(value);
 }
 
+inline uint64_t ConstBinaryView::assured_read_u64be(size_t offset) const {
+    uint64_t value;
+    memcpy(&value, &data()[offset], sizeof(value));
+    return network_to_host_u64(value);
+}
+
 inline ConstBinaryView ConstBinaryView::assured_subview(size_t offset, size_t count) const {
     return ConstBinaryView(data() + offset, count);
 }
 
 inline std::optional<uint8_t> ConstBinaryView::read_u8(size_t offset) const {
-    if (offset > size() - sizeof(uint8_t)) {
+    if (offset + sizeof(uint8_t) > size()) {
         return std::nullopt;
     }
     return assured_read_u8(offset);
 }
 
 inline std::optional<uint16_t> ConstBinaryView::read_u16be(size_t offset) const {
-    if (offset > size() - sizeof(uint16_t)) {
+    if (offset + sizeof(uint16_t) > size() ) {
         return std::nullopt;
     }
     return assured_read_u16be(offset);
 }
 
 inline std::optional<uint32_t> ConstBinaryView::read_u32be(size_t offset) const {
-    if (offset > size() - sizeof(uint32_t)) {
+    if (offset + sizeof(uint32_t) > size() ) {
         return std::nullopt;
     }
     return assured_read_u32be(offset);
+}
+
+inline std::optional<uint64_t> ConstBinaryView::read_u64be(size_t offset) const {
+    if (offset + sizeof(uint64_t) > size() ) {
+        return std::nullopt;
+    }
+    return assured_read_u64be(offset);
 }
 
 inline bool ConstBinaryView::contains(const Interval& i) const {
@@ -117,11 +132,14 @@ inline bool ConstBinaryView::contains(const Interval& i) const {
 }
 
 inline std::optional<ConstBinaryView> ConstBinaryView::subview(size_t offset) const {
+    if (offset > size()) {
+        return std::nullopt;
+    }
     return subview(offset, size() - offset);
 }
 
 inline std::optional<ConstBinaryView> ConstBinaryView::subview(size_t offset, size_t count) const {
-    if (count > size() || offset > size() - count) {
+    if (offset + count > size()) {
         return std::nullopt;
     }
     return assured_subview(offset, count);

@@ -144,4 +144,21 @@ ReturnValue<Value> Env::create_int32(int32_t value) const noexcept {
     return Value(m_env, int32);
 }
 
+ReturnValue<Value> Env::create_uint32(int32_t value) const noexcept {
+    napi_value uint32;
+    if (napi_status status = napi_create_uint32(m_env, value, &uint32); status != napi_ok) {
+        return make_error_code(status);
+    }
+    return Value(m_env, uint32);
+}
+
+ReturnValue<Value> Env::create_bigint_uint64(uint64_t value) const noexcept {
+    napi_value result;
+    if (napi_status status = napi_create_bigint_uint64(m_env, value, &result); status != napi_ok) {
+        return make_error_code(status);
+    }
+    return Value(m_env, result);
+}
+
+
 }

@@ -38,5 +38,29 @@ AttributeSet::MaybeAttr<XorMappedAddressAttribute> AttributeSet::xor_mapped() co
     return std::nullopt;
 }
 
+AttributeSet::MaybeAttr<uint32_t> AttributeSet::priority() const noexcept {
+    if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::PRIORITY)); it != m_map.end()) {
+        return it->second.as<PriorityAttribute>()->priority;
+    }
+    return std::nullopt;
+}
+
+AttributeSet::MaybeAttr<uint64_t> AttributeSet::ice_controlling() const noexcept {
+    if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::ICE_CONTROLLING)); it != m_map.end()) {
+        return it->second.as<IceControllingAttribute>()->tiebreaker;
+    }
+    return std::nullopt;
+}
+
+AttributeSet::MaybeAttr<uint64_t> AttributeSet::ice_controlled() const noexcept {
+    if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::ICE_CONTROLLED)); it != m_map.end()) {
+        return it->second.as<IceControlledAttribute>()->tiebreaker;
+    }
+    return std::nullopt;
+}
+
+bool AttributeSet::has_use_candidate() const noexcept {
+    return m_map.find(AttributeType::from_uint16(attr_registry::USE_CANDIDATE)) != m_map.end();
+}
 
 }

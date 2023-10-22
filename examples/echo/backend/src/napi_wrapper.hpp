@@ -67,6 +67,8 @@ public:
     ReturnValue<Value> create_buffer(const util::ConstBinaryView& view) const noexcept;
     ReturnValue<Value> create_boolean(bool value) const noexcept;
     ReturnValue<Value> create_int32(int32_t value) const noexcept;
+    ReturnValue<Value> create_uint32(int32_t value) const noexcept;
+    ReturnValue<Value> create_bigint_uint64(uint64_t value) const noexcept;
 
     napi_value throw_error(const std::string& message) const noexcept;
 

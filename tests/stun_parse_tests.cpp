@@ -214,6 +214,78 @@ TEST_F(STUNMessageParserTest, message_without_attributes) {
               util::ConstBinaryView(tid));
 }
 
+TEST_F(STUNMessageParserTest, rfc8445_priority_attribute) {
+    std::vector<uint8_t> request = {
+        0x00, 0x01, 0x00, 0x08,  //    Request type and message length
+        0x21, 0x12, 0xa4, 0x42,  //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01,  // }
+        0xbc, 0x34, 0xd6, 0x86,  // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae,  // }
+        0x00, 0x24, 0x00, 0x04,  //    PRIORITY attribute header
+        0x12, 0x34, 0x56, 0x78   //    PRIORITY value (0x1234578)
+    };
+    stun::ParseStat stat;
+    const auto result = stun::Message::parse(util::ConstBinaryView(request), stat);
+    EXPECT_EQ(stat.success.count(), 1);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->attribute_set.priority().has_value());
+    EXPECT_EQ(result->attribute_set.priority()->get(), 0x12345678);
+}
+
+TEST_F(STUNMessageParserTest, rfc8445_use_candidate_attribute) {
+    std::vector<uint8_t> request = {
+        0x00, 0x01, 0x00, 0x04,  //    Request type and message length
+        0x21, 0x12, 0xa4, 0x42,  //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01,  // }
+        0xbc, 0x34, 0xd6, 0x86,  // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae,  // }
+        0x00, 0x25, 0x00, 0x00   //    USE-CANDIDATE attribute header
+    };
+    stun::ParseStat stat;
+    const auto result = stun::Message::parse(util::ConstBinaryView(request), stat);
+    EXPECT_EQ(stat.success.count(), 1);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(result->attribute_set.has_use_candidate());
+}
+
+TEST_F(STUNMessageParserTest, rfc8445_ice_controlling_attribute) {
+    std::vector<uint8_t> request = {
+        0x00, 0x01, 0x00, 0x0C,  //    Request type and message length
+        0x21, 0x12, 0xa4, 0x42,  //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01,  // }
+        0xbc, 0x34, 0xd6, 0x86,  // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae,  // }
+        0x80, 0x2A, 0x00, 0x08,  //    ICE-CONTROLLING attribute header
+        0x12, 0x34, 0x56, 0x78,  // }  ICE-CONTROLLING value (0x12345789ABCDEF0)
+        0x9A, 0xBC, 0xDE, 0xF0   // }
+    };
+    stun::ParseStat stat;
+    const auto result = stun::Message::parse(util::ConstBinaryView(request), stat);
+    EXPECT_EQ(stat.success.count(), 1);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->attribute_set.ice_controlling().has_value());
+    EXPECT_EQ(result->attribute_set.ice_controlling()->get(), 0x123456789ABCDEF0LL);
+}
+
+TEST_F(STUNMessageParserTest, rfc8445_ice_controlled_attribute) {
+    std::vector<uint8_t> request = {
+        0x00, 0x01, 0x00, 0x0C,  //    Request type and message length
+        0x21, 0x12, 0xa4, 0x42,  //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01,  // }
+        0xbc, 0x34, 0xd6, 0x86,  // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae,  // }
+        0x80, 0x29, 0x00, 0x08,  //    ICE-CONTROLLED attribute header
+        0x12, 0x34, 0x56, 0x78,  // }  ICE-CONTROLLED value (0x12345789ABCDEF0)
+        0x9A, 0xBC, 0xDE, 0xF0   // }
+    };
+    stun::ParseStat stat;
+    const auto result = stun::Message::parse(util::ConstBinaryView(request), stat);
+    EXPECT_EQ(stat.success.count(), 1);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->attribute_set.ice_controlled().has_value());
+    EXPECT_EQ(result->attribute_set.ice_controlled()->get(), 0x123456789ABCDEF0LL);
+}
+
 // ================================================================================
 // Negative cases
 
@@ -441,5 +513,75 @@ TEST_F(STUNMessageParserTest, invalid_integrity_sha1_hmac) {
     EXPECT_FALSE(*is_valid_result.value()->get());
 }
 
+TEST_F(STUNMessageParserTest, rfc8445_priority_attribute_not_32bit) {
+    auto Note = [](uint8_t v) { return v; };
+    std::vector<uint8_t> request = {
+        0x00, 0x01, 0x00, 0x08,  //    Request type and message length
+        0x21, 0x12, 0xa4, 0x42,  //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01,  // }
+        0xbc, 0x34, 0xd6, 0x86,  // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae,  // }
+        0x00, 0x24, 0x00, Note(0x03),  //    PRIORITY attribute header
+        0x12, 0x34, 0x56, 0x78         //    PRIORITY value (0x1234578)
+    };
+    stun::ParseStat stat;
+    const auto result = stun::Message::parse(util::ConstBinaryView(request), stat);
+    EXPECT_EQ(stat.success.count(), 0);
+    EXPECT_EQ(stat.error.count(), 1);
+    EXPECT_EQ(stat.invalid_priority_size.count(), 1);
+}
+
+TEST_F(STUNMessageParserTest, rfc8445_use_candidate_attribute_with_data) {
+    std::vector<uint8_t> request = {
+        0x00, 0x01, 0x00, 0x08,  //    Request type and message length
+        0x21, 0x12, 0xa4, 0x42,  //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01,  // }
+        0xbc, 0x34, 0xd6, 0x86,  // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae,  // }
+        0x00, 0x25, 0x00, 0x04,  //    USE-CANDIDATE attribute header
+        0x01, 0x02, 0x03, 0x04   // <= unexpected body for attribute
+    };
+    stun::ParseStat stat;
+    const auto result = stun::Message::parse(util::ConstBinaryView(request), stat);
+    EXPECT_EQ(stat.success.count(), 0);
+    EXPECT_EQ(stat.error.count(), 1);
+    EXPECT_EQ(stat.invalid_use_candidate_size.count(), 1);
+}
+
+TEST_F(STUNMessageParserTest, rfc8445_ice_controlling_attribute_not_64bit) {
+    auto Note = [](uint8_t v) { return v; };
+    std::vector<uint8_t> request = {
+        0x00, 0x01, 0x00, 0x08,  //    Request type and message length
+        0x21, 0x12, 0xa4, 0x42,  //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01,  // }
+        0xbc, 0x34, 0xd6, 0x86,  // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae,  // }
+        0x80, 0x2A, 0x00, Note(0x04),  //    ICE-CONTROLLING attribute header
+        0x12, 0x34, 0x56, 0x78,        //    ICE-CONTROLLING value
+    };
+    stun::ParseStat stat;
+    const auto result = stun::Message::parse(util::ConstBinaryView(request), stat);
+    EXPECT_EQ(stat.success.count(), 0);
+    EXPECT_EQ(stat.error.count(), 1);
+    EXPECT_EQ(stat.invalid_ice_controlling_size.count(), 1);
+}
+
+TEST_F(STUNMessageParserTest, rfc8445_ice_controlled_attribute_not_64bit) {
+    auto Note = [](uint8_t v) { return v; };
+    std::vector<uint8_t> request = {
+        0x00, 0x01, 0x00, 0x08,  //    Request type and message length
+        0x21, 0x12, 0xa4, 0x42,  //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01,  // }
+        0xbc, 0x34, 0xd6, 0x86,  // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae,  // }
+        0x80, 0x29, 0x00, Note(0x04),  //    ICE-CONTROLLED attribute header
+        0x12, 0x34, 0x56, 0x78,        //    ICE-CONTROLLED value
+    };
+    stun::ParseStat stat;
+    const auto result = stun::Message::parse(util::ConstBinaryView(request), stat);
+    EXPECT_EQ(stat.success.count(), 0);
+    EXPECT_EQ(stat.error.count(), 1);
+    EXPECT_EQ(stat.invalid_ice_controlled_size.count(), 1);
+}
 
 }
