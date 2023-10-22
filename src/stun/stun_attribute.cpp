@@ -35,10 +35,16 @@ std::optional<Attribute> Attribute::parse(const util::ConstBinaryView& vv, Attri
     case attr_registry::FINGERPRINT:        return util::fmap(FingerprintAttribute::parse(vv, stat),      std::move(create_attr_fun));
     case attr_registry::PRIORITY:           return util::fmap(PriorityAttribute::parse(vv, stat),         std::move(create_attr_fun));
     case attr_registry::ICE_CONTROLLING:    return util::fmap(IceControllingAttribute::parse(vv, stat),   std::move(create_attr_fun));
-    case attr_registry::ICE_CONTROLLED:     return util::fmap(IceControlledAttribute::parse(vv, stat),   std::move(create_attr_fun));
+    case attr_registry::ICE_CONTROLLED:     return util::fmap(IceControlledAttribute::parse(vv, stat),    std::move(create_attr_fun));
     case attr_registry::USE_CANDIDATE:      return util::fmap(UseCandidateAttribute::parse(vv, stat),     std::move(create_attr_fun));
     default:
-        return Attribute(type, UnknownAttribute(vv));
+        if (type.value() >= attr_registry::COMPREHANENSION_OPTIONAL) {
+            return Attribute(type, UnknownAttribute(vv));
+        } else {
+            stat.error.inc();
+            stat.unknown_comprehension_required_attr.inc();
+            return std::nullopt;
+        }
     }
 }
 

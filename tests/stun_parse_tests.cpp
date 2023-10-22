@@ -286,6 +286,23 @@ TEST_F(STUNMessageParserTest, rfc8445_ice_controlled_attribute) {
     EXPECT_EQ(result->attribute_set.ice_controlled()->get(), 0x123456789ABCDEF0LL);
 }
 
+TEST_F(STUNMessageParserTest, unknown_attribute_that_does_not_require_comprehension) {
+    std::vector<uint8_t> request = {
+        0x00, 0x01, 0x00, 0x0C,  //    Request type and message length
+        0x21, 0x12, 0xa4, 0x42,  //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01,  // }
+        0xbc, 0x34, 0xd6, 0x86,  // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae,  // }
+        0xFF, 0xFF, 0x00, 0x08,  // Attribute requires compreshension (0xFFFF)
+        0x12, 0x34, 0x56, 0x78,  //
+        0x9A, 0xBC, 0xDE, 0xF0   //
+    };
+    stun::ParseStat stat;
+    const auto result = stun::Message::parse(util::ConstBinaryView(request), stat);
+    EXPECT_EQ(stat.success.count(), 1);
+    EXPECT_TRUE(result.has_value());
+}
+
 // ================================================================================
 // Negative cases
 
@@ -582,6 +599,24 @@ TEST_F(STUNMessageParserTest, rfc8445_ice_controlled_attribute_not_64bit) {
     EXPECT_EQ(stat.success.count(), 0);
     EXPECT_EQ(stat.error.count(), 1);
     EXPECT_EQ(stat.invalid_ice_controlled_size.count(), 1);
+}
+
+TEST_F(STUNMessageParserTest, unknown_attribute_that_requires_comprehension) {
+    std::vector<uint8_t> request = {
+        0x00, 0x01, 0x00, 0x0C,  //    Request type and message length
+        0x21, 0x12, 0xa4, 0x42,  //    Magic cookie
+        0xb7, 0xe7, 0xa7, 0x01,  // }
+        0xbc, 0x34, 0xd6, 0x86,  // }  Transaction ID
+        0xfa, 0x87, 0xdf, 0xae,  // }
+        0x7F, 0xFF, 0x00, 0x08,  // Attribute requires compreshension (0x7FFF)
+        0x12, 0x34, 0x56, 0x78,  //
+        0x9A, 0xBC, 0xDE, 0xF0   //
+    };
+    stun::ParseStat stat;
+    const auto result = stun::Message::parse(util::ConstBinaryView(request), stat);
+    EXPECT_EQ(stat.error.count(), 1);
+    EXPECT_EQ(stat.unknown_comprehension_required_attr.count(), 1);
+    EXPECT_FALSE(result.has_value());
 }
 
 }
