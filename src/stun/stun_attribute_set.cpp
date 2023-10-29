@@ -63,4 +63,14 @@ bool AttributeSet::has_use_candidate() const noexcept {
     return m_map.find(AttributeType::from_uint16(attr_registry::USE_CANDIDATE)) != m_map.end();
 }
 
+std::vector<AttributeType> AttributeSet::unknown_comprehension_required() const noexcept {
+    std::vector<AttributeType> result;
+    for (const auto& p: m_unknown) {
+        if (p.type.is_comprehension_required()) {
+            result.emplace_back(p.type);
+        }
+    }
+    return result;
+}
+
 }

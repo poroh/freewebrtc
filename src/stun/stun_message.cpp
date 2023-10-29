@@ -10,6 +10,7 @@
 #include "stun/details/stun_attr_registry.hpp"
 #include "stun/details/stun_fingerprint.hpp"
 #include "stun/details/stun_constants.hpp"
+#include "util/util_variant_overloaded.hpp"
 
 namespace freewebrtc::stun {
 
@@ -104,48 +105,63 @@ std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat
         // With the exception of the FINGERPRINT attribute, which
         // appears after MESSAGE-INTEGRITY, agents MUST ignore all
         // other attributes that follow MESSAGE-INTEGRITY.
-        if (!integrity_interval.has_value() || type == attr_registry::FINGERPRINT) {
-            auto maybe_attr = Attribute::parse(attr_view, attr_type, stat);
-            if (!maybe_attr.has_value()) {
-                // statisitics is increased by Attribute::parse.
-                return std::nullopt;
-            }
-            const auto& attr = *maybe_attr;
-            if (attr.as<MessageIntegityAttribute>() != nullptr) {
-                // 15.4.  MESSAGE-INTEGRITY
-                // The text used as input to HMAC is the STUN message,
-                // including the header, up to and including the
-                // attribute preceding the MESSAGE-INTEGRITY
-                // attribute.
-                integrity_interval = util::ConstBinaryView::Interval{0, attr_offset};
-            }
-            if (const auto *fingerprint = attr.as<FingerprintAttribute>(); fingerprint != nullptr) {
-                // 15.5.  FINGERPRINT
-                // When present, the FINGERPRINT attribute MUST be the last attribute in
-                // the message, and thus will appear after MESSAGE-INTEGRITY.
-                if (next_attr_offset < vv.size()) {
-                    stat.error.inc();
-                    stat.fingerprint_not_last.inc();
-                    return std::nullopt;
-                }
-                // Normative:
-                // The value of the attribute is computed as the CRC-32 of the STUN message
-                // up to (but excluding) the FINGERPRINT attribute itself, XOR'ed with
-                // the 32-bit value 0x5354554e (the XOR helps in cases where an
-                // application packet is also using CRC-32 in it).
-                //
-                // Implementation: we xored fingerprint with 0x5354554e in FingerprintAttribute so
-                // it fingerprint->crc32 must be equal to crc32 of the message without additional xor.
-                const uint32_t v = crc32(vv.assured_subview(0, attr_offset));
-                if (v != fingerprint->crc32) {
-                    stat.error.inc();
-                    stat.invalid_fingerprint.inc();
-                    return std::nullopt;
-                }
-            }
-            attrs.emplace(std::move(*maybe_attr));
+        if (integrity_interval.has_value() && type != attr_registry::FINGERPRINT) {
+            attr_offset = next_attr_offset;
+            continue;
         }
-
+        auto maybe_attr = Attribute::parse(attr_view, attr_type, stat);
+        if (!maybe_attr.has_value()) {
+            // statisitics is increased by Attribute::parse.
+            return std::nullopt;
+        }
+        const bool success =
+            std::visit(
+                util::overloaded {
+                    [&](UnknownAttribute&& attr) {
+                        attrs.emplace(std::move(attr));
+                        return true;
+                    },
+                    [&](Attribute&& attr) {
+                        if (attr.as<MessageIntegityAttribute>() != nullptr) {
+                            // 15.4.  MESSAGE-INTEGRITY
+                            // The text used as input to HMAC is the STUN message,
+                            // including the header, up to and including the
+                            // attribute preceding the MESSAGE-INTEGRITY
+                            // attribute.
+                            integrity_interval = util::ConstBinaryView::Interval{0, attr_offset};
+                        }
+                        if (const auto *fingerprint = attr.as<FingerprintAttribute>(); fingerprint != nullptr) {
+                            // 15.5.  FINGERPRINT
+                            // When present, the FINGERPRINT attribute MUST be the last attribute in
+                            // the message, and thus will appear after MESSAGE-INTEGRITY.
+                            if (next_attr_offset < vv.size()) {
+                                stat.error.inc();
+                                stat.fingerprint_not_last.inc();
+                                return false;
+                            }
+                            // Normative:
+                            // The value of the attribute is computed as the CRC-32 of the STUN message
+                            // up to (but excluding) the FINGERPRINT attribute itself, XOR'ed with
+                            // the 32-bit value 0x5354554e (the XOR helps in cases where an
+                            // application packet is also using CRC-32 in it).
+                            //
+                            // Implementation: we xored fingerprint with 0x5354554e in FingerprintAttribute so
+                            // it fingerprint->crc32 must be equal to crc32 of the message without additional xor.
+                            const uint32_t v = crc32(vv.assured_subview(0, attr_offset));
+                            if (v != fingerprint->crc32) {
+                                stat.error.inc();
+                                stat.invalid_fingerprint.inc();
+                                return false;
+                            }
+                        }
+                        attrs.emplace(std::move(attr));
+                        return true;
+                    }
+                },
+                std::move(*maybe_attr));
+        if (!success) {
+            return std::nullopt;
+        }
         attr_offset = next_attr_offset;
     }
 

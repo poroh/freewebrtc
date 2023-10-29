@@ -12,11 +12,13 @@
 #include "stun/details/stun_fingerprint.hpp"
 #include "stun/details/stun_constants.hpp"
 #include "util/util_fmap.hpp"
+#include "util/util_variant_overloaded.hpp"
 
 namespace freewebrtc::stun {
 
-UnknownAttribute::UnknownAttribute(const util::ConstBinaryView& vv)
-    : data(vv.begin(), vv.end())
+UnknownAttribute::UnknownAttribute(AttributeType t, const util::ConstBinaryView& vv)
+    : type(t)
+    , data(vv.begin(), vv.end())
 {}
 
 Attribute::Attribute(AttributeType t, Value&& v)
@@ -24,7 +26,7 @@ Attribute::Attribute(AttributeType t, Value&& v)
     , m_value(std::move(v))
 {}
 
-std::optional<Attribute> Attribute::parse(const util::ConstBinaryView& vv, AttributeType type, ParseStat& stat) {
+std::optional<Attribute::ParseResult> Attribute::parse(const util::ConstBinaryView& vv, AttributeType type, ParseStat& stat) {
     auto create_attr_fun = [=](auto&& attr) { return Attribute(type, attr); };
     switch (type.value()) {
     // case attr_registry::MAPPED_ADDRESS:  return util::fmap(MappedAddressAttribute::parse(vv, stat),    std::move(create_attr_fun));
@@ -38,14 +40,26 @@ std::optional<Attribute> Attribute::parse(const util::ConstBinaryView& vv, Attri
     case attr_registry::ICE_CONTROLLED:     return util::fmap(IceControlledAttribute::parse(vv, stat),    std::move(create_attr_fun));
     case attr_registry::USE_CANDIDATE:      return util::fmap(UseCandidateAttribute::parse(vv, stat),     std::move(create_attr_fun));
     default:
-        if (type.value() >= attr_registry::COMPREHANENSION_OPTIONAL) {
-            return Attribute(type, UnknownAttribute(vv));
-        } else {
-            stat.error.inc();
-            stat.unknown_comprehension_required_attr.inc();
-            return std::nullopt;
-        }
+        return UnknownAttribute(type, vv);
     }
+}
+
+Attribute Attribute::create(Value&& v) {
+    return std::visit(
+        util::overloaded {
+            [](XorMappedAddressAttribute&& a)  { return Attribute(AttributeType::from_uint16(attr_registry::XOR_MAPPED_ADDRESS), std::move(a)); },
+            [](UsernameAttribute&& a)          { return Attribute(AttributeType::from_uint16(attr_registry::USERNAME), std::move(a)); },
+            [](SoftwareAttribute&& a)          { return Attribute(AttributeType::from_uint16(attr_registry::SOFTWARE), std::move(a)); },
+            [](MessageIntegityAttribute&& a)   { return Attribute(AttributeType::from_uint16(attr_registry::MESSAGE_INTEGRITY), std::move(a)); },
+            [](FingerprintAttribute&& a)       { return Attribute(AttributeType::from_uint16(attr_registry::FINGERPRINT), std::move(a)); },
+            [](PriorityAttribute&& a)          { return Attribute(AttributeType::from_uint16(attr_registry::PRIORITY), std::move(a)); },
+            [](IceControllingAttribute&& a)    { return Attribute(AttributeType::from_uint16(attr_registry::ICE_CONTROLLING), std::move(a)); },
+            [](IceControlledAttribute&& a)     { return Attribute(AttributeType::from_uint16(attr_registry::ICE_CONTROLLED), std::move(a)); },
+            [](UseCandidateAttribute&& a)      { return Attribute(AttributeType::from_uint16(attr_registry::USE_CANDIDATE), std::move(a)); },
+            [](UnknownAttributesAttribute&& a) { return Attribute(AttributeType::from_uint16(attr_registry::UNKNOWN_ATTRIBUTES), std::move(a)); },
+            [](ErrorCodeAttribute&& a)         { return Attribute(AttributeType::from_uint16(attr_registry::ERROR_CODE), std::move(a)); }
+        },
+        std::move(v));
 }
 
 std::optional<XorMappedAddressAttribute> XorMappedAddressAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {

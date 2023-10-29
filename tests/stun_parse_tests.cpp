@@ -614,9 +614,9 @@ TEST_F(STUNMessageParserTest, unknown_attribute_that_requires_comprehension) {
     };
     stun::ParseStat stat;
     const auto result = stun::Message::parse(util::ConstBinaryView(request), stat);
-    EXPECT_EQ(stat.error.count(), 1);
-    EXPECT_EQ(stat.unknown_comprehension_required_attr.count(), 1);
-    EXPECT_FALSE(result.has_value());
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->attribute_set.unknown_comprehension_required().size(), 1);
+    EXPECT_EQ(result->attribute_set.unknown_comprehension_required()[0].value(), 0x7fff);
 }
 
 }

@@ -9,6 +9,7 @@ set(SUBLIBS
     crypto
     stun
     net
+    util
 )
 
 add_library(freewebrtc)

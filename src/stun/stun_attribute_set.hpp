@@ -18,6 +18,7 @@ namespace freewebrtc::stun {
 class AttributeSet {
 public:
     void emplace(Attribute&&);
+    void emplace(UnknownAttribute&&);
     template<typename Attr>
     using MaybeAttr = std::optional<std::reference_wrapper<const Attr>>;
     MaybeAttr<MessageIntegityAttribute::Digest> integrity() const noexcept;
@@ -28,8 +29,11 @@ public:
     MaybeAttr<uint64_t> ice_controlling() const noexcept;
     MaybeAttr<uint64_t> ice_controlled() const noexcept;
     bool has_use_candidate() const noexcept;
+    // Return list of uknown comprehension-required attributes
+    std::vector<AttributeType> unknown_comprehension_required() const noexcept;
 private:
     std::unordered_map<AttributeType, Attribute> m_map;
+    std::vector<UnknownAttribute> m_unknown;
 };
 
 //
@@ -40,6 +44,10 @@ inline void AttributeSet::emplace(Attribute&& attr)  {
         return;
     }
     m_map.emplace(attr.type(), std::move(attr));
+}
+
+inline void AttributeSet::emplace(UnknownAttribute&& attr) {
+    m_unknown.emplace_back(std::move(attr));
 }
 
 }

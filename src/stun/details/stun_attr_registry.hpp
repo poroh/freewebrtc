@@ -17,6 +17,7 @@ static constexpr uint16_t MAPPED_ADDRESS     = 0x0001;
 static constexpr uint16_t USERNAME           = 0x0006;
 static constexpr uint16_t MESSAGE_INTEGRITY  = 0x0008;
 static constexpr uint16_t ERROR_CODE         = 0x0009;
+static constexpr uint16_t UNKNOWN_ATTRIBUTES = 0x000A;
 static constexpr uint16_t REALM              = 0x0014;
 static constexpr uint16_t NONCE              = 0x0016;
 static constexpr uint16_t XOR_MAPPED_ADDRESS = 0x0020;

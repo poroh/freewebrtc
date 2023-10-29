@@ -15,7 +15,6 @@
 
 #include "util/util_endian.hpp"
 
-
 namespace freewebrtc::util {
 
 class ConstBinaryView : private std::basic_string_view<const uint8_t> {

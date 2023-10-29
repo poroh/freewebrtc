@@ -26,9 +26,10 @@ namespace freewebrtc::stun {
 struct ParseStat;
 
 struct UnknownAttribute {
-    UnknownAttribute(const util::ConstBinaryView&);
+    UnknownAttribute(AttributeType type, const util::ConstBinaryView&);
     UnknownAttribute(UnknownAttribute&&) = default;
 
+    AttributeType type;
     std::vector<uint8_t> data;
 };
 
@@ -84,12 +85,30 @@ struct IceControlledAttribute {
     static std::optional<IceControlledAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
+struct UnknownAttributesAttribute {
+    std::vector<AttributeType> types;
+};
+
+struct ErrorCodeAttribute {
+    // 15.6.  ERROR-CODE
+    enum class Code {
+        TryAlternate     = 300,
+        BadRequest       = 400,
+        Unauthorized     = 401,
+        UnknownAttribute = 420,
+        StaleNonce       = 438,
+        ServerError      = 500
+    };
+    Code code;
+    std::optional<std::string> reason_phrase;
+};
+
 class Attribute {
 public:
     using Value =
         std::variant<
             XorMappedAddressAttribute,
-            MappedAddressAttribute,
+            // MappedAddressAttribute,
             UsernameAttribute,
             SoftwareAttribute,
             MessageIntegityAttribute,
@@ -98,7 +117,8 @@ public:
             IceControllingAttribute,
             IceControlledAttribute,
             UseCandidateAttribute,
-            UnknownAttribute
+            UnknownAttributesAttribute,
+            ErrorCodeAttribute
         >;
 
     AttributeType type() const noexcept;
@@ -106,7 +126,10 @@ public:
     template<typename AttrType>
     const AttrType *as() const noexcept;
 
-    static std::optional<Attribute> parse(const util::ConstBinaryView&, AttributeType type, ParseStat&);
+    using ParseResult = std::variant<Attribute, UnknownAttribute>;
+    static std::optional<ParseResult> parse(const util::ConstBinaryView&, AttributeType type, ParseStat&);
+    static Attribute create(Value&&);
+
 private:
     Attribute(AttributeType, Value&&);
     AttributeType m_type;

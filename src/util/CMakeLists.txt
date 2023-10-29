@@ -5,14 +5,7 @@
 #
 
 set(SOURCES
-    stun_attribute.cpp
-    stun_attribute_set.cpp
-    stun_message.cpp
-    stun_password.cpp
-    stun_method.cpp
-    stun_address.cpp
-    stun_server_stateless.cpp
-    details/stun_fingerprint.cpp
+    util_hash_murmur.cpp
 )
 file(GLOB HEADERS "*.hpp")
 
