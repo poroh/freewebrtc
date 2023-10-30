@@ -20,7 +20,8 @@ struct Header {
     Class cls;
     Method method;
     TransactionId transaction_id;
-};
 
+    util::ByteVec build(size_t msg_len) const;
+};
 
 }

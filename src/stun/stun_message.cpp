@@ -14,13 +14,9 @@
 
 namespace freewebrtc::stun {
 
-// RFC5389: All STUN messages MUST start with a 20-byte header followed by zero
-// or more Attributes.
-static constexpr size_t STUN_HEADER_SIZE = 20;
-// Size of attribute header
-static constexpr size_t STUN_ATTR_HEADER_SIZE = 4;
 
 std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+    using namespace details;
     if (vv.size() < STUN_HEADER_SIZE) {
         stat.error.inc();
         stat.invalid_size.inc();
@@ -178,7 +174,10 @@ std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat
     };
 }
 
-ReturnValue<std::optional<bool>> Message::is_valid(const util::ConstBinaryView& data, const Password& password, crypto::SHA1Hash::Func h) const noexcept {
+ReturnValue<std::optional<bool>> Message::is_valid(const util::ConstBinaryView& data, const IntegrityData& idata) const noexcept {
+    using namespace details;
+    const auto& h = idata.hash;
+    const auto& password = idata.password;
     using MaybeBool = std::optional<bool>;
     if (!integrity_interval.has_value()) {
         return MaybeBool{std::nullopt};
@@ -211,6 +210,18 @@ ReturnValue<std::optional<bool>> Message::is_valid(const util::ConstBinaryView& 
         return *maybe_err;
     }
     return MaybeBool{digest.value()->get().value == integrity.get().value};
+}
+
+ReturnValue<util::ByteVec> Message::build(const MaybeInterity& maybeinterity) const noexcept {
+    const auto attrs_rv = attribute_set.build(header, maybeinterity);
+    if (attrs_rv.error().has_value()) {
+        return attrs_rv.error().value();
+    }
+    const auto& attrs = attrs_rv.value()->get();
+    return util::ConstBinaryView::concat({
+            util::ConstBinaryView(header.build(attrs.size())),
+            util::ConstBinaryView(attrs)
+        });
 }
 
 }

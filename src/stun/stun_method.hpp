@@ -18,6 +18,8 @@ public:
     static Method binding() noexcept;
 
     unsigned value() const;
+    uint16_t to_msg_type() const noexcept;
+
     bool operator==(const Method&) const noexcept = default;
 private:
     explicit Method(unsigned);
@@ -42,6 +44,12 @@ inline Method Method::from_msg_type(uint16_t v) noexcept {
     const auto m4_6  = (v >> 5) & 0x7;
     const auto m7_11 = (v >> 9);
     return Method(m0_3 | (m4_6 << 4) | (m7_11 << 7));
+}
+
+inline uint16_t Method::to_msg_type() const noexcept {
+    return (m_value & 0xF)
+        | ((m_value >> 4) & 0x7) << 5
+        | ((m_value >> 7) << 9);
 }
 
 }

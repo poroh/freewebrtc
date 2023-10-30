@@ -17,7 +17,7 @@
 #include "stun/stun_header.hpp"
 #include "stun/stun_attribute_set.hpp"
 #include "stun/stun_parse_stat.hpp"
-#include "stun/stun_password.hpp"
+#include "stun/stun_integrity.hpp"
 
 #include "crypto/crypto_hash.hpp"
 
@@ -41,7 +41,10 @@ struct Message {
     // If MESSAGE-INTEGRITY is not present then function returns std::nullopt
     // Error may occue if hash function returns error. Otherwise return_value.value()
     // is always not nullptr
-    ReturnValue<std::optional<bool>> is_valid(const util::ConstBinaryView&, const Password&, crypto::SHA1Hash::Func) const noexcept;
+    ReturnValue<std::optional<bool>> is_valid(const util::ConstBinaryView&, const IntegrityData&) const noexcept;
+
+    // Build message as bytes
+    ReturnValue<util::ByteVec> build(const MaybeInterity& maybe_integrity = std::nullopt) const noexcept;
 };
 
 }

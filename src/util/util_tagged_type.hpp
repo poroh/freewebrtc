@@ -26,6 +26,11 @@ struct TaggedType {
     TaggedType(TaggedType&&) = default;
     explicit TaggedType(const T&);
     explicit TaggedType(T&&);
+
+    TaggedType& operator=(const TaggedType&) = default;
+    TaggedType& operator=(TaggedType&&) = default;
+
+    bool operator==(const TaggedType&) const = default;
 };
 
 //

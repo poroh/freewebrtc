@@ -23,8 +23,12 @@ public:
         IPv4,
         IPv6
     };
+    static Family ipv4() noexcept;
+    static Family ipv6() noexcept;
     static std::optional<Family> from_uint8(std::optional<uint8_t>);
+
     Type type() const noexcept;
+    uint8_t to_uint8() const noexcept;
 private:
     explicit Family(Type);
     Type m_type;
@@ -41,6 +45,8 @@ public:
     // mapped IP address with the concatenation of the magic cookie
     // and the 96-bit transaction ID.
     net::ip::Address to_address(const TransactionId&) const noexcept;
+    Family family() const noexcept;
+    util::ConstBinaryView view() const noexcept;
 private:
     using V4Holder = std::array<uint8_t, net::ip::AddressV4::size()>;
     using V6Holder = std::array<uint8_t, net::ip::AddressV6::size()>;
@@ -59,6 +65,14 @@ inline Family::Family(Type type)
 
 inline Family::Type Family::type() const noexcept {
     return m_type;
+}
+
+inline Family Family::ipv4() noexcept {
+    return Family(IPv4);
+}
+
+inline Family Family::ipv6() noexcept {
+    return Family(IPv6);
 }
 
 }

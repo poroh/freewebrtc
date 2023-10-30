@@ -5,6 +5,7 @@
 #
 
 set(SOURCES
+    stun_header.cpp
     stun_attribute.cpp
     stun_attribute_set.cpp
     stun_message.cpp

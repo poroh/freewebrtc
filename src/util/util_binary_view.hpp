@@ -18,18 +18,19 @@
 namespace freewebrtc::util {
 
 class ConstBinaryView : private std::basic_string_view<const uint8_t> {
-    using ByteT = uint8_t;
-    using Base = std::basic_string_view<const ByteT>;
+    using Base = std::basic_string_view<value_type>;
 public:
+    using ByteT = uint8_t;
+    using ByteVec = std::vector<ByteT>;
     struct Interval {
         size_t offset;
         size_t count;
     };
     ConstBinaryView(const void *, size_t count);
-    explicit ConstBinaryView(const std::vector<uint8_t>&);
+    explicit ConstBinaryView(const ByteVec&);
 
     template<size_t SIZE>
-    explicit ConstBinaryView(const std::array<uint8_t, SIZE>&);
+    explicit ConstBinaryView(const std::array<ByteT, SIZE>&);
 
     bool contains(const Interval& i) const;
     using Base::data;
@@ -51,9 +52,12 @@ public:
     std::optional<ConstBinaryView> subview(size_t offset, size_t size) const;
     std::optional<ConstBinaryView> subview(const Interval&) const;
 
+    static ByteVec concat(const std::vector<ConstBinaryView>&);
+
     bool operator==(const ConstBinaryView&) const noexcept;
 };
 
+using ByteVec = ConstBinaryView::ByteVec;
 
 //
 // inlines
@@ -151,6 +155,5 @@ inline std::optional<ConstBinaryView> ConstBinaryView::subview(const Interval& i
 inline bool ConstBinaryView::operator==(const ConstBinaryView& other) const noexcept {
     return static_cast<const Base&>(*this) == static_cast<const Base&>(other);
 }
-
 
 }

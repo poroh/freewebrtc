@@ -90,6 +90,16 @@ std::optional<XorMappedAddressAttribute> XorMappedAddressAttribute::parse(const 
     return XorMappedAddressAttribute{*maybe_xaddr, port};
 }
 
+util::ByteVec XorMappedAddressAttribute::build() const {
+    const uint16_t xport = port.value() ^ (details::MAGIC_COOKIE >> 16);
+    const uint8_t family = addr.family().to_uint8();
+    const uint32_t first_word = util::host_to_network_u32(xport | (family >> 16));
+    return util::ConstBinaryView::concat({
+            util::ConstBinaryView(&first_word, sizeof(first_word)),
+            addr.view()
+        });
+}
+
 std::optional<SoftwareAttribute> SoftwareAttribute::parse(const util::ConstBinaryView& vv, ParseStat&) {
     return SoftwareAttribute{std::string(vv.begin(), vv.end())};
 }
@@ -159,6 +169,41 @@ std::optional<UseCandidateAttribute> UseCandidateAttribute::parse(const util::Co
         return std::nullopt;
     }
     return UseCandidateAttribute{};
+}
+
+util::ByteVec UnknownAttributesAttribute::build() const {
+    //  0                   1                   2                   3
+    //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    // |      Attribute 1 Type           |     Attribute 2 Type        |
+    // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    // |      Attribute 3 Type           |     Attribute 4 Type    ...
+    // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    using AttrRawType = uint16_t;
+    std::vector<uint8_t> result(types.size() * sizeof(AttrRawType));
+    auto pos = result.begin();
+    for (auto t: types) {
+        AttrRawType tv = util::host_to_network_u16(t.value());
+        memcpy(&*pos, &tv, sizeof(AttrRawType));
+        pos += sizeof(tv);
+    }
+    return result;
+}
+
+util::ByteVec ErrorCodeAttribute::build() const {
+    //  0                   1                   2                   3
+    //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    // |           Reserved, should be 0         |Class|     Number    |
+    // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    // |      Reason Phrase (variable)                                ..
+    // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    uint32_t first_word = util::host_to_network_u32(((code / 100) << 5) | (code % 100));
+    return util::ConstBinaryView::concat({
+            util::ConstBinaryView(&first_word, sizeof(first_word)),
+            reason_phrase.has_value() ? util::ConstBinaryView(reason_phrase->data(), reason_phrase->size())
+                                      : util::ConstBinaryView(&first_word, 0) // 0 is by intention!
+        });
 }
 
 }

@@ -74,6 +74,11 @@ inline Hash<TagType, SIZE>::Hash(Value&& v)
 {}
 
 template<typename TagType, size_t SIZE>
+const typename Hash<TagType, SIZE>::Value& Hash<TagType, SIZE>::value() const noexcept {
+    return m_data;
+}
+
+template<typename TagType, size_t SIZE>
 inline bool Hash<TagType, SIZE>::operator==(const Hash& other) const noexcept {
     return m_data == other.m_data;
 }
@@ -82,5 +87,6 @@ template<typename TagType, size_t SIZE>
 inline util::ConstBinaryView Hash<TagType, SIZE>::view() const noexcept {
     return util::ConstBinaryView(m_data);
 }
+
 
 }

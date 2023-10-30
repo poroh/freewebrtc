@@ -28,6 +28,9 @@ struct ParseStat;
 struct UnknownAttribute {
     UnknownAttribute(AttributeType type, const util::ConstBinaryView&);
     UnknownAttribute(UnknownAttribute&&) = default;
+    UnknownAttribute(const UnknownAttribute&) = default;
+    UnknownAttribute& operator=(const UnknownAttribute&) = default;
+    UnknownAttribute& operator=(UnknownAttribute&&) = default;
 
     AttributeType type;
     std::vector<uint8_t> data;
@@ -43,6 +46,7 @@ struct XorMappedAddressAttribute {
     XoredAddress addr;
     net::Port port;
     static std::optional<XorMappedAddressAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    util::ByteVec build() const;
 };
 
 struct UsernameAttribute {
@@ -87,11 +91,12 @@ struct IceControlledAttribute {
 
 struct UnknownAttributesAttribute {
     std::vector<AttributeType> types;
+    util::ByteVec build() const;
 };
 
 struct ErrorCodeAttribute {
     // 15.6.  ERROR-CODE
-    enum class Code {
+    enum Code {
         TryAlternate     = 300,
         BadRequest       = 400,
         Unauthorized     = 401,
@@ -99,8 +104,10 @@ struct ErrorCodeAttribute {
         StaleNonce       = 438,
         ServerError      = 500
     };
-    Code code;
+    int code;
     std::optional<std::string> reason_phrase;
+
+    util::ByteVec build() const;
 };
 
 class Attribute {
@@ -122,6 +129,7 @@ public:
         >;
 
     AttributeType type() const noexcept;
+    const Value& value() const noexcept;
 
     template<typename AttrType>
     const AttrType *as() const noexcept;
@@ -146,6 +154,10 @@ inline AttributeType Attribute::type() const noexcept {
 template<typename AttrType>
 inline const AttrType *Attribute::as() const noexcept {
     return std::get_if<AttrType>(&m_value);
+}
+
+inline const Attribute::Value& Attribute::value() const noexcept {
+    return m_value;
 }
 
 }

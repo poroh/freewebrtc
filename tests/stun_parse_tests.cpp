@@ -66,7 +66,7 @@ TEST_F(STUNMessageParserTest, rfc5796_2_1_sample_request) {
     EXPECT_EQ(result->header.method, stun::Method::binding());
     auto password = stun::Password::short_term(precis::OpaqueString("VOkJxbRl1RmTxUk/WvJxBt"), crypto::openssl::sha1);
     ASSERT_TRUE(password.value().has_value());
-    auto is_valid_result = result->is_valid(util::ConstBinaryView(request), *password.value(), crypto::openssl::sha1);
+    auto is_valid_result = result->is_valid(util::ConstBinaryView(request), stun::IntegrityData{*password.value(), crypto::openssl::sha1});
     ASSERT_TRUE(!is_valid_result.error().has_value());
     EXPECT_TRUE(is_valid_result.value().has_value() && is_valid_result.value()->get().has_value() && *is_valid_result.value()->get());
     auto username = result->attribute_set.username();
@@ -118,7 +118,7 @@ TEST_F(STUNMessageParserTest, rfc5796_2_2_sample_response) {
 
     auto password = stun::Password::short_term(precis::OpaqueString("VOkJxbRl1RmTxUk/WvJxBt"), crypto::openssl::sha1);
     ASSERT_TRUE(password.value().has_value());
-    auto is_valid_result = result->is_valid(util::ConstBinaryView(response), *password.value(), crypto::openssl::sha1);
+    auto is_valid_result = result->is_valid(util::ConstBinaryView(response), stun::IntegrityData{*password.value(), crypto::openssl::sha1});
     ASSERT_TRUE(!is_valid_result.error().has_value());
     EXPECT_TRUE(is_valid_result.value().has_value() && is_valid_result.value()->get().has_value() && *is_valid_result.value()->get());
 
@@ -175,7 +175,7 @@ TEST_F(STUNMessageParserTest, rfc5796_2_3_sample_ipv6_response) {
 
     auto password = stun::Password::short_term(precis::OpaqueString("VOkJxbRl1RmTxUk/WvJxBt"), crypto::openssl::sha1);
     ASSERT_TRUE(password.value().has_value());
-    auto is_valid_result = result->is_valid(util::ConstBinaryView(response), *password.value(), crypto::openssl::sha1);
+    auto is_valid_result = result->is_valid(util::ConstBinaryView(response), stun::IntegrityData{*password.value(), crypto::openssl::sha1});
     ASSERT_TRUE(!is_valid_result.error().has_value());
     EXPECT_TRUE(is_valid_result.value().has_value() && is_valid_result.value()->get().has_value() && *is_valid_result.value()->get());
 
@@ -524,7 +524,7 @@ TEST_F(STUNMessageParserTest, invalid_integrity_sha1_hmac) {
 
     auto password = stun::Password::short_term(precis::OpaqueString("VOkJxbRl1RmTxUk/WvJxBt"), crypto::openssl::sha1);
     ASSERT_TRUE(password.value().has_value());
-    auto is_valid_result = result->is_valid(util::ConstBinaryView(response), *password.value(), crypto::openssl::sha1);
+    auto is_valid_result = result->is_valid(util::ConstBinaryView(response), stun::IntegrityData{*password.value(), crypto::openssl::sha1});
     ASSERT_TRUE(!is_valid_result.error().has_value());
     ASSERT_TRUE(is_valid_result.value().has_value() && is_valid_result.value()->get().has_value());
     EXPECT_FALSE(*is_valid_result.value()->get());

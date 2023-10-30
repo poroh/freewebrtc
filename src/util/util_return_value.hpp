@@ -26,6 +26,8 @@ public:
     ReturnValue(const std::error_code&);
     ReturnValue(const ReturnValue&) = default;
     ReturnValue(ReturnValue&&) = default;
+    ReturnValue& operator=(const ReturnValue&) = default;
+    ReturnValue& operator=(ReturnValue&&) = default;
 
     using MaybeError = std::optional<Error>;
     MaybeError error() const noexcept;

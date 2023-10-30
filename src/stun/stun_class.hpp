@@ -28,6 +28,7 @@ public:
     static Class success_response() noexcept;
     static Class error_response() noexcept;
 
+    uint16_t to_msg_type() const noexcept;
     Value value() const noexcept;
 
     bool operator==(const Class&) const = default;
@@ -64,6 +65,12 @@ inline Class Class::from_msg_type(uint16_t v) noexcept {
     }
     return Class(ERROR_RESPONSE);
 }
+
+inline uint16_t Class::to_msg_type() const noexcept {
+    return ((m_value & 0x1) << 4)
+        | ((m_value >> 1) << 8);
+}
+
 
 inline Class Class::request() noexcept {
     return Class(REQUEST);

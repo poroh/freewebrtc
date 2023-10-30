@@ -10,6 +10,7 @@
 #include "stun/stun_transaction_id.hpp"
 #include "stun/details/stun_attr_registry.hpp"
 #include "stun/details/stun_constants.hpp"
+#include "util/util_variant_overloaded.hpp"
 
 namespace freewebrtc::stun {
 
@@ -24,6 +25,15 @@ std::optional<Family> Family::from_uint8(std::optional<uint8_t> maybe_v) {
             return Family(Family::IPv6);
     }
     return std::nullopt;
+}
+
+uint8_t Family::to_uint8() const noexcept {
+    switch (m_type) {
+    case IPv4:
+        return attr_registry::FAMILY_IPV4;
+    case IPv6:
+        return attr_registry::FAMILY_IPV6;
+    }
 }
 
 std::optional<XoredAddress> XoredAddress::from_view(Family f, const util::ConstBinaryView& vv) {
@@ -51,12 +61,9 @@ XoredAddress::XoredAddress(Value&& v)
     : m_value(std::move(v))
 {}
 
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
-
 net::ip::Address XoredAddress::to_address(const TransactionId& tid) const noexcept {
     return std::visit(
-        overloaded {
+        util::overloaded {
             [](const V4Holder& v) {
                 V4Holder vv = v;
                 const uint32_t magic = util::host_to_network_u32(details::MAGIC_COOKIE);
@@ -81,5 +88,31 @@ net::ip::Address XoredAddress::to_address(const TransactionId& tid) const noexce
             }
         }, m_value);
 }
+
+Family XoredAddress::family() const noexcept {
+    return std::visit(
+        util::overloaded {
+            [](const V4Holder&) {
+                return Family::ipv4();
+            },
+            [&](const V6Holder&) {
+                return Family::ipv6();
+            }
+        }, m_value);
+}
+
+util::ConstBinaryView XoredAddress::view() const noexcept {
+    return std::visit(
+        util::overloaded {
+            [](const V4Holder& h4) {
+                return util::ConstBinaryView(h4);
+            },
+            [&](const V6Holder& h6) {
+                return util::ConstBinaryView(h6);
+            }
+        }, m_value);
+}
+
+
 
 }
