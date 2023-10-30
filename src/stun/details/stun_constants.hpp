@@ -26,5 +26,7 @@ static constexpr size_t HEADER_SIZE = 20;
 static constexpr size_t STUN_HEADER_SIZE = 20;
 // Size of attribute header
 static constexpr size_t STUN_ATTR_HEADER_SIZE = 4;
+//
+static constexpr size_t FINGERPRINT_CRC_SIZE = 4;
 
 }

@@ -8,7 +8,9 @@
 
 #include "stun/stun_attribute_set.hpp"
 #include "stun/stun_header.hpp"
+#include "stun/details/stun_fingerprint.hpp"
 #include "util/util_variant_overloaded.hpp"
+#include <iostream>
 
 namespace freewebrtc::stun {
 
@@ -102,8 +104,13 @@ AttributeSet AttributeSet::create(std::vector<Attribute::Value> ka, std::vector<
 
 ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const MaybeInterity& maybe_integrity) const {
     std::vector<util::ConstBinaryView> result;
-    result.reserve((m_map.size() + m_unknown.size()) * 2);
-    std::vector<uint32_t> attr_headers(m_map.size() + m_unknown.size() + (maybe_integrity.has_value() ? 1 : 0));
+    const size_t num_attrs = m_map.size() + m_unknown.size() + (maybe_integrity.has_value() ? 1 : 0);
+    result.reserve(num_attrs * 2 + 1);
+    int dummy_hdr;
+    result.emplace_back(&dummy_hdr, 0);
+    auto& header_place_holder = result[0];
+
+    std::vector<uint32_t> attr_headers(num_attrs);
     auto attr_headers_it = attr_headers.begin();
     const uint32_t padding = 0;
     uint32_t total_size = 0;
@@ -187,9 +194,8 @@ ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const Maybe
         std::vector<util::ConstBinaryView> to_sign;
         to_sign.reserve(result.size() + 1);
         auto fake_header = header.build(total_size + details::STUN_ATTR_HEADER_SIZE + crypto::SHA1Hash::size);
-        to_sign.emplace_back(fake_header);
-        std::copy(result.begin(), result.end(), std::back_inserter(to_sign));
-        maybe_integrity_digest_rv = crypto::hmac::digest(to_sign, p.opad(), p.ipad(), h);
+        header_place_holder = util::ConstBinaryView(fake_header);
+        maybe_integrity_digest_rv = crypto::hmac::digest(result, p.opad(), p.ipad(), h);
         const auto& integrity_digest_rv = maybe_integrity_digest_rv.value();
         if (integrity_digest_rv.error().has_value()) {
             return integrity_digest_rv.error().value();
@@ -197,9 +203,18 @@ ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const Maybe
         add_attr(attr_registry::MESSAGE_INTEGRITY, util::ConstBinaryView(integrity_digest_rv.value()->get().value.value()));
     }
 
-    uint32_t fingerprint_data;
+    util::ByteVec real_header;
+    uint32_t fingerprint_data = 0;
     if (m_map.find(AttributeType::from_uint16(attr_registry::FINGERPRINT)) != m_map.end()) {
+        static_assert(sizeof(fingerprint_data) == details::FINGERPRINT_CRC_SIZE);
+        real_header = header.build(total_size + details::FINGERPRINT_CRC_SIZE + details::STUN_ATTR_HEADER_SIZE);
+        header_place_holder = util::ConstBinaryView(real_header);
+        const auto fp = crc32(result) ^ FINGERPRINT_XOR;
+        fingerprint_data = util::host_to_network_u32(fp);
         add_attr(attr_registry::FINGERPRINT, util::ConstBinaryView(&fingerprint_data, sizeof(fingerprint_data)));
+    } else {
+        real_header = header.build(total_size);
+        header_place_holder = util::ConstBinaryView(real_header);
     }
     return util::ConstBinaryView::concat(result);
 }

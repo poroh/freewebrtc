@@ -11,6 +11,7 @@
 #include "stun/details/stun_fingerprint.hpp"
 #include "stun/details/stun_constants.hpp"
 #include "util/util_variant_overloaded.hpp"
+#include <iostream>
 
 namespace freewebrtc::stun {
 
@@ -213,15 +214,7 @@ ReturnValue<std::optional<bool>> Message::is_valid(const util::ConstBinaryView& 
 }
 
 ReturnValue<util::ByteVec> Message::build(const MaybeInterity& maybeinterity) const noexcept {
-    const auto attrs_rv = attribute_set.build(header, maybeinterity);
-    if (attrs_rv.error().has_value()) {
-        return attrs_rv.error().value();
-    }
-    const auto& attrs = attrs_rv.value()->get();
-    return util::ConstBinaryView::concat({
-            util::ConstBinaryView(header.build(attrs.size())),
-            util::ConstBinaryView(attrs)
-        });
+    return attribute_set.build(header, maybeinterity);
 }
 
 }

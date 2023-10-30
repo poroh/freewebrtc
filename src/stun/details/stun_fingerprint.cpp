@@ -55,12 +55,25 @@ static uint32_t CRC32_TABLE[] = {
     0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d
 };
 
+uint32_t crc32_helper(const util::ConstBinaryView& vv, uint32_t start) {
+    return std::accumulate(vv.begin(),
+                           vv.end(),
+                           start,
+                           [](uint32_t crc, uint8_t v) {
+                               return CRC32_TABLE[(crc ^ v) & 0xff] ^ ((crc) >> 8);
+                           });
+}
+
 uint32_t crc32(const util::ConstBinaryView& vv) {
-    return ~std::accumulate(vv.begin(),
-                            vv.end(),
+    return ~crc32_helper(vv, 0xffffffff);
+}
+
+uint32_t crc32(const std::vector<util::ConstBinaryView>& vvv) {
+    return ~std::accumulate(vvv.begin(),
+                            vvv.end(),
                             0xffffffff,
-                            [](uint32_t crc, uint8_t v) {
-                                return CRC32_TABLE[(crc ^ v) & 0xff] ^ ((crc) >> 8);
+                            [](uint32_t crc, const util::ConstBinaryView& vv) {
+                                return crc32_helper(vv, crc);
                             });
 }
 

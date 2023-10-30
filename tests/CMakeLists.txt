@@ -6,6 +6,7 @@ set(TEST_SOURCES
     rtp_timestamp_tests.cpp
     crypto_hmac_openssl_tests.cpp
     stun_parse_tests.cpp
+    stun_build_tests.cpp
     stun_server_stateless_tests.cpp
 )
 
