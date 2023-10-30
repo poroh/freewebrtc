@@ -7,6 +7,7 @@
 //
 
 #include "stun/stun_server_stateless.hpp"
+#include "util/util_variant_overloaded.hpp"
 
 namespace freewebrtc::stun::server {
 
@@ -29,16 +30,17 @@ Message create_error(const Message& msg, ErrorCodeAttribute::Code error) {
 
 }
 
-Stateless::Stateless(crypto::SHA1Hash::Func sha1)
+Stateless::Stateless(crypto::SHA1Hash::Func sha1, const std::optional<Settings>& maybe_settings)
     : m_sha1(sha1)
+    , m_settings(maybe_settings.value_or(Settings{}))
 {}
 
-Stateless::MaybeResponse Stateless::process(const net::Endpoint& ep, const util::ConstBinaryView& view) {
-    const auto maybe_msg = stun::Message::parse(view, m_stat);
+Stateless::ProcessResult Stateless::process(const net::Endpoint& ep, const util::ConstBinaryView& view) {
+    auto maybe_msg = stun::Message::parse(view, m_stat);
     if (!maybe_msg.has_value()) {
-        return std::nullopt;
+        return Ignore{};
     }
-    const auto& msg = maybe_msg.value();
+    auto& msg = maybe_msg.value();
     // RFC 5389: 7.3.1. Processing a Request
     // If the request contains one or more unknown comprehension-required
     // attributes, the server replies with an error response with an error
@@ -46,18 +48,22 @@ Stateless::MaybeResponse Stateless::process(const net::Endpoint& ep, const util:
     // attribute in the response that lists the unknown comprehension-
     // required attributes.
     if (msg.header.cls == stun::Class::request()) {
-        return process_request(ep, msg, view);
+        return process_request(ep, std::move(msg), view);
     }
-    return std::nullopt;
+    return Ignore{};
 }
 
-Stateless::MaybeResponse Stateless::process_request(const net::Endpoint&, const Message& msg, const util::ConstBinaryView& view) {
+void Stateless::add_user(const precis::OpaqueString& name, const stun::Password& password) {
+    m_users.emplace(name, password);
+}
+
+Stateless::ProcessResult Stateless::process_request(const net::Endpoint& ep, Message&& msg, const util::ConstBinaryView& view) {
     const auto unknown_comprehension_required = msg.attribute_set.unknown_comprehension_required();
     if (!unknown_comprehension_required.empty()) {
         auto rsp = create_error(msg, ErrorCodeAttribute::Code::UnknownAttribute);
         auto attr = Attribute::create(UnknownAttributesAttribute{std::move(unknown_comprehension_required)});
         rsp.attribute_set.emplace(std::move(attr));
-        return rsp;
+        return Respond{rsp, std::move(msg)};
     }
     // RFC5389 10.1.2. Receiving a Request or Indication
     auto maybe_username = msg.attribute_set.username();
@@ -69,9 +75,10 @@ Stateless::MaybeResponse Stateless::process_request(const net::Endpoint&, const 
         // *  If the message is a request, the server MUST reject the request
         //    with an error response.  This response MUST use an error code
         //    of 400 (Bad Request).
-        return create_error(msg, ErrorCodeAttribute::Code::BadRequest);
+        return Respond{create_error(msg, ErrorCodeAttribute::Code::BadRequest), std::move(msg)};
     }
 
+    std::optional<IntegrityData> maybe_integrity_data;
     if (maybe_username.has_value()) {
         const auto& username = maybe_username->get();
         const auto user_password_pair_it = m_users.find(username);
@@ -82,15 +89,52 @@ Stateless::MaybeResponse Stateless::process_request(const net::Endpoint&, const 
             // *  If the message is a request, the server MUST reject the request
             //    with an error response.  This response MUST use an error code
             //    of 401 (Unauthorized).
-            return create_error(msg, ErrorCodeAttribute::Code::Unauthorized);
+            return Respond{create_error(msg, ErrorCodeAttribute::Code::Unauthorized), std::move(msg)};
         }
         // Using the password associated with the username, compute the value
         // for the message integrity as described in Section 15.4.  If the
         // resulting value does not match the contents of the MESSAGE-
-        // INTEGRITY attribute
-        msg.is_valid(view, IntegrityData{user_password_pair_it->second, m_sha1});
+        // INTEGRITY attribute:
+        //
+        // *  If the message is a request, the server MUST reject the request
+        //    with an error response.  This response MUST use an error code
+        //    of 401 (Unauthorized).
+        maybe_integrity_data = IntegrityData{user_password_pair_it->second, m_sha1};
+        const auto maybe_is_valid_rv = msg.is_valid(view, maybe_integrity_data.value());
+        if (maybe_is_valid_rv.error().has_value()) {
+            return Error{maybe_is_valid_rv.error().value()};
+        }
+        const auto maybe_is_valid = maybe_is_valid_rv.value()->get();
+        if (maybe_is_valid.has_value() && !maybe_is_valid.value()) {
+            return Respond{create_error(msg, ErrorCodeAttribute::Code::Unauthorized), std::move(msg)};
+        }
     }
-    return std::nullopt;
+
+    if (msg.header.method == Method::binding()) {
+        Header header {
+            Class::success_response(),
+            msg.header.method,
+            TransactionId(msg.header.transaction_id.view())
+        };
+        AttributeSet attrset;
+        if (!msg.is_rfc3489 && m_settings.use_fingerprint) {
+            attrset.emplace(Attribute::create(FingerprintAttribute{0}));
+        }
+        if (!msg.is_rfc3489) {
+            auto xored_addr = XoredAddress::from_address(ep.address(), msg.header.transaction_id);
+            attrset.emplace(Attribute::create(XorMappedAddressAttribute{xored_addr, ep.port()}));
+        }
+        return Respond{
+            Message {
+                std::move(header),
+                attrset,
+                msg.is_rfc3489
+            },
+            std::move(msg),
+            maybe_integrity_data
+        };
+    }
+    return Ignore{};
 }
 
 }

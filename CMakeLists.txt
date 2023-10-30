@@ -9,6 +9,14 @@ set(freewebrtc_VERSION_MINOR 0)
 
 add_compile_options(-Werror -Wall -Wunused-variable -Wunused-parameter -pedantic)
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fno-omit-frame-pointer -g")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -g")
+        set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address")
+    endif()
+endif()
+
 add_subdirectory(src)
 
 target_include_directories(freewebrtc PRIVATE ${CMAKE_SOURCE_DIR}/src)

@@ -27,6 +27,7 @@ public:
     Password(const Password&) = default;
     Password(Password&&) = default;
     Password& operator=(const Password&) = default;
+    bool operator==(const Password&) const noexcept = default;
 
     const crypto::hmac::IPadKey& ipad() const noexcept;
     const crypto::hmac::OPadKey& opad() const noexcept;

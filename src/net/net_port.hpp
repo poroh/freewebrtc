@@ -15,7 +15,7 @@ namespace freewebrtc::net {
 class Port {
 public:
     explicit Port(uint16_t);
-
+    bool operator==(const Port&) const noexcept = default;
     uint16_t value() const noexcept;
 private:
     uint16_t m_value;

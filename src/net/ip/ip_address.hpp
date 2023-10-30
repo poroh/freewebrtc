@@ -31,6 +31,8 @@ public:
 
     static std::optional<Address> from_string(const std::string_view&);
 
+    const Value& value() const noexcept;
+
     ReturnValue<std::string> to_string() const;
     bool operator==(const Address&) const noexcept = default;
 private:
@@ -57,5 +59,9 @@ inline Address::Address(AddressV4&& v)
 inline Address::Address(AddressV6&& v)
     : m_value(std::move(v))
 {}
+
+inline const Address::Value& Address::value() const noexcept {
+    return m_value;
+}
 
 }

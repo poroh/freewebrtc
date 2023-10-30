@@ -102,13 +102,12 @@ AttributeSet AttributeSet::create(std::vector<Attribute::Value> ka, std::vector<
     return newset;
 }
 
-ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const MaybeInterity& maybe_integrity) const {
+ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const MaybeIntegrity& maybe_integrity) const {
     std::vector<util::ConstBinaryView> result;
     const size_t num_attrs = m_map.size() + m_unknown.size() + (maybe_integrity.has_value() ? 1 : 0);
     result.reserve(num_attrs * 2 + 1);
     int dummy_hdr;
     result.emplace_back(&dummy_hdr, 0);
-    auto& header_place_holder = result[0];
 
     std::vector<uint32_t> attr_headers(num_attrs);
     auto attr_headers_it = attr_headers.begin();
@@ -191,10 +190,8 @@ ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const Maybe
     if (maybe_integrity.has_value()) {
         const auto& h = maybe_integrity->hash;
         const auto& p = maybe_integrity->password;
-        std::vector<util::ConstBinaryView> to_sign;
-        to_sign.reserve(result.size() + 1);
         auto fake_header = header.build(total_size + details::STUN_ATTR_HEADER_SIZE + crypto::SHA1Hash::size);
-        header_place_holder = util::ConstBinaryView(fake_header);
+        result[0] = util::ConstBinaryView(fake_header);
         maybe_integrity_digest_rv = crypto::hmac::digest(result, p.opad(), p.ipad(), h);
         const auto& integrity_digest_rv = maybe_integrity_digest_rv.value();
         if (integrity_digest_rv.error().has_value()) {
@@ -208,13 +205,13 @@ ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const Maybe
     if (m_map.find(AttributeType::from_uint16(attr_registry::FINGERPRINT)) != m_map.end()) {
         static_assert(sizeof(fingerprint_data) == details::FINGERPRINT_CRC_SIZE);
         real_header = header.build(total_size + details::FINGERPRINT_CRC_SIZE + details::STUN_ATTR_HEADER_SIZE);
-        header_place_holder = util::ConstBinaryView(real_header);
+        result[0] = util::ConstBinaryView(real_header);
         const auto fp = crc32(result) ^ FINGERPRINT_XOR;
         fingerprint_data = util::host_to_network_u32(fp);
         add_attr(attr_registry::FINGERPRINT, util::ConstBinaryView(&fingerprint_data, sizeof(fingerprint_data)));
     } else {
         real_header = header.build(total_size);
-        header_place_holder = util::ConstBinaryView(real_header);
+        result[0] = util::ConstBinaryView(real_header);
     }
     return util::ConstBinaryView::concat(result);
 }

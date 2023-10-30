@@ -213,8 +213,8 @@ ReturnValue<std::optional<bool>> Message::is_valid(const util::ConstBinaryView& 
     return MaybeBool{digest.value()->get().value == integrity.get().value};
 }
 
-ReturnValue<util::ByteVec> Message::build(const MaybeInterity& maybeinterity) const noexcept {
-    return attribute_set.build(header, maybeinterity);
+ReturnValue<util::ByteVec> Message::build(const MaybeIntegrity& maybeintegrity) const noexcept {
+    return attribute_set.build(header, maybeintegrity);
 }
 
 }

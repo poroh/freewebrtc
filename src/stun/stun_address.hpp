@@ -37,6 +37,7 @@ private:
 class XoredAddress {
 public:
     static std::optional<XoredAddress> from_view(Family, const util::ConstBinaryView&);
+    static XoredAddress from_address(const net::ip::Address&, const TransactionId&);
     // Get Address from XOR format.
     // Normative RFC8489 (14.2.  XOR-MAPPED-ADDRESS)
     // If the IP address family is IPv4, X-Address is computed by

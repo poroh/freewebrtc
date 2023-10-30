@@ -11,6 +11,7 @@
 #include <variant>
 #include "net/ip/ip_address.hpp"
 #include "net/net_port.hpp"
+#include "util/util_variant_overloaded.hpp"
 
 namespace freewebrtc::net {
 
@@ -35,6 +36,8 @@ public:
     Endpoint(TcpEndpoint&&);
 
     bool is_udp() const noexcept;
+    ip::Address address() const noexcept;
+    net::Port port() const noexcept;
 
 private:
     Value m_value;
@@ -61,6 +64,24 @@ inline Endpoint::Endpoint(TcpEndpoint&& v)
 
 inline bool Endpoint::is_udp() const noexcept {
     return std::holds_alternative<UdpEndpoint>(m_value);
+}
+
+inline ip::Address Endpoint::address() const noexcept {
+    return std::visit(
+        util::overloaded {
+            [](const net::UdpEndpoint& ep) { return ep.address; },
+            [](const net::TcpEndpoint& ep) { return ep.address; }
+        },
+        m_value);
+}
+
+inline net::Port Endpoint::port() const noexcept {
+    return std::visit(
+        util::overloaded {
+            [](const net::UdpEndpoint& ep) { return ep.port; },
+            [](const net::TcpEndpoint& ep) { return ep.port; }
+        },
+        m_value);
 }
 
 }

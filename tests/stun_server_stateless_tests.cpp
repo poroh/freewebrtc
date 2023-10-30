@@ -19,6 +19,11 @@ public:
     using Clock = std::chrono::steady_clock;
     using StunServer = stun::server::Stateless;
     const net::Endpoint endpoint = net::UdpEndpoint{net::ip::Address::from_string("127.0.0.1").value(), net::Port(2023)};
+    void check_success_response(const stun::Message& rsp, const stun::Message& req) {
+        EXPECT_EQ(rsp.header.cls, stun::Class::success_response());
+        EXPECT_EQ(rsp.header.method, req.header.method);
+        EXPECT_EQ(rsp.header.transaction_id, req.header.transaction_id);
+    }
     void check_error_response(const stun::Message& rsp, const stun::Message& req) {
         EXPECT_EQ(rsp.header.cls, stun::Class::error_response());
         EXPECT_EQ(rsp.header.method, req.header.method);
@@ -45,6 +50,76 @@ public:
 // ================================================================================
 // Positive cases
 
+TEST_F(STUNServerStatelessTest, request_rfc5389) {
+    StunServer server(sha1);
+    const stun::Message request {
+        stun::Header {
+            stun::Class::request(),
+            stun::Method::binding(),
+            rand_tid()
+        },
+        stun::AttributeSet::create({}),
+        stun::IsRFC3489{false}
+    };
+    const auto r = server.process(endpoint, util::ConstBinaryView(build(request)));
+    ASSERT_TRUE(std::holds_alternative<StunServer::Respond>(r));
+    const auto& rsp = std::get<StunServer::Respond>(r).response;
+    check_success_response(rsp, request);
+    const auto& maybe_xor_mapped = rsp.attribute_set.xor_mapped();
+    ASSERT_TRUE(maybe_xor_mapped.has_value());
+    const auto& xor_mapped = maybe_xor_mapped.value().get();
+    EXPECT_EQ(xor_mapped.addr.to_address(rsp.header.transaction_id), endpoint.address());
+    EXPECT_EQ(xor_mapped.port, endpoint.port());
+    // No integrity because not username / integrity in the request
+    EXPECT_TRUE(!rsp.attribute_set.integrity().has_value());
+}
+
+TEST_F(STUNServerStatelessTest, request_rfc5389_authenticated) {
+    StunServer server(sha1);
+
+    precis::OpaqueString joe{"joe"};
+    auto joe_password_rv = stun::Password::short_term(precis::OpaqueString("1234"), sha1);
+    ASSERT_TRUE(joe_password_rv.value().has_value());
+    auto joe_password = joe_password_rv.value()->get();
+    server.add_user(joe, joe_password);
+
+    const stun::Message request {
+        stun::Header {
+            stun::Class::request(),
+            stun::Method::binding(),
+            rand_tid()
+        },
+        stun::AttributeSet::create({
+                stun::UsernameAttribute{joe},
+                stun::FingerprintAttribute{0},
+            }),
+        stun::IsRFC3489{false}
+    };
+    stun::IntegrityData integrity_data{joe_password, sha1};
+    const auto rv = request.build(integrity_data);
+    ASSERT_TRUE(rv.value().has_value());
+    const auto request_data = rv.value()->get();
+    const auto r = server.process(endpoint, util::ConstBinaryView(request_data));
+
+    ASSERT_TRUE(std::holds_alternative<StunServer::Respond>(r));
+    const auto& rsp = std::get<StunServer::Respond>(r).response;
+    check_success_response(rsp, request);
+    const auto& maybe_xor_mapped = rsp.attribute_set.xor_mapped();
+    ASSERT_TRUE(maybe_xor_mapped.has_value());
+    const auto& xor_mapped = maybe_xor_mapped.value().get();
+    EXPECT_EQ(xor_mapped.addr.to_address(rsp.header.transaction_id), endpoint.address());
+    EXPECT_EQ(xor_mapped.port, endpoint.port());
+
+    // Integrity must be used for response:
+    const auto maybe_rsp_integrity_data = std::get<StunServer::Respond>(r).maybe_integrity;
+    ASSERT_TRUE(maybe_rsp_integrity_data.has_value());
+    const auto& rsp_integrity_data = maybe_rsp_integrity_data.value();
+    ASSERT_EQ(rsp_integrity_data.password, joe_password);
+
+    // RFC5389: 10.1.2. Receiving a Request or Indication
+    // The response MUST NOT contain the USERNAME attribute
+    EXPECT_FALSE(rsp.attribute_set.username().has_value());
+}
 
 // ================================================================================
 // Negative cases
@@ -68,10 +143,9 @@ TEST_F(STUNServerStatelessTest, request_with_unknown_attribute_requires_comprehe
         stun::AttributeSet::create({}, {unknown_attr}),
         stun::IsRFC3489{false}
     };
-    const auto maybe_rsp = server.process(endpoint, util::ConstBinaryView(build(request)));
-    ASSERT_TRUE(maybe_rsp.has_value());
-
-    const auto& rsp = maybe_rsp.value();
+    const auto r = server.process(endpoint, util::ConstBinaryView(build(request)));
+    ASSERT_TRUE(std::holds_alternative<StunServer::Respond>(r));
+    const auto& rsp = std::get<StunServer::Respond>(r).response;
     check_error_response(rsp, request);
     check_error_code(rsp, stun::ErrorCodeAttribute::UnknownAttribute);
 
@@ -103,11 +177,11 @@ TEST_F(STUNServerStatelessTest, request_with_username_attribute_without_integrit
             }),
         stun::IsRFC3489{false}
     };
-    const auto maybe_rsp = server.process(endpoint, util::ConstBinaryView(build(request)));
-    ASSERT_TRUE(maybe_rsp.has_value());
+    const auto r = server.process(endpoint, util::ConstBinaryView(build(request)));
+    ASSERT_TRUE(std::holds_alternative<StunServer::Respond>(r));
+    const auto& rsp = std::get<StunServer::Respond>(r).response;
 
     // General response checks:
-    const auto& rsp = maybe_rsp.value();
     check_error_response(rsp, request);
     check_error_code(rsp, stun::ErrorCodeAttribute::BadRequest);
 }
@@ -136,13 +210,71 @@ TEST_F(STUNServerStatelessTest, request_with_integrity_attribute_without_usernam
     auto password = maybepassword.value()->get();
     const auto rv = request.build(stun::IntegrityData{password, sha1});
     const auto request_data = rv.value()->get();
-    const auto maybe_rsp = server.process(endpoint, util::ConstBinaryView(request_data));
-    ASSERT_TRUE(maybe_rsp.has_value());
-
-    // General response checks:
-    const auto& rsp = maybe_rsp.value();
+    const auto r = server.process(endpoint, util::ConstBinaryView(request_data));
+    ASSERT_TRUE(std::holds_alternative<StunServer::Respond>(r));
+    const auto& rsp = std::get<StunServer::Respond>(r).response;
     check_error_response(rsp, request);
     check_error_code(rsp, stun::ErrorCodeAttribute::BadRequest);
 }
+
+TEST_F(STUNServerStatelessTest, unknown_username) {
+    StunServer server(sha1);
+    const stun::Message request {
+        stun::Header {
+            stun::Class::request(),
+            stun::Method::binding(),
+            rand_tid()
+        },
+        stun::AttributeSet::create({
+                stun::UsernameAttribute{precis::OpaqueString{"joe"}}
+            }),
+        stun::IsRFC3489{false}
+    };
+
+    auto maybepassword = stun::Password::short_term(precis::OpaqueString("1234"), sha1);
+    ASSERT_TRUE(maybepassword.value().has_value());
+    auto password = maybepassword.value()->get();
+    const auto rv = request.build(stun::IntegrityData{password, sha1});
+    const auto request_data = rv.value()->get();
+    const auto r = server.process(endpoint, util::ConstBinaryView(request_data));
+    ASSERT_TRUE(std::holds_alternative<StunServer::Respond>(r));
+    const auto& rsp = std::get<StunServer::Respond>(r).response;
+    check_error_response(rsp, request);
+    check_error_code(rsp, stun::ErrorCodeAttribute::Unauthorized);
+}
+
+TEST_F(STUNServerStatelessTest, wrong_password) {
+    StunServer server(sha1);
+    precis::OpaqueString joe{"joe"};
+    const stun::Message request {
+        stun::Header {
+            stun::Class::request(),
+            stun::Method::binding(),
+            rand_tid()
+        },
+        stun::AttributeSet::create({
+                stun::UsernameAttribute{joe}
+            }),
+        stun::IsRFC3489{false}
+    };
+
+    auto joe_password_rv = stun::Password::short_term(precis::OpaqueString("4321"), sha1);
+    ASSERT_TRUE(joe_password_rv.value().has_value());
+    auto joe_password = joe_password_rv.value()->get();
+    server.add_user(joe, joe_password);
+
+    auto wrong_password_rv = stun::Password::short_term(precis::OpaqueString("1234"), sha1);
+    ASSERT_TRUE(wrong_password_rv.value().has_value());
+    auto wrong_password = wrong_password_rv.value()->get();
+    const auto rv = request.build(stun::IntegrityData{wrong_password, sha1});
+    ASSERT_TRUE(rv.value().has_value());
+    const auto request_data = rv.value()->get();
+    const auto r = server.process(endpoint, util::ConstBinaryView(request_data));
+    ASSERT_TRUE(std::holds_alternative<StunServer::Respond>(r));
+    const auto& rsp = std::get<StunServer::Respond>(r).response;
+    check_error_response(rsp, request);
+    check_error_code(rsp, stun::ErrorCodeAttribute::Unauthorized);
+}
+
 
 }

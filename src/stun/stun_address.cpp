@@ -14,6 +14,12 @@
 
 namespace freewebrtc::stun {
 
+namespace {
+
+const uint32_t net_magic = util::host_to_network_u32(details::MAGIC_COOKIE);
+
+}
+
 std::optional<Family> Family::from_uint8(std::optional<uint8_t> maybe_v) {
     if (!maybe_v.has_value()) {
         return std::nullopt;
@@ -57,6 +63,35 @@ std::optional<XoredAddress> XoredAddress::from_view(Family f, const util::ConstB
     }
 }
 
+XoredAddress XoredAddress::from_address(const net::ip::Address& addr, const TransactionId& tid) {
+    return
+        std::visit(
+            util::overloaded {
+                [](const net::ip::AddressV4& v4) {
+                    const auto vv = v4.view();
+                    V4Holder holder;
+                    std::copy(vv.begin(), vv.end(), holder.begin());
+                    auto& vvu32 = reinterpret_cast<uint32_t&>(*holder.begin());
+                    vvu32 ^= net_magic;
+                    return XoredAddress(std::move(holder));
+                },
+                [&](const net::ip::AddressV6& v6) {
+                    const auto vv = v6.view();
+                    V6Holder holder;
+                    std::copy(vv.begin(), vv.end(), holder.begin());
+                    auto& vvu32 = reinterpret_cast<uint32_t&>(*holder.begin());
+                    vvu32 ^= net_magic;
+                    auto tidv = tid.view();
+                    for (size_t i = 0; i < tidv.size() && i < vv.size() - 4; ++i) {
+                        holder[i + 4] ^= tidv.assured_read_u8(i);
+                    }
+                    return XoredAddress(std::move(holder));
+                }
+            },
+            addr.value());
+}
+
+
 XoredAddress::XoredAddress(Value&& v)
     : m_value(std::move(v))
 {}
@@ -66,9 +101,8 @@ net::ip::Address XoredAddress::to_address(const TransactionId& tid) const noexce
         util::overloaded {
             [](const V4Holder& v) {
                 V4Holder vv = v;
-                const uint32_t magic = util::host_to_network_u32(details::MAGIC_COOKIE);
                 auto& vvu32 = reinterpret_cast<uint32_t&>(*vv.begin());
-                vvu32 ^= magic;
+                vvu32 ^= net_magic;
                 return net::ip::Address(net::ip::AddressV4(std::move(vv)));
             },
             [&](const V6Holder& v) {
@@ -77,9 +111,8 @@ net::ip::Address XoredAddress::to_address(const TransactionId& tid) const noexce
                 // concatenation of the magic cookie and the 96-bit
                 // transaction ID.
                 V6Holder vv = v;
-                const uint32_t magic = util::host_to_network_u32(details::MAGIC_COOKIE);
                 auto& vvu32 = reinterpret_cast<uint32_t&>(*vv.begin());
-                vvu32 ^= magic;
+                vvu32 ^= net_magic;
                 auto tidv = tid.view();
                 for (size_t i = 0; i < tidv.size() && i < vv.size() - 4; ++i) {
                     vv[i + 4] ^= tidv.assured_read_u8(i);

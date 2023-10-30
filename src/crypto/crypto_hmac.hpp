@@ -29,6 +29,7 @@ public:
     PadKey(PadKey&&) = default;
     PadKey& operator=(const PadKey&) = default;
     PadKey& operator=(PadKey&&) = default;
+    bool operator==(const PadKey&) const noexcept = default;
 
     util::ConstBinaryView view() const noexcept;
 private:

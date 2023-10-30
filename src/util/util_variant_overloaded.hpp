@@ -8,6 +8,8 @@
 //
 //
 
+#pragma once
+
 namespace freewebrtc::util {
 
 template<class... Ts>

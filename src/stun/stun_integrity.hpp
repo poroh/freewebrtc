@@ -18,7 +18,7 @@ struct IntegrityData {
     crypto::SHA1Hash::Func hash;
 };
 
-using MaybeInterity = std::optional<IntegrityData>;
+using MaybeIntegrity = std::optional<IntegrityData>;
 
 
 }

@@ -39,7 +39,7 @@ public:
 
     static AttributeSet create(std::vector<Attribute::Value>, std::vector<UnknownAttribute> = {});
 
-    ReturnValue<util::ByteVec> build(const Header&, const MaybeInterity&) const;
+    ReturnValue<util::ByteVec> build(const Header&, const MaybeIntegrity&) const;
 private:
     std::unordered_map<AttributeType, Attribute> m_map;
     std::vector<UnknownAttribute> m_unknown;

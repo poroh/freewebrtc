@@ -44,7 +44,7 @@ struct Message {
     ReturnValue<std::optional<bool>> is_valid(const util::ConstBinaryView&, const IntegrityData&) const noexcept;
 
     // Build message as bytes
-    ReturnValue<util::ByteVec> build(const MaybeInterity& maybe_integrity = std::nullopt) const noexcept;
+    ReturnValue<util::ByteVec> build(const MaybeIntegrity& maybe_integrity = std::nullopt) const noexcept;
 };
 
 }
