@@ -28,6 +28,7 @@ public:
     MaybeAttr<precis::OpaqueString> username() const noexcept;
     MaybeAttr<std::string> software() const noexcept;
     MaybeAttr<XorMappedAddressAttribute> xor_mapped() const noexcept;
+    MaybeAttr<MappedAddressAttribute> mapped() const noexcept;
     MaybeAttr<uint32_t> priority() const noexcept;
     MaybeAttr<uint64_t> ice_controlling() const noexcept;
     MaybeAttr<uint64_t> ice_controlled() const noexcept;

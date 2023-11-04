@@ -24,6 +24,7 @@ struct ParseStat {
     stat::Counter invalid_fingerprint;
     stat::Counter invalid_fingerprint_size;
     stat::Counter invalid_message_integrity;
+    stat::Counter invalid_mapped_address;
     stat::Counter invalid_xor_mapped_address;
     stat::Counter invalid_ip_address;
     stat::Counter invalid_priority_size;

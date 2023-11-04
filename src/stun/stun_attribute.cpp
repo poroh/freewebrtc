@@ -29,7 +29,7 @@ Attribute::Attribute(AttributeType t, Value&& v)
 std::optional<Attribute::ParseResult> Attribute::parse(const util::ConstBinaryView& vv, AttributeType type, ParseStat& stat) {
     auto create_attr_fun = [=](auto&& attr) { return Attribute(type, attr); };
     switch (type.value()) {
-    // case attr_registry::MAPPED_ADDRESS:  return util::fmap(MappedAddressAttribute::parse(vv, stat),    std::move(create_attr_fun));
+    case attr_registry::MAPPED_ADDRESS:     return util::fmap(MappedAddressAttribute::parse(vv, stat),    std::move(create_attr_fun));
     case attr_registry::XOR_MAPPED_ADDRESS: return util::fmap(XorMappedAddressAttribute::parse(vv, stat), std::move(create_attr_fun));
     case attr_registry::USERNAME:           return util::fmap(UsernameAttribute::parse(vv, stat),         std::move(create_attr_fun));
     case attr_registry::SOFTWARE:           return util::fmap(SoftwareAttribute::parse(vv, stat),         std::move(create_attr_fun));
@@ -48,6 +48,7 @@ Attribute Attribute::create(Value&& v) {
     return std::visit(
         util::overloaded {
             [](XorMappedAddressAttribute&& a)  { return Attribute(AttributeType::from_uint16(attr_registry::XOR_MAPPED_ADDRESS), std::move(a)); },
+            [](MappedAddressAttribute&& a)     { return Attribute(AttributeType::from_uint16(attr_registry::MAPPED_ADDRESS), std::move(a)); },
             [](UsernameAttribute&& a)          { return Attribute(AttributeType::from_uint16(attr_registry::USERNAME), std::move(a)); },
             [](SoftwareAttribute&& a)          { return Attribute(AttributeType::from_uint16(attr_registry::SOFTWARE), std::move(a)); },
             [](MessageIntegityAttribute&& a)   { return Attribute(AttributeType::from_uint16(attr_registry::MESSAGE_INTEGRITY), std::move(a)); },
@@ -60,6 +61,61 @@ Attribute Attribute::create(Value&& v) {
             [](ErrorCodeAttribute&& a)         { return Attribute(AttributeType::from_uint16(attr_registry::ERROR_CODE), std::move(a)); }
         },
         std::move(v));
+}
+
+std::optional<MappedAddressAttribute> MappedAddressAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+    //  0                   1                   2                   3
+    //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    // |x x x x x x x x|    Family     |           Port                |
+    // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    // |                             Address                           |
+    // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    //
+    auto maybe_family = vv.read_u8(1);
+    auto maybe_port = vv.read_u16be(2);
+    const auto maybe_addr_view = vv.subview(4);
+    if (!maybe_family.has_value() || !maybe_port.has_value() || !maybe_addr_view.has_value()) {
+        stat.error.inc();
+        stat.invalid_mapped_address.inc();
+        return std::nullopt;
+    }
+    const auto family = *maybe_family;
+    const auto port = net::Port(*maybe_port);
+    const auto& addr_view = *maybe_addr_view;
+    std::optional<net::ip::Address> maybe_addr;
+    switch (family) {
+    case attr_registry::FAMILY_IPV4:
+        maybe_addr = net::ip::AddressV4::from_view(addr_view);
+        break;
+    case attr_registry::FAMILY_IPV6:
+        maybe_addr = net::ip::AddressV6::from_view(addr_view);
+        break;
+    }
+    if (!maybe_addr.has_value()) {
+        stat.error.inc();
+        stat.invalid_ip_address.inc();
+        return std::nullopt;
+    }
+    return MappedAddressAttribute{*maybe_addr, port};
+}
+
+util::ByteVec MappedAddressAttribute::build() const {
+    auto [family, view]
+        = std::visit(
+            util::overloaded {
+                [](const net::ip::AddressV4& a) {
+                    return std::make_pair(attr_registry::FAMILY_IPV4, a.view());
+                },
+                [](const net::ip::AddressV6& a) {
+                    return std::make_pair(attr_registry::FAMILY_IPV6, a.view());
+                }
+            }, addr.value());
+    const uint32_t first_word = util::host_to_network_u32(port.value() | (family >> 16));
+    return util::ConstBinaryView::concat({
+            util::ConstBinaryView(&first_word, sizeof(first_word)),
+            view
+        });
 }
 
 std::optional<XorMappedAddressAttribute> XorMappedAddressAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {

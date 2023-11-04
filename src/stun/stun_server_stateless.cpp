@@ -8,19 +8,32 @@
 
 #include "stun/stun_server_stateless.hpp"
 #include "util/util_variant_overloaded.hpp"
+#include "util/util_fmap.hpp"
 
 namespace freewebrtc::stun::server {
 
 namespace {
 
-Message create_error(const Message& msg, ErrorCodeAttribute::Code error) {
+using MaybeStringView = std::optional<std::string_view>;
+Message create_error(const Message& msg, ErrorCodeAttribute::Code error, MaybeStringView reason = std::nullopt) {
     Header header {
         Class::error_response(),
         msg.header.method,
         TransactionId(msg.header.transaction_id.view())
     };
     AttributeSet attrset;
-    attrset.emplace(Attribute::create(ErrorCodeAttribute{error}));
+    attrset.emplace(
+        Attribute::create(
+            ErrorCodeAttribute{
+                error,
+                util::fmap(
+                    reason,
+                    [](const auto& a) -> std::string {
+                        return std::string{a};
+                    })
+            }
+        )
+    );
     return Message {
         std::move(header),
         attrset,
@@ -123,6 +136,14 @@ Stateless::ProcessResult Stateless::process_request(const net::Endpoint& ep, Mes
         if (!msg.is_rfc3489) {
             auto xored_addr = XoredAddress::from_address(ep.address(), msg.header.transaction_id);
             attrset.emplace(Attribute::create(XorMappedAddressAttribute{xored_addr, ep.port()}));
+        } else {
+            // Normative:
+            // When the server detects an RFC 3489 client, it SHOULD
+            // copy the value seen in the magic cookie field in the
+            // Binding request to the magic cookie field in the
+            // Binding response message, and1 insert a MAPPED-ADDRESS
+            // attribute instead of an XOR-MAPPED-ADDRESS attribute.
+            attrset.emplace(Attribute::create(MappedAddressAttribute{ep.address(), ep.port()}));
         }
         return Respond{
             Message {

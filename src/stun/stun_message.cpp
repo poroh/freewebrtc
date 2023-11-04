@@ -62,7 +62,9 @@ std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat
         return std::nullopt;
     }
 
-    const auto transaction_id = !is_rfc3489 ? vv.assured_subview(8, 12) : vv.assured_subview(4, 12);
+    const auto transaction_id =
+        !is_rfc3489 ? vv.assured_subview(8, TRANSACTION_ID_SIZE)
+                    : vv.assured_subview(4, TRANSACTION_ID_SIZE_RFC3489);
 
     AttributeSet attrs;
     std::optional<util::ConstBinaryView::Interval> integrity_interval;

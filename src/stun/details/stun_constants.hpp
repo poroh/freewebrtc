@@ -18,6 +18,7 @@ namespace freewebrtc::stun::details {
 static constexpr uint32_t MAGIC_COOKIE = 0x2112A442;
 
 static constexpr size_t TRANSACTION_ID_SIZE = 96 / 8;
+static constexpr size_t TRANSACTION_ID_SIZE_RFC3489 = 128 / 8;
 
 static constexpr size_t HEADER_SIZE = 20;
 

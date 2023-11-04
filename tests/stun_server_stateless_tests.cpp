@@ -11,14 +11,15 @@
 
 #include "stun/stun_server_stateless.hpp"
 #include "crypto/openssl/openssl_hash.hpp"
+#include "util/util_fmap.hpp"
 
 namespace freewebrtc::test {
 
-class STUNServerStatelessTest : public ::testing::Test {
+class STUNServerStatelessTest : public testing::TestWithParam<net::Endpoint> {
 public:
     using Clock = std::chrono::steady_clock;
     using StunServer = stun::server::Stateless;
-    const net::Endpoint endpoint = net::UdpEndpoint{net::ip::Address::from_string("127.0.0.1").value(), net::Port(2023)};
+
     void check_success_response(const stun::Message& rsp, const stun::Message& req) {
         EXPECT_EQ(rsp.header.cls, stun::Class::success_response());
         EXPECT_EQ(rsp.header.method, req.header.method);
@@ -39,6 +40,10 @@ public:
         std::random_device random;
         return stun::TransactionId::generate(random);
     }
+    stun::TransactionId rand_tid_rfc3489() {
+        std::random_device random;
+        return stun::TransactionId::generate_rfc3489(random);
+    }
     util::ByteVec build(const stun::Message& msg) {
         const auto rv = msg.build();
         assert(!rv.error().has_value());
@@ -47,10 +52,17 @@ public:
     const crypto::SHA1Hash::Func sha1 = crypto::openssl::sha1;
 };
 
+const auto all_endpoints =
+    testing::Values(
+        net::UdpEndpoint{net::ip::Address::from_string("127.0.0.1").value(), net::Port(2023)},
+        net::UdpEndpoint{net::ip::Address::from_string("::1").value(), net::Port(2023)}
+    );
+
 // ================================================================================
 // Positive cases
 
-TEST_F(STUNServerStatelessTest, request_rfc5389) {
+TEST_P(STUNServerStatelessTest, request_rfc5389) {
+    const auto endpoint = GetParam();
     StunServer server(sha1);
     const stun::Message request {
         stun::Header {
@@ -74,7 +86,8 @@ TEST_F(STUNServerStatelessTest, request_rfc5389) {
     EXPECT_TRUE(!rsp.attribute_set.integrity().has_value());
 }
 
-TEST_F(STUNServerStatelessTest, request_rfc5389_authenticated) {
+TEST_P(STUNServerStatelessTest, request_rfc5389_authenticated) {
+    const auto endpoint = GetParam();
     StunServer server(sha1);
 
     precis::OpaqueString joe{"joe"};
@@ -95,6 +108,7 @@ TEST_F(STUNServerStatelessTest, request_rfc5389_authenticated) {
             }),
         stun::IsRFC3489{false}
     };
+
     stun::IntegrityData integrity_data{joe_password, sha1};
     const auto rv = request.build(integrity_data);
     ASSERT_TRUE(rv.value().has_value());
@@ -121,11 +135,40 @@ TEST_F(STUNServerStatelessTest, request_rfc5389_authenticated) {
     EXPECT_FALSE(rsp.attribute_set.username().has_value());
 }
 
+TEST_P(STUNServerStatelessTest, request_rfc3489) {
+    const auto endpoint = GetParam();
+    StunServer server(sha1);
+    const stun::Message request {
+        stun::Header {
+            stun::Class::request(),
+            stun::Method::binding(),
+            rand_tid_rfc3489()
+        },
+        stun::AttributeSet::create({}),
+        stun::IsRFC3489{true}
+    };
+
+    const auto r = server.process(endpoint, util::ConstBinaryView(build(request)));
+    ASSERT_TRUE(std::holds_alternative<StunServer::Respond>(r));
+    const auto& rsp = std::get<StunServer::Respond>(r).response;
+    check_success_response(rsp, request);
+
+    const auto& maybe_xor_mapped = rsp.attribute_set.xor_mapped();
+    ASSERT_FALSE(maybe_xor_mapped.has_value());
+
+    const auto& maybe_mapped = rsp.attribute_set.mapped();
+    ASSERT_TRUE(maybe_mapped.has_value());
+    const auto& mapped = maybe_mapped.value().get();
+    EXPECT_EQ(mapped.addr, endpoint.address());
+    EXPECT_EQ(mapped.port, endpoint.port());
+}
+
 // ================================================================================
 // Negative cases
 
 // Create of 420 response code with UNKNOWN-ATTRIBUTES attribute
-TEST_F(STUNServerStatelessTest, request_with_unknown_attribute_requires_comprehension) {
+TEST_P(STUNServerStatelessTest, request_with_unknown_attribute_requires_comprehension) {
+    const auto endpoint = GetParam();
     // RFC5389: 7.3.1.  Processing a Request
     // If the request contains one or more unknown comprehension-required
     // attributes, the server replies with an error response with an error
@@ -157,7 +200,8 @@ TEST_F(STUNServerStatelessTest, request_with_unknown_attribute_requires_comprehe
     EXPECT_EQ(unknown_attributes_attr.types[0], unknown_attr.type);
 }
 
-TEST_F(STUNServerStatelessTest, request_with_username_attribute_without_integrity) {
+TEST_P(STUNServerStatelessTest, request_with_username_attribute_without_integrity) {
+    const auto endpoint = GetParam();
     // RFC5389: 10.1.2.  Receiving a Request or Indication
     // o  If the message does not contain both a MESSAGE-INTEGRITY and a
     //   USERNAME attribute:
@@ -186,7 +230,8 @@ TEST_F(STUNServerStatelessTest, request_with_username_attribute_without_integrit
     check_error_code(rsp, stun::ErrorCodeAttribute::BadRequest);
 }
 
-TEST_F(STUNServerStatelessTest, request_with_integrity_attribute_without_username) {
+TEST_P(STUNServerStatelessTest, request_with_integrity_attribute_without_username) {
+    const auto endpoint = GetParam();
     // RFC5389: 10.1.2.  Receiving a Request or Indication
     // o  If the message does not contain both a MESSAGE-INTEGRITY and a
     //   USERNAME attribute:
@@ -217,7 +262,8 @@ TEST_F(STUNServerStatelessTest, request_with_integrity_attribute_without_usernam
     check_error_code(rsp, stun::ErrorCodeAttribute::BadRequest);
 }
 
-TEST_F(STUNServerStatelessTest, unknown_username) {
+TEST_P(STUNServerStatelessTest, unknown_username) {
+    const auto endpoint = GetParam();
     StunServer server(sha1);
     const stun::Message request {
         stun::Header {
@@ -243,7 +289,8 @@ TEST_F(STUNServerStatelessTest, unknown_username) {
     check_error_code(rsp, stun::ErrorCodeAttribute::Unauthorized);
 }
 
-TEST_F(STUNServerStatelessTest, wrong_password) {
+TEST_P(STUNServerStatelessTest, wrong_password) {
+    const auto endpoint = GetParam();
     StunServer server(sha1);
     precis::OpaqueString joe{"joe"};
     const stun::Message request {
@@ -276,5 +323,18 @@ TEST_F(STUNServerStatelessTest, wrong_password) {
     check_error_code(rsp, stun::ErrorCodeAttribute::Unauthorized);
 }
 
-
+INSTANTIATE_TEST_SUITE_P(
+    CheckAllEndpoints,
+    STUNServerStatelessTest,
+    all_endpoints,
+    [](const auto& v) -> std::string { // More nicer test naming
+        const auto& ep = v.param;
+        auto index_str = std::to_string(v.index);
+        return std::visit(
+            util::overloaded {
+                [&](const net::ip::AddressV4&) { return "IPv4_" + index_str; },
+                    [&](const net::ip::AddressV6&) { return "IPv6_" + index_str; },
+                    },
+            ep.address().value());
+    });
 }

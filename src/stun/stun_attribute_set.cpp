@@ -42,6 +42,13 @@ AttributeSet::MaybeAttr<XorMappedAddressAttribute> AttributeSet::xor_mapped() co
     return std::nullopt;
 }
 
+AttributeSet::MaybeAttr<MappedAddressAttribute> AttributeSet::mapped() const noexcept {
+    if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::MAPPED_ADDRESS)); it != m_map.end()) {
+        return *it->second.as<MappedAddressAttribute>();
+    }
+    return std::nullopt;
+}
+
 AttributeSet::MaybeAttr<uint32_t> AttributeSet::priority() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::PRIORITY)); it != m_map.end()) {
         return it->second.as<PriorityAttribute>()->priority;
@@ -105,7 +112,7 @@ AttributeSet AttributeSet::create(std::vector<Attribute::Value> ka, std::vector<
 ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const MaybeIntegrity& maybe_integrity) const {
     std::vector<util::ConstBinaryView> result;
     const size_t num_attrs = m_map.size() + m_unknown.size() + (maybe_integrity.has_value() ? 1 : 0);
-    result.reserve(num_attrs * 2 + 1);
+    result.reserve(num_attrs * 3 + 1); // We can have up to three views per attribute
     int dummy_hdr;
     result.emplace_back(&dummy_hdr, 0);
 
@@ -130,12 +137,13 @@ ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const Maybe
         }
     };
 
-    util::ByteVec xor_mapped_data;
+    std::optional<util::ByteVec> xor_mapped_data;
+    std::optional<util::ByteVec> mapped_data;
     uint32_t prio = 0;
     uint64_t ice_controlling = 0;
     uint64_t ice_controlled = 0;
-    util::ByteVec error_code_data;
-    util::ByteVec unknown_attributes_data;
+    std::optional<util::ByteVec> error_code_data;
+    std::optional<util::ByteVec> unknown_attributes_data;
 
     for (const auto& p: m_map) {
         const auto type = p.first.value();
@@ -150,7 +158,11 @@ ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const Maybe
                 },
                 [&](const XorMappedAddressAttribute& a) {
                     xor_mapped_data = a.build();
-                    add_attr(type, util::ConstBinaryView(xor_mapped_data));
+                    add_attr(type, util::ConstBinaryView(*xor_mapped_data));
+                },
+                [&](const MappedAddressAttribute& a) {
+                    mapped_data = a.build();
+                    add_attr(type, util::ConstBinaryView(*mapped_data));
                 },
                 [&](const PriorityAttribute& a) {
                     prio = util::host_to_network_u32(a.priority);
@@ -169,11 +181,11 @@ ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const Maybe
                 },
                 [&](const ErrorCodeAttribute& ec) {
                     error_code_data = ec.build();
-                    add_attr(type, util::ConstBinaryView(error_code_data));
+                    add_attr(type, util::ConstBinaryView(*error_code_data));
                 },
                 [&](const UnknownAttributesAttribute& a) {
                     unknown_attributes_data = a.build();
-                    add_attr(type, util::ConstBinaryView(unknown_attributes_data));
+                    add_attr(type, util::ConstBinaryView(*unknown_attributes_data));
                 },
                 [&](const MessageIntegityAttribute&) { /* Do not add integrity here */ },
                 [&](const FingerprintAttribute&) { /* Do not add fingerprint here */ }

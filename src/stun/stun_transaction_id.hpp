@@ -23,6 +23,9 @@ public:
     template<typename RandomGen>
     static TransactionId generate(RandomGen&);
 
+    template<typename RandomGen>
+    static TransactionId generate_rfc3489(RandomGen&);
+
     util::ConstBinaryView view() const noexcept;
     bool operator==(const TransactionId&) const noexcept = default;
 private:
@@ -45,6 +48,16 @@ template<typename RandomGen>
 TransactionId TransactionId::generate(RandomGen& r) {
     using W = uint32_t;
     std::array<W, details::TRANSACTION_ID_SIZE / sizeof(W)> value;
+    for (auto& v: value) {
+        v = r();
+    }
+    return TransactionId(util::ConstBinaryView(value.data(), value.size() * sizeof(W)));
+}
+
+template<typename RandomGen>
+TransactionId TransactionId::generate_rfc3489(RandomGen& r) {
+    using W = uint32_t;
+    std::array<W, details::TRANSACTION_ID_SIZE_RFC3489 / sizeof(W)> value;
     for (auto& v: value) {
         v = r();
     }

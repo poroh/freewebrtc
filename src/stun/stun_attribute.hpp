@@ -40,6 +40,7 @@ struct MappedAddressAttribute {
     net::ip::Address addr;
     net::Port port;
     static std::optional<MappedAddressAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    util::ByteVec build() const;
 };
 
 struct XorMappedAddressAttribute {
@@ -115,7 +116,7 @@ public:
     using Value =
         std::variant<
             XorMappedAddressAttribute,
-            // MappedAddressAttribute,
+            MappedAddressAttribute,
             UsernameAttribute,
             SoftwareAttribute,
             MessageIntegityAttribute,

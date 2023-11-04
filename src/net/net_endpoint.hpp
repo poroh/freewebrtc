@@ -36,7 +36,7 @@ public:
     Endpoint(TcpEndpoint&&);
 
     bool is_udp() const noexcept;
-    ip::Address address() const noexcept;
+    const ip::Address& address() const noexcept;
     net::Port port() const noexcept;
 
 private:
@@ -66,11 +66,11 @@ inline bool Endpoint::is_udp() const noexcept {
     return std::holds_alternative<UdpEndpoint>(m_value);
 }
 
-inline ip::Address Endpoint::address() const noexcept {
+inline const ip::Address& Endpoint::address() const noexcept {
     return std::visit(
         util::overloaded {
-            [](const net::UdpEndpoint& ep) { return ep.address; },
-            [](const net::TcpEndpoint& ep) { return ep.address; }
+            [](const net::UdpEndpoint& ep) { return std::cref(ep.address); },
+            [](const net::TcpEndpoint& ep) { return std::cref(ep.address); }
         },
         m_value);
 }
