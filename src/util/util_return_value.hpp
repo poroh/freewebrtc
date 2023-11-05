@@ -15,11 +15,13 @@
 
 namespace freewebrtc {
 
+template<typename T> class ReturnValue;
+
+template<typename T> T strip_rv(const ReturnValue<T>& v);
+template<typename T> T strip_rv(const T& v);
+
 template<typename V>
 class ReturnValue {
-    template<typename T> T strip_rv(const ReturnValue<T>& v);
-    template<typename T> T strip_rv(const T& v);
-
 public:
     using Value = V;
     using Error = std::error_code;
@@ -59,10 +61,30 @@ private:
     std::variant<Value, Error> m_result;
 };
 
+// Check that any of the ReturnValue is error.
+// Example:
+//   ReturnValue<int> v1 = 1;
+//   ReturnValue<std::string> v2 = "1234";
+//   ReturnValue<double> v3 = std::make_error_code(std::errc::invalid_argument);
+//   assert(any_is_error(v1, v2, v3));
+template<typename T, typename... Ts>
+std::optional<std::error_code> any_is_error(ReturnValue<T> first, ReturnValue<Ts>... rest);
+
+// Combine ReturnValue s with function
+// Example:
+//   ReturnValue<int> v1 = 1;
+//   ReturnValue<std::string> v2 = "1234";
+//   ReturnValue<double> v3 = 0.2;
+//   combine([](int v1, const std::string& v2, double v3) {
+//       // .. some code
+//   },
+//   v1, v2, v3)
+template<typename F, typename... Ts>
+auto combine(F&& f, ReturnValue<Ts>... rvs) -> ReturnValue<decltype(strip_rv(f(std::declval<Ts>()...)))>;
+
 //
 // inlines
 //
-
 template<typename V>
 inline ReturnValue<V>::ReturnValue(const Value& v)
     : m_result(v)
@@ -145,6 +167,54 @@ auto ReturnValue<V>::fmap(Fmap&& f) -> ReturnValue<decltype(strip_rv(f(std::decl
         return f(assert_value());
     } else {
         auto result = f(assert_value());
+        if (result.is_error()) {
+            return result.assert_error();
+        }
+        return result.assert_value();
+    }
+}
+
+template<typename T, typename... Ts>
+std::optional<std::error_code> any_is_error(ReturnValue<T> first, ReturnValue<Ts>... rest) {
+    if (first.is_error()) {
+        return first.assert_error();
+    }
+    if constexpr (sizeof...(rest) > 0) {
+        return any_is_error(rest...);
+    } else {
+        return std::nullopt;
+    }
+}
+
+template<typename Func, typename... Values, typename T>
+auto combine_with_values(Func func, const std::tuple<Values...>& values, const ReturnValue<T>& rv) {
+    return std::apply(func, std::tuple_cat(values, std::make_tuple(rv.assert_value())));
+}
+
+template<typename F, typename... Values, typename T, typename... Rest>
+auto combine_with_values(F func, const std::tuple<Values...>& values, const ReturnValue<T>& rv, const Rest&... rest) {
+    return combine_with_values(func, std::tuple_cat(values, std::make_tuple(rv.assert_value())), rest...);
+}
+
+// Base function to start the process with an empty tuple
+template<typename Func, typename... ReturnValues>
+auto combine_with_values(Func func, const ReturnValues&... rvs) {
+    return combine_with_values(func, std::tuple<>{}, rvs...);
+}
+
+template<typename F, typename... Ts>
+auto combine(F&& f, ReturnValue<Ts>... rvs) -> ReturnValue<decltype(strip_rv(f(std::declval<Ts>()...)))> {
+    if (auto maybe_error = any_is_error(rvs...); maybe_error.has_value()) {
+        return maybe_error.value();
+    }
+    using FRetT = decltype(f(std::declval<Ts>()...));
+    using FmapRet = decltype(strip_rv(f(std::declval<Ts>()...)));
+
+
+    if constexpr (std::is_same_v<FRetT, FmapRet>) {
+        return combine_with_values(f, rvs...);
+    } else {
+        auto result = combine_with_values(f, rvs...);
         if (result.is_error()) {
             return result.assert_error();
         }

@@ -57,9 +57,16 @@ private:
     napi_value m_value;
 };
 
-struct CallbackInfo {
+class CallbackInfo {
+public:
+    CallbackInfo(Value this_arg, std::vector<Value>&&);
+
     Value this_arg;
-    std::vector<Value> args;
+
+    ReturnValue<Value> operator[](size_t index) const noexcept;
+
+private:
+    std::vector<Value> m_args;
 };
 
 class Env {
@@ -143,6 +150,3 @@ inline Value Object::to_value() const noexcept {
 }
 
 }
-
-
-

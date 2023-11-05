@@ -25,7 +25,8 @@ enum class WrapperError {
     OK = 0,
     INVALID_TYPE = 1,
     UNKNOWN_STUN_METHOD = 2,
-    INVALID_IP_ADDRESS = 3
+    INVALID_IP_ADDRESS = 3,
+    NO_REQUIRED_ARGUMENT = 4
 };
 
 class NapiWrapperErrorCategory : public std::error_category {

@@ -61,6 +61,7 @@ std::string NapiWrapperErrorCategory::message(int code) const {
     case WrapperError::INVALID_TYPE:  return "Invalid type";
     case WrapperError::UNKNOWN_STUN_METHOD: return "Unknown stun method";
     case WrapperError::INVALID_IP_ADDRESS:  return "Invalid IP address";
+    case WrapperError::NO_REQUIRED_ARGUMENT:  return "No required argument specified";
     }
     return "Unknown napi wrapper code: " + std::to_string(code);
 }

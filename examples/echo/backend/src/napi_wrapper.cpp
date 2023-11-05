@@ -71,8 +71,6 @@ ReturnValue<int32_t> Value::as_int32() const noexcept {
     return result;
 }
 
-
-
 Object::Object(napi_env env, napi_value value)
     : m_env(env)
     , m_value(value)
@@ -115,7 +113,7 @@ ReturnValue<CallbackInfo> Env::create_callback_info(napi_callback_info info, voi
     for (const auto& v: args) {
         result_args.emplace_back(m_env, v);
     }
-    return CallbackInfo{Value{m_env, this_arg}, result_args};
+    return CallbackInfo(Value{m_env, this_arg}, std::move(result_args));
 }
 
 ReturnValue<Object> Env::create_object() const noexcept {
@@ -359,6 +357,18 @@ ReturnValue<Value> Env::create_class(std::string_view name, Function ctor, const
         return make_error_code(status);
     }
     return Value(m_env, result);
+}
+
+CallbackInfo::CallbackInfo(Value self_arg, std::vector<Value>&& values)
+    : this_arg(self_arg)
+    , m_args(std::move(values))
+{}
+
+ReturnValue<Value> CallbackInfo::operator[](size_t index) const noexcept {
+    if (index > m_args.size()) {
+        return make_error_code(WrapperError::NO_REQUIRED_ARGUMENT);
+    }
+    return m_args[index];
 }
 
 }

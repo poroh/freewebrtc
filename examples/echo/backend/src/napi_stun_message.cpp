@@ -74,23 +74,16 @@ ReturnValue<Value> stun_message(const Env& env, const stun::Message& msg) {
 }
 
 ReturnValue<Value> stun_message_parse(Env& env, const CallbackInfo& ci) {
-    if (ci.args.size() == 0) {
-        return env.throw_error("First argument must be a buffer");
-    }
-
-    auto as_buffer_result = ci.args[0].as_buffer();
-    if (as_buffer_result.is_error()) {
-        return as_buffer_result.assert_error();
-    }
-
-    const auto& view = as_buffer_result.assert_value();
-
-    freewebrtc::stun::ParseStat parsestat;
-    auto maybe_msg = freewebrtc::stun::Message::parse(view, parsestat);
-    if (!maybe_msg.has_value()) {
-        return env.throw_error("Failed to parse STUN packet");
-    }
-    return stun_message(env, maybe_msg.value());
+    return ci[0]
+        .fmap([](const auto& arg) { return arg.as_buffer(); })
+        .fmap([&](const auto& view) {
+            freewebrtc::stun::ParseStat parsestat;
+            auto maybe_msg = freewebrtc::stun::Message::parse(view, parsestat);
+            if (!maybe_msg.has_value()) {
+                return env.throw_error("Failed to parse STUN packet");
+            }
+            return stun_message(env, maybe_msg.value());
+        });
 }
 
 }

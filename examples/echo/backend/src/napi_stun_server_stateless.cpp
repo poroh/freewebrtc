@@ -15,23 +15,20 @@ namespace freewebrtc::napi {
 
 namespace {
 
+using ServerRefWrap = std::reference_wrapper<stun::server::Stateless>;
+
 ReturnValue<Value> constructor(Env& env, const CallbackInfo& info) {
-    auto obj_rvv = info.this_arg.as_object();
-    if (obj_rvv.is_error()) {
-        return obj_rvv.assert_error();
-    }
-    auto& obj = obj_rvv.assert_value();
-    return obj.wrap(std::make_unique<stun::server::Stateless>(crypto::node_openssl::sha1));
+    return info.this_arg.as_object()
+        .fmap([](const auto& obj) {
+            return obj.wrap(std::make_unique<stun::server::Stateless>(crypto::node_openssl::sha1));
+        });
 }
 
 ReturnValue<net::Endpoint> extract_rinfo(const Value& v) {
-    auto obj_rv = v.as_object();
-    if (obj_rv.is_error()) {
-        return obj_rv.assert_error();
-    }
-    const auto& obj = obj_rv.assert_value();
-    const auto addr_rv = obj.named_property("address")
-        .fmap([](auto v) { return v.as_string(); })
+    const auto addr_rv =
+        v.as_object()
+        .fmap([](auto obj) { return obj.named_property("address"); })
+        .fmap([](auto v)   { return v.as_string(); })
         .fmap([](auto v) -> ReturnValue<net::ip::Address> {
             auto addr = net::ip::Address::from_string(v);
             if (addr.has_value()) {
@@ -39,101 +36,90 @@ ReturnValue<net::Endpoint> extract_rinfo(const Value& v) {
             }
             return make_error_code(WrapperError::INVALID_IP_ADDRESS);
         });
-    const auto port_rv = obj.named_property("port").fmap([](const auto& v) { return v.as_int32(); });
-    if (addr_rv.is_error() || port_rv.is_error()) {
-        return addr_rv.maybe_error().value_or(port_rv.assert_error());
-    }
-    return net::Endpoint(net::UdpEndpoint{addr_rv.assert_value(), net::Port(port_rv.assert_value())});
+
+    const auto port_rv =
+        v.as_object()
+        .fmap([](auto obj) { return obj.named_property("port"); })
+        .fmap([](const auto& v) { return v.as_int32(); });
+
+    return combine([](const auto& addr, const auto& port) {
+            return net::Endpoint(net::UdpEndpoint{addr, net::Port(port)});
+        },
+        addr_rv,
+        port_rv);
 }
 
 ReturnValue<Value> process_message(Env& env, const CallbackInfo& info) {
     // (message, rinfo)
-    if (info.args.size() < 2) {
-        return env.throw_error("Two arguments are expected: (message, rinfo)");
-    }
-
-    auto buffer_rv = info.args[0].as_buffer();
-    if (buffer_rv.is_error()) {
-        return buffer_rv.assert_error();
-    }
-
-    auto rinfo_rv = extract_rinfo(info.args[1]);
-    if (rinfo_rv.is_error()) {
-        return rinfo_rv.assert_error();
-    }
-
-    const auto& message = buffer_rv.assert_value();
-    const auto& ep = rinfo_rv.assert_value();
-
+    auto buffer_rv = info[0].fmap([](const auto& arg) { return arg.as_buffer(); });
+    auto rinfo_rv = info[1].fmap([](const auto& arg) { return extract_rinfo(arg); });
     auto obj_rvv = info.this_arg.unwrap<stun::server::Stateless>();
-    if (obj_rvv.is_error()) {
-        return obj_rvv.assert_error();
+
+    if (auto maybe_error = any_is_error(buffer_rv, rinfo_rv, obj_rvv); maybe_error.has_value()) {
+        return maybe_error.value();
     }
-    auto& server = obj_rvv.assert_value().get();
-    auto result = server.process(ep, message);
-    using RVV = ReturnValue<Value>;
-    return std::visit(
-        util::overloaded {
-            [&](const stun::server::Stateless::Ignore&) -> RVV {
-                return env.create_undefined();
-            },
-            [&](const stun::server::Stateless::Error& err) -> RVV {
-                return err.error;
-            },
-            [&](const stun::server::Stateless::Respond& rsp) -> RVV {
-                auto bytevec_rv = rsp.response.build(rsp.maybe_integrity);
-                if (bytevec_rv.is_error()) {
-                    return bytevec_rv.assert_error();
-                }
-                return env.create_buffer(util::ConstBinaryView(bytevec_rv.assert_value()));
-            }
+    return combine(
+        [&](const auto& message, const auto& endpoint, ServerRefWrap server) {
+            using RVV = ReturnValue<Value>;
+            auto result = server.get().process(endpoint, message);
+            return std::visit(
+                util::overloaded {
+                    [&](const stun::server::Stateless::Ignore&) -> RVV {
+                        return env.create_undefined();
+                    },
+                    [&](const stun::server::Stateless::Error& err) -> RVV {
+                        return err.error;
+                    },
+                    [&](const stun::server::Stateless::Respond& rsp) -> RVV {
+                        return rsp.response.build(rsp.maybe_integrity)
+                            .fmap([&](const auto& bytevec) {
+                                return env.create_buffer(util::ConstBinaryView(bytevec));
+                            });
+                    }
+                },
+                result);
         },
-        result);
+        buffer_rv,
+        rinfo_rv,
+        obj_rvv);
+
 }
 
 ReturnValue<Value> add_user(Env& env, const CallbackInfo& info) {
-    // (message, rinfo)
-    if (info.args.size() < 2) {
-        return env.throw_error("Two arguments are expected: (username, password)");
-    }
-
-    auto username_str_rv = info.args[0].as_string();
-    if (username_str_rv.is_error()) {
-        return username_str_rv.assert_error();
-    }
-    const auto& username_str = username_str_rv.assert_value();
-    precis::OpaqueString username{username_str};
-
-    auto password_str_rv = info.args[1].as_string();
-    if (password_str_rv.is_error()) {
-        return password_str_rv.assert_error();
-    }
-    const auto& password_str = password_str_rv.assert_value();
-    auto password_rv = stun::Password::short_term(precis::OpaqueString{password_str}, crypto::node_openssl::sha1);
-    if (password_rv.is_error()) {
-        return password_rv.assert_error();
-    }
-    auto password = password_rv.assert_value();
-
+    // (username, password)
+    auto username_rv = info[0]
+        .fmap([](const auto& arg) { return arg.as_string(); })
+        .fmap([](const auto& str) {
+            return precis::OpaqueString{str};
+        });
+    auto password_rv = info[1]
+        .fmap([](const auto& arg) { return arg.as_string(); })
+        .fmap([](const auto& str) {
+            return stun::Password::short_term(precis::OpaqueString{str}, crypto::node_openssl::sha1);
+        });
     auto obj_rvv = info.this_arg.unwrap<stun::server::Stateless>();
-    if (obj_rvv.is_error()) {
-        return obj_rvv.assert_error();
-    }
-    auto& server = obj_rvv.assert_value().get();
+    return combine(
+        [&](const auto& username, const auto& password, ServerRefWrap server) {
+            server.get().add_user(username, password);
+            return env.create_undefined();
+        },
+        username_rv,
+        password_rv,
+        obj_rvv);
 
-    server.add_user(username, password);
-    return env.create_undefined();
 }
 
 }
 
 ReturnValue<Value> stun_server_class(Env& env, std::string_view name) {
-    return env.create_class(name,
-                            constructor,
-                            {
-                                {"process", process_message},
-                                {"addUser", add_user}
-                            });
+    return
+        env.create_class(
+            name,
+            constructor,
+            {
+                {"process", process_message},
+                {"addUser", add_user}
+            });
 }
 
 }
