@@ -32,14 +32,13 @@ ReturnValue<Value> stun_transcation_id(const Env& env, const stun::TransactionId
     return env.create_buffer(id.view());
 }
 
-ReturnValue<Value> stun_header(const Env& env, const stun::Header& hdr) noexcept {
+ReturnValue<Object> stun_header(const Env& env, const stun::Header& hdr) noexcept {
     return
         env.create_object({
                 { "class", stun_class(env, hdr.cls) },
                 { "method", stun_method(env, hdr.method) },
                 { "transaction", stun_transcation_id(env, hdr.transaction_id) }
-            })
-        .fmap([](const Object& obj) -> Value { return obj.to_value(); }); // transform from Object to Value
+            });
 }
 
 }

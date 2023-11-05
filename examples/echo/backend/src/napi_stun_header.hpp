@@ -13,6 +13,6 @@
 
 namespace freewebrtc::napi {
 
-ReturnValue<Value> stun_header(const Env& env, const stun::Header& hdr) noexcept;
+ReturnValue<Object> stun_header(const Env& env, const stun::Header& hdr) noexcept;
 
 }

@@ -9,12 +9,10 @@ napi_value init(napi_env inenv, napi_value) {
     Env env(inenv);
     auto exports =
         env.create_object({
-                {"stun",
-                 env.create_object({
-                         { "message_parse", env.create_function(stun_message_parse) },
-                         { "StatelessServer", stun_server_class(env, "StatelessServer") }
-                     })
-                     .fmap([](const Object& obj) -> Value { return obj.to_value(); })
+                {"stun", env.create_object({
+                            { "message_parse", env.create_function(stun_message_parse) },
+                            { "StatelessServer", stun_server_class(env, "StatelessServer") }
+                        })
                 }
             });
     if (exports.is_error()) {

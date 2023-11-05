@@ -134,11 +134,20 @@ ReturnValue<Object> Env::create_object(const ObjectSpec& spec) const noexcept {
         const auto& k = p.first;
         const auto& v = p.second;
         using MaybeRVV = std::optional<ReturnValue<Value>>;
+        using MaybeRVO = std::optional<ReturnValue<Object>>;
         auto mrvv = std::visit(
             util::overloaded {
                 [](const ReturnValue<Value>& rv) -> MaybeRVV { return rv; },
                 [](const Value& vv)  -> MaybeRVV { return vv; },
-                [](const MaybeRVV& mrvv) { return mrvv; }
+                [](const MaybeRVV& mrvv) { return mrvv; },
+                [](const Object& vv)  -> MaybeRVV { return vv.to_value(); },
+                [](const RVO& rv) -> MaybeRVV { return rv.fmap([](const auto& obj) { return obj.to_value(); }); },
+                [](const MaybeRVO& mrvo) -> MaybeRVV {
+                    if (!mrvo.has_value()) {
+                        return std::nullopt;
+                    }
+                    return mrvo->fmap(Object::fmap_to_value);
+                },
             }, v);
         if (!mrvv.has_value()) {
             continue;
@@ -240,13 +249,19 @@ ReturnValue<Value> Env::create_function(Function f, std::optional<std::string_vi
     auto data = std::make_unique<Function>(std::move(f));
     if (maybename.has_value()) {
         const auto& name = maybename.value();
-        if (napi_status status = napi_create_function(m_env, name.data(), name.size(), function_wrapper, data.get(), &result); status != napi_ok) {
+        if (auto status = napi_create_function(m_env, name.data(), name.size(), function_wrapper, data.get(), &result); status != napi_ok) {
             return make_error_code(status);
         }
     } else {
-        if (napi_status status = napi_create_function(m_env, nullptr, 0, function_wrapper, data.get(), &result); status != napi_ok) {
+        if (auto status = napi_create_function(m_env, nullptr, 0, function_wrapper, data.get(), &result); status != napi_ok) {
             return make_error_code(status);
         }
+    }
+    auto dtor = [](napi_env, void *data, void *) {
+        delete static_cast<Function *>(data);
+    };
+    if (auto status = napi_add_finalizer(m_env, result, data.get(), dtor, nullptr, nullptr); status != napi_ok) {
+        return make_error_code(status);
     }
     data.release();
     return Value(m_env, result);
@@ -356,6 +371,9 @@ ReturnValue<Value> Env::create_class(std::string_view name, Function ctor, const
     if (status != napi_ok) {
         return make_error_code(status);
     }
+    // Note that data in property descriptions data will leak
+    // if module can be uploaded. We can add napi_add_finalizer to
+    // class definition as well but it is not practal thing.
     return Value(m_env, result);
 }
 

@@ -25,8 +25,8 @@ ReturnValue<Value> constructor(Env& env, const CallbackInfo& info) {
 }
 
 ReturnValue<net::Endpoint> extract_rinfo(const Value& v) {
-    const auto addr_rv =
-        v.as_object()
+    auto v_as_obj = v.as_object();
+    auto addr_rv = v_as_obj
         .fmap([](auto obj) { return obj.named_property("address"); })
         .fmap([](auto v)   { return v.as_string(); })
         .fmap([](auto v) -> ReturnValue<net::ip::Address> {
@@ -37,16 +37,16 @@ ReturnValue<net::Endpoint> extract_rinfo(const Value& v) {
             return make_error_code(WrapperError::INVALID_IP_ADDRESS);
         });
 
-    const auto port_rv =
-        v.as_object()
+    auto port_rv = v_as_obj
         .fmap([](auto obj) { return obj.named_property("port"); })
         .fmap([](const auto& v) { return v.as_int32(); });
 
-    return combine([](const auto& addr, const auto& port) {
+    return combine(
+        [](auto&& addr, auto&& port) {
             return net::Endpoint(net::UdpEndpoint{addr, net::Port(port)});
         },
-        addr_rv,
-        port_rv);
+        std::move(addr_rv),
+        std::move(port_rv));
 }
 
 ReturnValue<Value> process_message(Env& env, const CallbackInfo& info) {
@@ -59,7 +59,7 @@ ReturnValue<Value> process_message(Env& env, const CallbackInfo& info) {
         return maybe_error.value();
     }
     return combine(
-        [&](const auto& message, const auto& endpoint, ServerRefWrap server) {
+        [&](auto&& message, auto&& endpoint, auto&& server) {
             using RVV = ReturnValue<Value>;
             auto result = server.get().process(endpoint, message);
             return std::visit(
@@ -79,9 +79,9 @@ ReturnValue<Value> process_message(Env& env, const CallbackInfo& info) {
                 },
                 result);
         },
-        buffer_rv,
-        rinfo_rv,
-        obj_rvv);
+        std::move(buffer_rv),
+        std::move(rinfo_rv),
+        std::move(obj_rvv));
 
 }
 
@@ -92,20 +92,22 @@ ReturnValue<Value> add_user(Env& env, const CallbackInfo& info) {
         .fmap([](const auto& str) {
             return precis::OpaqueString{str};
         });
+
     auto password_rv = info[1]
         .fmap([](const auto& arg) { return arg.as_string(); })
         .fmap([](const auto& str) {
             return stun::Password::short_term(precis::OpaqueString{str}, crypto::node_openssl::sha1);
         });
     auto obj_rvv = info.this_arg.unwrap<stun::server::Stateless>();
+
     return combine(
-        [&](const auto& username, const auto& password, ServerRefWrap server) {
+        [&](auto&& username, auto&& password, auto&& server) {
             server.get().add_user(username, password);
             return env.create_undefined();
         },
-        username_rv,
-        password_rv,
-        obj_rvv);
+        std::move(username_rv),
+        std::move(password_rv),
+        std::move(obj_rvv));
 
 }
 

@@ -33,6 +33,7 @@ public:
     template<typename T>
     ReturnValue<Value> wrap(std::unique_ptr<T> native_obj) const noexcept;
 
+    static Value fmap_to_value(const Object& obj) noexcept;
 private:
     napi_env m_env;
     napi_value m_value;
@@ -76,13 +77,14 @@ public:
     ReturnValue<CallbackInfo> create_callback_info(napi_callback_info, void ** = nullptr) const noexcept;
 
     using RVV = ReturnValue<Value>;
+    using RVO = ReturnValue<Object>;
 
-    using ValueInit = std::variant<Value, RVV, std::optional<RVV>>;
+    using ValueInit = std::variant<Value, RVV, std::optional<RVV>, Object, RVO, std::optional<RVO>>;
     using ObjectSpec = std::vector<std::pair<std::string, ValueInit>>;
     using Function = std::function<RVV(Env& env, const CallbackInfo&)>;
 
-    ReturnValue<Object> create_object() const noexcept;
-    ReturnValue<Object> create_object(const ObjectSpec&) const noexcept;
+    RVO create_object() const noexcept;
+    RVO create_object(const ObjectSpec&) const noexcept;
 
     RVV create_undefined() const noexcept;
     RVV create_string(const std::string_view&) const noexcept;
@@ -147,6 +149,10 @@ bool Env::maybe_throw_error(const ReturnValue<T>& v) const noexcept {
 
 inline Value Object::to_value() const noexcept {
     return Value(m_env, m_value);
+}
+
+inline Value Object::fmap_to_value(const Object& obj) noexcept {
+    return obj.to_value();
 }
 
 }
