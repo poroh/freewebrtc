@@ -46,6 +46,7 @@ struct MappedAddressAttribute {
 struct XorMappedAddressAttribute {
     XoredAddress addr;
     net::Port port;
+    bool operator==(const XorMappedAddressAttribute&) const noexcept = default;
     static std::optional<XorMappedAddressAttribute> parse(const util::ConstBinaryView&, ParseStat&);
     util::ByteVec build() const;
 };
@@ -108,6 +109,7 @@ struct ErrorCodeAttribute {
     int code;
     std::optional<std::string> reason_phrase;
 
+    bool operator==(const ErrorCodeAttribute&) const noexcept = default;
     static std::optional<ErrorCodeAttribute> parse(const util::ConstBinaryView&, ParseStat&);
     util::ByteVec build() const;
 };

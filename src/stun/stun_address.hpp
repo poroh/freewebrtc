@@ -48,6 +48,7 @@ public:
     net::ip::Address to_address(const TransactionId&) const noexcept;
     Family family() const noexcept;
     util::ConstBinaryView view() const noexcept;
+    bool operator==(const XoredAddress&) const noexcept = default;
 private:
     using V4Holder = std::array<uint8_t, net::ip::AddressV4::size()>;
     using V6Holder = std::array<uint8_t, net::ip::AddressV6::size()>;

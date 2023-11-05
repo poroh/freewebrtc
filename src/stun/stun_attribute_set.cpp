@@ -130,7 +130,7 @@ ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const Maybe
             result.emplace_back(view);
             total_size += view.size();
             if ((view.size() & 0x3) != 0) {
-                const size_t padding_size = 4 - view.size();
+                const size_t padding_size = 4 - (view.size() % 4);
                 result.emplace_back(util::ConstBinaryView(&padding, padding_size));
                 total_size += padding_size;
             }

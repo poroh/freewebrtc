@@ -27,6 +27,12 @@ public:
         stun::ParseStat stat;
         return stun::Message::parse(util::ConstBinaryView(data), stat);
     }
+    void expect_headers_are_equal(const stun::Message& m1, const stun::Message& m2) {
+        EXPECT_EQ(m1.header.cls,            m2.header.cls);
+        EXPECT_EQ(m1.header.method,         m2.header.method);
+        EXPECT_EQ(m1.header.transaction_id, m2.header.transaction_id);
+    }
+
     const crypto::SHA1Hash::Func sha1 = crypto::openssl::sha1;
 };
 
@@ -45,18 +51,15 @@ TEST_F(STUNMessageBuildTest, build_simple_binding_request) {
     const auto& maybe_req = rebuild(request);
     ASSERT_TRUE(maybe_req.has_value());
     const auto& req = maybe_req.value();
-    EXPECT_EQ(req.header.cls, stun::Class::request());
-    EXPECT_EQ(req.header.method, stun::Method::binding());
-    EXPECT_EQ(req.header.transaction_id, tid);
+    expect_headers_are_equal(req, request);
 }
 
 TEST_F(STUNMessageBuildTest, build_binding_request_with_fingerprint) {
-    const auto tid = rand_tid();
     const stun::Message request {
         stun::Header {
             stun::Class::request(),
             stun::Method::binding(),
-            tid
+            rand_tid()
         },
         stun::AttributeSet::create({stun::FingerprintAttribute{0}}),
         stun::IsRFC3489{false}
@@ -64,18 +67,15 @@ TEST_F(STUNMessageBuildTest, build_binding_request_with_fingerprint) {
     const auto& maybe_req = rebuild(request);
     ASSERT_TRUE(maybe_req.has_value());
     const auto& req = maybe_req.value();
-    EXPECT_EQ(req.header.cls, stun::Class::request());
-    EXPECT_EQ(req.header.method, stun::Method::binding());
-    EXPECT_EQ(req.header.transaction_id, tid);
+    expect_headers_are_equal(req, request);
 }
 
 TEST_F(STUNMessageBuildTest, build_binding_request_with_integrity) {
-    const auto tid = rand_tid();
     const stun::Message request {
         stun::Header {
             stun::Class::request(),
             stun::Method::binding(),
-            tid
+            rand_tid()
         },
         stun::AttributeSet::create({}),
         stun::IsRFC3489{false}
@@ -94,6 +94,52 @@ TEST_F(STUNMessageBuildTest, build_binding_request_with_integrity) {
     auto is_valid_rv = req.is_valid(util::ConstBinaryView(data), integrity_data);
     ASSERT_TRUE(is_valid_rv.is_value());
     EXPECT_TRUE(is_valid_rv.assert_value().value_or(false));
+}
+
+TEST_F(STUNMessageBuildTest, build_error_response_with_errocode) {
+    const stun::Message response {
+        stun::Header {
+            stun::Class::error_response(),
+            stun::Method::binding(),
+            rand_tid()
+        },
+        stun::AttributeSet::create({
+                stun::ErrorCodeAttribute{stun::ErrorCodeAttribute::BadRequest, "Bad Request"},
+            }),
+        stun::IsRFC3489{false}
+    };
+    const auto& maybe_rsp = rebuild(response);
+    ASSERT_TRUE(maybe_rsp.has_value());
+    const auto& rsp = maybe_rsp.value();
+    expect_headers_are_equal(rsp, response);
+
+    ASSERT_TRUE(rsp.attribute_set.error_code().has_value());
+    ASSERT_TRUE(response.attribute_set.error_code().has_value());
+    EXPECT_EQ(rsp.attribute_set.error_code()->get(), response.attribute_set.error_code()->get());
+}
+
+TEST_F(STUNMessageBuildTest, build_success_response_with_xor_mapped) {
+    auto tid = rand_tid();
+    auto xaddr = stun::XoredAddress::from_address(net::ip::Address::from_string("127.0.0.1").value(), tid);
+    const stun::Message response {
+        stun::Header {
+            stun::Class::success_response(),
+            stun::Method::binding(),
+            tid
+        },
+        stun::AttributeSet::create({
+                stun::XorMappedAddressAttribute{xaddr, net::Port(1234)},
+            }),
+        stun::IsRFC3489{false}
+    };
+    const auto& maybe_rsp = rebuild(response);
+    ASSERT_TRUE(maybe_rsp.has_value());
+    const auto& rsp = maybe_rsp.value();
+    expect_headers_are_equal(rsp, response);
+
+    ASSERT_TRUE(rsp.attribute_set.xor_mapped().has_value());
+    ASSERT_TRUE(response.attribute_set.xor_mapped().has_value());
+    EXPECT_EQ(rsp.attribute_set.xor_mapped()->get(), response.attribute_set.xor_mapped()->get());
 }
 
 
