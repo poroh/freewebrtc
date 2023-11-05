@@ -10,15 +10,23 @@
 
 #include <variant>
 #include <system_error>
+#include <type_traits>
 #include <optional>
 
 namespace freewebrtc {
 
 template<typename V>
 class ReturnValue {
+    template<typename T> T strip_rv(const ReturnValue<T>& v);
+    template<typename T> T strip_rv(const T& v);
+
 public:
     using Value = V;
     using Error = std::error_code;
+
+    using MaybeError = std::optional<Error>;
+    using MaybeValue = std::optional<std::reference_wrapper<Value>>;
+    using MaybeConstValue = std::optional<std::reference_wrapper<const Value>>;
 
     ReturnValue(Value&&);
     ReturnValue(const Value&);
@@ -29,26 +37,25 @@ public:
     ReturnValue& operator=(const ReturnValue&) = default;
     ReturnValue& operator=(ReturnValue&&) = default;
 
-    using MaybeError = std::optional<Error>;
-    MaybeError error() const noexcept;
-    using MaybeValue = std::optional<std::reference_wrapper<Value>>;
-    using MaybeConstValue = std::optional<std::reference_wrapper<const Value>>;
-    MaybeConstValue value() const noexcept;
-    MaybeValue value() noexcept;
+    bool is_error() const noexcept;
+    MaybeError maybe_error() const noexcept;
+    const Error& assert_error() const noexcept;
+
+    bool is_value() const noexcept;
+    MaybeValue maybe_value() noexcept;
+    MaybeConstValue maybe_value() const noexcept;
+    Value& assert_value() noexcept;
+    const Value& assert_value() const noexcept;
 
     // Apply function to Value if it ReturnValue is value
     // and return result as ReturnValue of result of the function.
-    // If Fmap returns ReturnValue<SomeType> then return value of fmap is
-    // ReturnValue<SomeType> instead of ResultValue<ResultValue<SomeType>>
+    // If function Fmap returns ReturnValue<SomeTime> then
+    // fmap return also returns ReturnValue<SomeTime> instead of
+    // ReturnValue<ReturnValue<SomeTime>>
     template<typename Fmap>
-    auto fmap(Fmap&& f) -> ReturnValue<decltype(f(std::declval<V>()))>;
+    auto fmap(Fmap&& f) -> ReturnValue<decltype(strip_rv(f(std::declval<V>())))>;
 
 private:
-    template<typename T>
-    ReturnValue<T> fmap_helper(ReturnValue<T>&& v);
-    template<typename T>
-    ReturnValue<T> fmap_helper(T&& v);
-
     std::variant<Value, Error> m_result;
 };
 
@@ -76,49 +83,73 @@ inline ReturnValue<V>::ReturnValue(const std::error_code& c)
     : m_result(c)
 {}
 
+
+template<typename V>
+inline bool ReturnValue<V>::is_error() const noexcept {
+    return std::holds_alternative<Error>(m_result);
+}
+
 template<typename V>
 inline std::optional<typename ReturnValue<V>::Error>
-ReturnValue<V>::error() const noexcept {
+ReturnValue<V>::maybe_error() const noexcept {
     auto err = std::get_if<Error>(&m_result);
     return err != nullptr ? *err : std::optional<Error>(std::nullopt);
 }
 
 template<typename V>
+inline const typename ReturnValue<V>::Error&
+ReturnValue<V>::assert_error() const noexcept {
+    return std::get<Error>(m_result);
+}
+
+template<typename V>
+inline bool ReturnValue<V>::is_value() const noexcept {
+    return std::holds_alternative<Value>(m_result);
+}
+
+template<typename V>
 inline typename ReturnValue<V>::MaybeConstValue
-ReturnValue<V>::value() const noexcept {
+ReturnValue<V>::maybe_value() const noexcept {
     auto v = std::get_if<V>(&m_result);
     return v != nullptr ? MaybeConstValue{*v} : std::nullopt;
 }
 
 template<typename V>
 inline typename ReturnValue<V>::MaybeValue
-ReturnValue<V>::value() noexcept {
+ReturnValue<V>::maybe_value() noexcept {
     auto v = std::get_if<V>(&m_result);
     return v != nullptr ? MaybeValue{*v} : std::nullopt;
 }
 
 template<typename V>
-template<typename T>
-ReturnValue<T> ReturnValue<V>::fmap_helper(ReturnValue<T>&& v) {
-    if (v.error().has_value()) {
-        return v.error().value();
-    }
-    return std::move(v.value().value().get());
-};
+inline const typename ReturnValue<V>::Value&
+ReturnValue<V>::assert_value() const noexcept {
+    return std::get<Value>(m_result);
+}
 
 template<typename V>
-template<typename T>
-ReturnValue<T> ReturnValue<V>::fmap_helper(T&& v) {
-    return v;
-};
+inline typename ReturnValue<V>::Value&
+ReturnValue<V>::assert_value() noexcept {
+    return std::get<Value>(m_result);
+}
 
-template<typename T>
+template<typename V>
 template<typename Fmap>
-auto ReturnValue<T>::fmap(Fmap&& f) -> ReturnValue<decltype(f(std::declval<T>()))> {
-    if (error().has_value()) {
-        return error().value();
+auto ReturnValue<V>::fmap(Fmap&& f) -> ReturnValue<decltype(strip_rv(f(std::declval<V>())))> {
+    using FRetT = decltype(f(std::declval<V>()));
+    using FmapRet = decltype(strip_rv(f(std::declval<V>())));
+    if (is_error()) {
+        return assert_error();
     }
-    return fmap_helper(f(value()->get()));
+    if constexpr (std::is_same_v<FRetT, FmapRet>) {
+        return f(assert_value());
+    } else {
+        auto result = f(assert_value());
+        if (result.is_error()) {
+            return result.assert_error();
+        }
+        return result.assert_value();
+    }
 }
 
 }

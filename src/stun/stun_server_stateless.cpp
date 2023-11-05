@@ -114,10 +114,10 @@ Stateless::ProcessResult Stateless::process_request(const net::Endpoint& ep, Mes
         //    of 401 (Unauthorized).
         maybe_integrity_data = IntegrityData{user_password_pair_it->second, m_sha1};
         const auto maybe_is_valid_rv = msg.is_valid(view, maybe_integrity_data.value());
-        if (maybe_is_valid_rv.error().has_value()) {
-            return Error{maybe_is_valid_rv.error().value()};
+        if (maybe_is_valid_rv.is_error()) {
+            return Error{maybe_is_valid_rv.assert_error()};
         }
-        const auto maybe_is_valid = maybe_is_valid_rv.value()->get();
+        const auto maybe_is_valid = maybe_is_valid_rv.assert_value();
         if (maybe_is_valid.has_value() && !maybe_is_valid.value()) {
             return Respond{create_error(msg, ErrorCodeAttribute::Code::Unauthorized), std::move(msg)};
         }

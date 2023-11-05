@@ -27,12 +27,12 @@ ReturnValue<Value> stun_attributes(const Env& env, const stun::TransactionId& ti
                 { "xor_mapped",
                         util::fmap(attrs.xor_mapped(), [&](const auto& v) -> ReturnValue<Value> {
                             auto addr_rvv = v.get().addr.to_address(tid).to_string();
-                            if (addr_rvv.error().has_value()) {
-                                return addr_rvv.error().value();
+                            if (addr_rvv.is_error()) {
+                                return addr_rvv.assert_error();
                             }
                             return
                                 env.create_object({
-                                        { "addr", env.create_string(addr_rvv.value().value().get()) },
+                                        { "addr", env.create_string(addr_rvv.assert_value()) },
                                         { "port", env.create_int32(v.get().port.value()) }
                                     })
                                 .fmap([](const Object& obj) -> Value { return obj.to_value(); });
@@ -49,7 +49,16 @@ ReturnValue<Value> stun_attributes(const Env& env, const stun::TransactionId& ti
                         util::fmap(attrs.ice_controlled(), [&](const auto& v) {
                             return env.create_bigint_uint64(v.get());
                         })},
-                { "use-candidate", attrs.has_use_candidate() ? MaybeRVV(env.create_boolean(true)) : std::nullopt }
+                { "use-candidate", attrs.has_use_candidate() ? MaybeRVV(env.create_boolean(true)) : std::nullopt },
+                { "error_code",
+                        util::fmap(attrs.error_code(), [&](const auto& v) {
+                            return
+                                env.create_object({
+                                        { "code", env.create_int32(v.get().code)},
+                                        { "reason", env.create_string(v.get().reason_phrase.value_or("")) }
+                                    })
+                                .fmap([](const Object& obj) -> Value { return obj.to_value(); });
+                        })}
             })
         .fmap([](const Object& obj) -> Value { return obj.to_value(); });
 }
@@ -62,6 +71,26 @@ ReturnValue<Value> stun_message(const Env& env, const stun::Message& msg) {
                 { "attributes", stun_attributes(env, msg.header.transaction_id, msg.attribute_set) }
             })
         .fmap([](const Object& obj) -> Value { return obj.to_value(); });
+}
+
+ReturnValue<Value> stun_message_parse(Env& env, const CallbackInfo& ci) {
+    if (ci.args.size() == 0) {
+        return env.throw_error("First argument must be a buffer");
+    }
+
+    auto as_buffer_result = ci.args[0].as_buffer();
+    if (as_buffer_result.is_error()) {
+        return as_buffer_result.assert_error();
+    }
+
+    const auto& view = as_buffer_result.assert_value();
+
+    freewebrtc::stun::ParseStat parsestat;
+    auto maybe_msg = freewebrtc::stun::Message::parse(view, parsestat);
+    if (!maybe_msg.has_value()) {
+        return env.throw_error("Failed to parse STUN packet");
+    }
+    return stun_message(env, maybe_msg.value());
 }
 
 }

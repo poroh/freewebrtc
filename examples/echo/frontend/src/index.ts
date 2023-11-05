@@ -1,5 +1,4 @@
 
-
 async function startRTC() {
     console.log("started");
     const cfg : RTCConfiguration = {};

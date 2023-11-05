@@ -69,11 +69,11 @@ inline ReturnValue<PadKey<xorv>> PadKey<xorv>::from_key(const util::ConstBinaryV
 {
     util::ConstBinaryView v = view;
     if (v.size() > B) {
-        auto hash = h({view});
-        if (auto maybe_err = hash.error(); maybe_err.has_value()) {
-            return *maybe_err;
+        auto hash_rv = h({view});
+        if (hash_rv.is_error()) {
+            return hash_rv.assert_error();
         }
-        v = hash.value()->get().view();
+        v = hash_rv.assert_value().view();
     }
     Data data = {0};
     std::copy(v.begin(), v.end(), data.begin());
@@ -90,14 +90,14 @@ HMACReturnValue<HashFunc> digest(const std::vector<util::ConstBinaryView>& data,
     std::vector<util::ConstBinaryView> inner_data = {ipad.view()};
     std::copy(data.begin(), data.end(), std::back_inserter(inner_data));
     auto inner = h(inner_data);
-    if (inner.error().has_value()) {
-        return *inner.error();
+    if (inner.is_error()) {
+        return inner.assert_error();
     }
-    auto outer = h({opad.view(), inner.value()->get().view()});
-    if (outer.error().has_value()) {
-        return *outer.error();
+    auto outer = h({opad.view(), inner.assert_value().view()});
+    if (outer.is_error()) {
+        return outer.assert_error();
     }
-    return (typename HMACReturnValue<HashFunc>::Value)(std::move(*outer.value()));
+    return (typename HMACReturnValue<HashFunc>::Value)(std::move(outer.assert_value()));
 }
 
 }

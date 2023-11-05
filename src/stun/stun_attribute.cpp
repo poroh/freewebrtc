@@ -39,6 +39,7 @@ std::optional<Attribute::ParseResult> Attribute::parse(const util::ConstBinaryVi
     case attr_registry::ICE_CONTROLLING:    return util::fmap(IceControllingAttribute::parse(vv, stat),   std::move(create_attr_fun));
     case attr_registry::ICE_CONTROLLED:     return util::fmap(IceControlledAttribute::parse(vv, stat),    std::move(create_attr_fun));
     case attr_registry::USE_CANDIDATE:      return util::fmap(UseCandidateAttribute::parse(vv, stat),     std::move(create_attr_fun));
+    case attr_registry::ERROR_CODE:         return util::fmap(ErrorCodeAttribute::parse(vv, stat),        std::move(create_attr_fun));
     default:
         return UnknownAttribute(type, vv);
     }
@@ -149,7 +150,7 @@ std::optional<XorMappedAddressAttribute> XorMappedAddressAttribute::parse(const 
 util::ByteVec XorMappedAddressAttribute::build() const {
     const uint16_t xport = port.value() ^ (details::MAGIC_COOKIE >> 16);
     const uint8_t family = addr.family().to_uint8();
-    const uint32_t first_word = util::host_to_network_u32(xport | (family >> 16));
+    const uint32_t first_word = util::host_to_network_u32(xport | (family << 16));
     return util::ConstBinaryView::concat({
             util::ConstBinaryView(&first_word, sizeof(first_word)),
             addr.view()
@@ -254,12 +255,27 @@ util::ByteVec ErrorCodeAttribute::build() const {
     // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     // |      Reason Phrase (variable)                                ..
     // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    uint32_t first_word = util::host_to_network_u32(((code / 100) << 5) | (code % 100));
+    uint32_t first_word = util::host_to_network_u32(((code / 100) << 8) | (code % 100));
     return util::ConstBinaryView::concat({
             util::ConstBinaryView(&first_word, sizeof(first_word)),
             reason_phrase.has_value() ? util::ConstBinaryView(reason_phrase->data(), reason_phrase->size())
                                       : util::ConstBinaryView(&first_word, 0) // 0 is by intention!
         });
+}
+
+std::optional<ErrorCodeAttribute> ErrorCodeAttribute::parse(const util::ConstBinaryView& v, ParseStat& stat) {
+    auto maybe_first_word = v.read_u32be(0);
+    auto maybe_reason = v.subview(4);
+    if (!maybe_first_word.has_value()) {
+        stat.error.inc();
+        stat.invalid_error_code_size.inc();
+        return std::nullopt;
+    }
+    int first_word = *maybe_first_word;
+    return ErrorCodeAttribute{(first_word >> 8) * 100 + (first_word & 0xFF),
+                              util::fmap(maybe_reason, [](auto view) {
+                                  return std::string(view.begin(), view.end());
+                              })};
 }
 
 }

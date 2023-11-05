@@ -22,8 +22,8 @@ public:
     }
     std::optional<stun::Message> rebuild(const stun::Message& msg, const stun::MaybeIntegrity& maybe_integrity = std::nullopt) {
         const auto rv = msg.build(maybe_integrity);
-        assert(!rv.error().has_value());
-        const auto& data = rv.value()->get();
+        assert(!rv.is_error());
+        const auto& data = rv.assert_value();
         stun::ParseStat stat;
         return stun::Message::parse(util::ConstBinaryView(data), stat);
     }
@@ -82,18 +82,18 @@ TEST_F(STUNMessageBuildTest, build_binding_request_with_integrity) {
     };
 
     auto password = stun::Password::short_term(precis::OpaqueString("VOkJxbRl1RmTxUk/WvJxBt"), sha1);
-    ASSERT_TRUE(password.value().has_value());
-    stun::IntegrityData integrity_data{*password.value(), sha1};
+    ASSERT_TRUE(password.is_value());
+    stun::IntegrityData integrity_data{password.assert_value(), sha1};
     const auto rv = request.build(integrity_data);
-    assert(!rv.error().has_value());
-    const auto& data = rv.value()->get();
+    assert(!rv.is_error());
+    const auto& data = rv.assert_value();
     stun::ParseStat stat;
     const auto& maybe_req = stun::Message::parse(util::ConstBinaryView(data), stat);
     ASSERT_TRUE(maybe_req.has_value());
     const auto& req = maybe_req.value();
-    auto is_valid_result = req.is_valid(util::ConstBinaryView(data), integrity_data);
-    ASSERT_TRUE(is_valid_result.value().has_value());
-    EXPECT_TRUE(is_valid_result.value().value().get());
+    auto is_valid_rv = req.is_valid(util::ConstBinaryView(data), integrity_data);
+    ASSERT_TRUE(is_valid_rv.is_value());
+    EXPECT_TRUE(is_valid_rv.assert_value().value_or(false));
 }
 
 

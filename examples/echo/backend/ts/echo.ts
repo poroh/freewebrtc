@@ -11,6 +11,7 @@ import { EchoTransport } from './echo_transport';
 import { HTTPServer, HTTPServerPrefix, ProcessJsonResult } from './http';
 import { parseSDP, serializeSDP, SDP, MediaDescriptor } from './sdp';
 import * as os from 'os';
+import { webrtcProcessSDP } from './webrtc_sdp';
 
 const prefixes: HTTPServerPrefix[] = [
     {method: 'POST', prefix: '/echo-api/offer', action: {type: 'process-json', handler: sdpOffer}},
@@ -33,7 +34,13 @@ async function sdpOffer(req: object): Promise<ProcessJsonResult> {
         };
     }
     const answerSDP = generateAnswerSDP(r.obj);
-    const t = new EchoTransport;
+    const remoteInfo = webrtcProcessSDP(r.obj);
+    const localInfo = webrtcProcessSDP(answerSDP);
+    const remoteUfrag = remoteInfo.transports[0].ice.ufrag;
+    const localUfrag = localInfo.transports[0].ice.ufrag;
+    const localPassword = localInfo.transports[0].ice.pwd;
+
+    const t = new EchoTransport(`${remoteUfrag!}:${localUfrag!}`, localPassword!);
     const addr = await t.start();
     if (addr.address === '0.0.0.0') {
         const candidates = collectNonLoopbackAddresses(addr.family)

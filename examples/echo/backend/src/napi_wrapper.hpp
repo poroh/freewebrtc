@@ -13,6 +13,7 @@
 #include <optional>
 #include "util/util_return_value.hpp"
 #include "util/util_binary_view.hpp"
+#include "napi_error.hpp"
 
 namespace freewebrtc::napi {
 
@@ -27,6 +28,10 @@ public:
 
     MaybeError set_named_property(const std::string&, const Value&) noexcept;
     Value to_value() const noexcept;
+    ReturnValue<Value> named_property(const std::string& name) const noexcept;
+
+    template<typename T>
+    ReturnValue<Value> wrap(std::unique_ptr<T> native_obj) const noexcept;
 
 private:
     napi_env m_env;
@@ -38,9 +43,14 @@ public:
     Value(napi_env, napi_value);
 
     ReturnValue<util::ConstBinaryView> as_buffer() const noexcept;
-
+    ReturnValue<Object> as_object() const noexcept;
+    ReturnValue<std::string> as_string() const noexcept;
+    ReturnValue<int32_t> as_int32() const noexcept;
 
     napi_value to_napi() const noexcept;
+
+    template<typename T>
+    ReturnValue<std::reference_wrapper<T>> unwrap() const noexcept;
 
 private:
     napi_env m_env;
@@ -48,6 +58,7 @@ private:
 };
 
 struct CallbackInfo {
+    Value this_arg;
     std::vector<Value> args;
 };
 
@@ -55,22 +66,34 @@ class Env {
 public:
     explicit Env(napi_env);
 
-    ReturnValue<CallbackInfo> create_callback_info(napi_callback_info) const noexcept;
+    ReturnValue<CallbackInfo> create_callback_info(napi_callback_info, void ** = nullptr) const noexcept;
 
-    using ValueInit = std::variant<Value, ReturnValue<Value>, std::optional<ReturnValue<Value>>>;
+    using RVV = ReturnValue<Value>;
+
+    using ValueInit = std::variant<Value, RVV, std::optional<RVV>>;
     using ObjectSpec = std::vector<std::pair<std::string, ValueInit>>;
+    using Function = std::function<RVV(Env& env, const CallbackInfo&)>;
 
     ReturnValue<Object> create_object() const noexcept;
     ReturnValue<Object> create_object(const ObjectSpec&) const noexcept;
 
-    ReturnValue<Value> create_string(const std::string_view&) const noexcept;
-    ReturnValue<Value> create_buffer(const util::ConstBinaryView& view) const noexcept;
-    ReturnValue<Value> create_boolean(bool value) const noexcept;
-    ReturnValue<Value> create_int32(int32_t value) const noexcept;
-    ReturnValue<Value> create_uint32(int32_t value) const noexcept;
-    ReturnValue<Value> create_bigint_uint64(uint64_t value) const noexcept;
+    RVV create_undefined() const noexcept;
+    RVV create_string(const std::string_view&) const noexcept;
+    RVV create_buffer(const util::ConstBinaryView& view) const noexcept;
+    RVV create_boolean(bool value) const noexcept;
+    RVV create_int32(int32_t value) const noexcept;
+    RVV create_uint32(int32_t value) const noexcept;
+    RVV create_bigint_uint64(uint64_t value) const noexcept;
+    RVV create_function(Function, std::optional<std::string_view> name = std::nullopt);
+    RVV throw_error(const std::string& message) const noexcept;
 
-    napi_value throw_error(const std::string& message) const noexcept;
+    struct ClassAttr {
+        std::optional<Function> getter;
+        std::optional<Function> setter;
+    };
+    using ClassProperty = std::variant<Function, RVV, ClassAttr>;
+    using ClassPropertySpec = std::vector<std::pair<std::string, ClassProperty>>;
+    RVV create_class(std::string_view name, Function ctor, const ClassPropertySpec&) const noexcept;
 
     template<typename T>
     bool maybe_throw_error(const ReturnValue<T>& v) const noexcept;
@@ -81,19 +104,35 @@ private:
 //
 // implementation
 //
+template<typename T>
+ReturnValue<Value> Object::wrap(std::unique_ptr<T> native_obj) const noexcept {
+    auto dtor = [](napi_env env, void *data, void *finalize_hint) {
+        delete static_cast<T *>(data);
+    };
+    if (auto status = napi_wrap(m_env, m_value, native_obj.get(), dtor, nullptr, nullptr); status != napi_ok) {
+        return make_error_code(status);
+    }
+    native_obj.release();
+    return to_value();
+}
+
 inline napi_value Value::to_napi() const noexcept {
     return m_value;
 }
 
-inline napi_value Env::throw_error(const std::string& message) const noexcept {
-    napi_throw_error(m_env, nullptr, message.c_str());
-    return nullptr;
+template<typename T>
+ReturnValue<std::reference_wrapper<T>> Value::unwrap() const noexcept {
+    T *t;
+    if (auto status = napi_unwrap(m_env, m_value, reinterpret_cast<void **>(&t)); status != napi_ok) {
+        return make_error_code(status);
+    }
+    return std::ref(*t);
 }
 
 template<typename T>
 bool Env::maybe_throw_error(const ReturnValue<T>& v) const noexcept {
-    if (v.error().has_value()) {
-        throw_error(v.error()->message());
+    if (v.is_error()) {
+        throw_error(v.assert_error().message());
         return true;
     }
     return false;

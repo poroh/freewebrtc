@@ -31,6 +31,7 @@ struct ParseStat {
     stat::Counter invalid_ice_controlling_size;
     stat::Counter invalid_ice_controlled_size;
     stat::Counter invalid_use_candidate_size;
+    stat::Counter invalid_error_code_size;
     stat::Counter unknown_comprehension_required_attr;
 };
 

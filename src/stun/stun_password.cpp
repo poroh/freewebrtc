@@ -14,10 +14,10 @@ ReturnValue<Password> Password::short_term(const OpaqueString& password, crypto:
     std::vector<uint8_t> data(password.value.begin(), password.value.end());
     auto ipad = crypto::hmac::IPadKey::from_key(util::ConstBinaryView(data), h);
     auto opad = crypto::hmac::OPadKey::from_key(util::ConstBinaryView(data), h);
-    if (ipad.error().has_value() || opad.error().has_value()) {
-        return ipad.error().value_or(*opad.error());
+    if (ipad.is_error() || opad.is_error()) {
+        return ipad.maybe_error().value_or(opad.assert_error());
     }
-    return Password(std::move(ipad.value()->get()), std::move(opad.value()->get()));
+    return Password(std::move(ipad.assert_value()), std::move(opad.assert_value()));
 }
 
 Password::Password(crypto::hmac::IPadKey&& ipad, crypto::hmac::OPadKey&& opad)

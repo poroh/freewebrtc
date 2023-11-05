@@ -1,3 +1,4 @@
+
 //
 // Copyright (c) 2023 Dmitry Poroh
 // All rights reserved.
@@ -12,8 +13,11 @@ const echob = require('../build/Release/echo_backend');
 
 export class EchoTransport {
     private readonly socket: Socket;
-    constructor() {
+    private readonly stunServer: any;
+    constructor(user: string, password: string) {
         this.socket = createSocket('udp4');
+        this.stunServer = new echob.stun.StatelessServer();
+        this.stunServer.addUser(user, password);
     }
     start() : Promise<AddressInfo> {
         return new Promise((resolve, reject) => {
@@ -28,8 +32,16 @@ export class EchoTransport {
         });
     }
     receive(msg: Buffer, rinfo: RemoteInfo) {
-        console.log(echob.parseSTUN(msg));
-        //console.log(msg);
+        console.log(rinfo);
+        try {
+            console.log('Request:', echob.stun.message_parse(msg));
+        } catch (e) {
+        }
+        let response = this.stunServer.process(msg, rinfo);
+        if (response) {
+            console.log('Response:', echob.stun.message_parse(response));
+            this.socket.send(response, rinfo.port, rinfo.address);
+        }
     }
 };
 

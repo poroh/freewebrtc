@@ -35,6 +35,43 @@ ReturnValue<util::ConstBinaryView> Value::as_buffer() const noexcept {
     return freewebrtc::util::ConstBinaryView(data, length);
 }
 
+ReturnValue<Object> Value::as_object() const noexcept {
+    napi_valuetype valuetype;
+    if (auto status = napi_typeof(m_env, m_value, &valuetype); status != napi_ok) {
+        return make_error_code(status);
+    }
+    if (valuetype != napi_object) {
+        return make_error_code(WrapperError::INVALID_TYPE);
+    }
+    return Object(m_env, m_value);
+}
+
+ReturnValue<std::string> Value::as_string() const noexcept {
+    // Get the length of the string in bytes
+    size_t sz;
+    if (auto status = napi_get_value_string_utf8(m_env, m_value, nullptr, 0, &sz); status != napi_ok) {
+        return make_error_code(status);
+    }
+
+    std::string str;
+    str.resize(sz);
+
+    if (auto status = napi_get_value_string_utf8(m_env, m_value, &str[0], sz + 1, &sz); status != napi_ok) {
+        return make_error_code(status);
+    }
+
+    return str;
+}
+
+ReturnValue<int32_t> Value::as_int32() const noexcept {
+    int32_t result;
+    if (auto status = napi_get_value_int32(m_env, m_value, &result); status != napi_ok) {
+        return make_error_code(status);
+    }
+    return result;
+}
+
+
 
 Object::Object(napi_env env, napi_value value)
     : m_env(env)
@@ -48,13 +85,23 @@ MaybeError Object::set_named_property(const std::string& k, const Value& v) noex
     return std::nullopt;
 }
 
+ReturnValue<Value> Object::named_property(const std::string& k) const noexcept {
+    napi_value result;
+    if (auto status = napi_get_named_property(m_env, m_value, k.c_str(), &result); status != napi_ok) {
+        return make_error_code(status);
+    }
+    return Value(m_env, result);
+}
+
+
 Env::Env(napi_env env)
     : m_env(env)
 {}
 
-ReturnValue<CallbackInfo> Env::create_callback_info(napi_callback_info info) const noexcept {
+ReturnValue<CallbackInfo> Env::create_callback_info(napi_callback_info info, void **data) const noexcept {
     size_t argc = 0;
-    if (const auto status = napi_get_cb_info(m_env, info, &argc, nullptr, nullptr, nullptr); status != napi_ok) {
+    napi_value this_arg;
+    if (const auto status = napi_get_cb_info(m_env, info, &argc, nullptr, &this_arg, data); status != napi_ok) {
         return make_error_code(status);
     }
 
@@ -68,7 +115,7 @@ ReturnValue<CallbackInfo> Env::create_callback_info(napi_callback_info info) con
     for (const auto& v: args) {
         result_args.emplace_back(m_env, v);
     }
-    return CallbackInfo{result_args};
+    return CallbackInfo{Value{m_env, this_arg}, result_args};
 }
 
 ReturnValue<Object> Env::create_object() const noexcept {
@@ -81,10 +128,10 @@ ReturnValue<Object> Env::create_object() const noexcept {
 
 ReturnValue<Object> Env::create_object(const ObjectSpec& spec) const noexcept {
     auto object_result = create_object();
-    if (object_result.error().has_value()) {
+    if (object_result.is_error()) {
         return object_result;
     }
-    auto& object = object_result.value()->get();
+    auto& object = object_result.assert_value();
     for (const auto& p: spec) {
         const auto& k = p.first;
         const auto& v = p.second;
@@ -99,15 +146,23 @@ ReturnValue<Object> Env::create_object(const ObjectSpec& spec) const noexcept {
             continue;
         }
         const auto& rvv = mrvv.value();
-        if (rvv.error().has_value()) {
-            return rvv.error().value();
+        if (rvv.is_error()) {
+            return rvv.assert_error();
         }
-        const auto& vv = rvv.value()->get();
+        const auto& vv = rvv.assert_value();
         if (auto maybe_error = object.set_named_property(k, vv); maybe_error.has_value()) {
             return maybe_error.value();
         }
     }
     return object_result;
+}
+
+ReturnValue<Value> Env::create_undefined() const noexcept {
+    napi_value result;
+    if (auto status = napi_get_undefined(m_env, &result); status != napi_ok) {
+        return make_error_code(status);
+    }
+    return Value(m_env, result);
 }
 
 ReturnValue<Value> Env::create_string(const std::string_view& str) const noexcept {
@@ -160,5 +215,150 @@ ReturnValue<Value> Env::create_bigint_uint64(uint64_t value) const noexcept {
     return Value(m_env, result);
 }
 
+ReturnValue<Value> Env::throw_error(const std::string& message) const noexcept {
+    if (napi_status status = napi_throw_error(m_env, nullptr, message.c_str()); status != napi_ok) {
+        return make_error_code(status);
+    }
+    return create_undefined();
+}
+
+static napi_value function_wrapper(napi_env inenv, napi_callback_info info) {
+    Env env(inenv);
+    void *data;
+    auto ci_info_rvv = env.create_callback_info(info, &data);
+    if (env.maybe_throw_error(ci_info_rvv)) {
+        return nullptr;
+    }
+    auto& f = *static_cast<Env::Function *>(data);
+    auto ret_rvv = f(env, ci_info_rvv.assert_value());
+    if (env.maybe_throw_error(ret_rvv)) {
+        return nullptr;
+    }
+    return ret_rvv.assert_value().to_napi();
+}
+
+ReturnValue<Value> Env::create_function(Function f, std::optional<std::string_view> maybename) {
+    napi_value result;
+    auto data = std::make_unique<Function>(std::move(f));
+    if (maybename.has_value()) {
+        const auto& name = maybename.value();
+        if (napi_status status = napi_create_function(m_env, name.data(), name.size(), function_wrapper, data.get(), &result); status != napi_ok) {
+            return make_error_code(status);
+        }
+    } else {
+        if (napi_status status = napi_create_function(m_env, nullptr, 0, function_wrapper, data.get(), &result); status != napi_ok) {
+            return make_error_code(status);
+        }
+    }
+    data.release();
+    return Value(m_env, result);
+}
+
+static napi_value function_getter(napi_env inenv, napi_callback_info info) {
+    Env env(inenv);
+    void *data;
+    auto ci_info_rvv = env.create_callback_info(info, &data);
+    if (env.maybe_throw_error(ci_info_rvv)) {
+        return nullptr;
+    }
+    auto& attr = *static_cast<Env::ClassAttr *>(data);
+    if (!attr.getter.has_value()) {
+        return nullptr;
+    }
+    auto ret_rvv = (*attr.getter)(env, ci_info_rvv.assert_value());
+    if (env.maybe_throw_error(ret_rvv)) {
+        return nullptr;
+    }
+    return ret_rvv.assert_value().to_napi();
+}
+
+static napi_value function_setter(napi_env inenv, napi_callback_info info) {
+    Env env(inenv);
+    void *data;
+    auto ci_info_rvv = env.create_callback_info(info, &data);
+    if (env.maybe_throw_error(ci_info_rvv)) {
+        return nullptr;
+    }
+    auto& attr = *static_cast<Env::ClassAttr *>(data);
+    if (!attr.setter.has_value()) {
+        return nullptr;
+    }
+    auto ret_rvv = (*attr.setter)(env, ci_info_rvv.assert_value());
+    if (env.maybe_throw_error(ret_rvv)) {
+        return nullptr;
+    }
+    return ret_rvv.assert_value().to_napi();
+}
+
+ReturnValue<Value> Env::create_class(std::string_view name, Function ctor, const ClassPropertySpec& spec) const noexcept {
+    using DescrRV = ReturnValue<napi_property_descriptor>;
+    std::vector<napi_property_descriptor> descriptors;
+    descriptors.reserve(spec.size());
+    for (auto& p: spec) {
+        auto rvv =
+            std::visit(
+                util::overloaded {
+                    [&](const Function& f) -> DescrRV {
+                        return napi_property_descriptor{
+                                p.first.c_str(),
+                                nullptr, // name
+                                function_wrapper, // method
+                                nullptr, // getter
+                                nullptr, // setter
+                                nullptr, // value
+                                napi_default, // attributes
+                                new Function(f) // data
+                            };
+                    },
+                    [&](const ReturnValue<Value>& rvv) -> DescrRV {
+                            if (rvv.is_error()) {
+                                return rvv.assert_error();
+                            }
+                            return napi_property_descriptor{
+                                p.first.c_str(),
+                                nullptr, // name
+                                function_wrapper, // method
+                                nullptr, // getter
+                                nullptr, // setter
+                                rvv.assert_value().to_napi(), // value
+                                napi_default, // attributes
+                                nullptr  // data
+                            };
+                    },
+                    [&](const ClassAttr& attr) -> DescrRV {
+                        return napi_property_descriptor{
+                            p.first.c_str(),
+                            nullptr, // name
+                            nullptr, // method
+                            function_getter, // getter
+                            function_setter, // setter
+                            nullptr, // value
+                            napi_default, // attributes
+                            new ClassAttr(attr)  // data
+                        };
+                    }
+                },
+                p.second);
+        if (rvv.is_error()) {
+            return rvv.assert_error();
+        }
+        descriptors.emplace_back(rvv.assert_value());
+    }
+    napi_value result;
+    auto status =
+        napi_define_class(
+            m_env,
+            name.data(),
+            name.size(),
+            function_wrapper,
+            new Function(ctor),
+            descriptors.size(),
+            descriptors.data(),
+            &result);
+    if (status != napi_ok) {
+        return make_error_code(status);
+    }
+    return Value(m_env, result);
+}
 
 }

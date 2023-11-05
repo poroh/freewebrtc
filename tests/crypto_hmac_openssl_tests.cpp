@@ -26,16 +26,16 @@ TEST_F(CryptoHMACOpenSSLTests, rfc2104_test_vectors_1) {
     const auto key = std::vector<uint8_t>(16, 0x0b);
     const auto ipad = crypto::hmac::IPadKey::from_key(util::ConstBinaryView(key), crypto::openssl::md5);
     const auto opad = crypto::hmac::OPadKey::from_key(util::ConstBinaryView(key), crypto::openssl::md5);
-    ASSERT_TRUE(ipad.value().has_value());
-    ASSERT_TRUE(opad.value().has_value());
+    ASSERT_TRUE(ipad.is_value());
+    ASSERT_TRUE(opad.is_value());
     const std::string data = "Hi There";
     const auto digest = crypto::hmac::digest({util::ConstBinaryView(data.c_str(), data.length())},
-                                             *opad.value(),
-                                             *ipad.value(),
+                                             opad.assert_value(),
+                                             ipad.assert_value(),
                                              crypto::MD5Hash::Func{&crypto::openssl::md5});
-    ASSERT_TRUE(digest.value().has_value());
+    ASSERT_TRUE(digest.is_value());
     crypto::MD5Hash::Value expected_v = {0x92, 0x94, 0x72, 0x7a, 0x36, 0x38, 0xbb, 0x1c, 0x13, 0xf4, 0x8e, 0xf8, 0x15, 0x8b, 0xfc, 0x9d};
-    EXPECT_TRUE(crypto::MD5Hash(std::move(expected_v)) == digest.value()->get().value);
+    EXPECT_TRUE(crypto::MD5Hash(std::move(expected_v)) == digest.assert_value().value);
 }
 
 TEST_F(CryptoHMACOpenSSLTests, rfc2104_test_vectors_2) {
@@ -46,16 +46,16 @@ TEST_F(CryptoHMACOpenSSLTests, rfc2104_test_vectors_2) {
     const std::string key = "Jefe";
     const auto ipad = crypto::hmac::IPadKey::from_key(util::ConstBinaryView(key.c_str(), key.length()), crypto::openssl::md5);
     const auto opad = crypto::hmac::OPadKey::from_key(util::ConstBinaryView(key.c_str(), key.length()), crypto::openssl::md5);
-    ASSERT_TRUE(ipad.value().has_value());
-    ASSERT_TRUE(opad.value().has_value());
+    ASSERT_TRUE(ipad.is_value());
+    ASSERT_TRUE(opad.is_value());
     const std::string data = "what do ya want for nothing?";
     const auto digest = crypto::hmac::digest({util::ConstBinaryView(data.c_str(), data.length())},
-                                             *opad.value(),
-                                             *ipad.value(),
+                                             opad.assert_value(),
+                                             ipad.assert_value(),
                                              crypto::MD5Hash::Func{&crypto::openssl::md5});
-    ASSERT_TRUE(digest.value().has_value());
+    ASSERT_TRUE(digest.is_value());
     crypto::MD5Hash::Value expected_v = {0x75, 0x0c, 0x78, 0x3e, 0x6a, 0xb0, 0xb5, 0x03, 0xea, 0xa8, 0x6e, 0x31, 0x0a, 0x5d, 0xb7, 0x38};
-    EXPECT_TRUE(crypto::MD5Hash(std::move(expected_v)) == digest.value()->get().value);
+    EXPECT_TRUE(crypto::MD5Hash(std::move(expected_v)) == digest.assert_value().value);
 }
 
 TEST_F(CryptoHMACOpenSSLTests, rfc2104_test_vectors_3) {
@@ -71,16 +71,16 @@ TEST_F(CryptoHMACOpenSSLTests, rfc2104_test_vectors_3) {
     const auto key = std::vector<uint8_t>(16, 0xAA);
     const auto ipad = crypto::hmac::IPadKey::from_key(util::ConstBinaryView(key), crypto::openssl::md5);
     const auto opad = crypto::hmac::OPadKey::from_key(util::ConstBinaryView(key), crypto::openssl::md5);
-    ASSERT_TRUE(ipad.value().has_value());
-    ASSERT_TRUE(opad.value().has_value());
+    ASSERT_TRUE(ipad.is_value());
+    ASSERT_TRUE(opad.is_value());
     const auto data = std::vector<uint8_t>(50, 0xDD);
     const auto digest = crypto::hmac::digest({util::ConstBinaryView(data)},
-                                             *opad.value(),
-                                             *ipad.value(),
+                                             opad.assert_value(),
+                                             ipad.assert_value(),
                                              crypto::MD5Hash::Func{&crypto::openssl::md5});
-    ASSERT_TRUE(digest.value().has_value());
+    ASSERT_TRUE(digest.is_value());
     crypto::MD5Hash::Value expected_v = {0x56, 0xbe, 0x34, 0x52, 0x1d, 0x14, 0x4c, 0x88, 0xdb, 0xb8, 0xc7, 0x33, 0xf0, 0xe8, 0xb3, 0xf6};
-    EXPECT_TRUE(crypto::MD5Hash(std::move(expected_v)) == digest.value()->get().value);
+    EXPECT_TRUE(crypto::MD5Hash(std::move(expected_v)) == digest.assert_value().value);
 }
 
 }

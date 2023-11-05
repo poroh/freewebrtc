@@ -108,6 +108,7 @@ struct ErrorCodeAttribute {
     int code;
     std::optional<std::string> reason_phrase;
 
+    static std::optional<ErrorCodeAttribute> parse(const util::ConstBinaryView&, ParseStat&);
     util::ByteVec build() const;
 };
 

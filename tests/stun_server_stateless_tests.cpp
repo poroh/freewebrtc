@@ -46,8 +46,8 @@ public:
     }
     util::ByteVec build(const stun::Message& msg) {
         const auto rv = msg.build();
-        assert(!rv.error().has_value());
-        return rv.value()->get();
+        assert(!rv.is_error());
+        return rv.assert_value();
     }
     const crypto::SHA1Hash::Func sha1 = crypto::openssl::sha1;
 };
@@ -92,8 +92,8 @@ TEST_P(STUNServerStatelessTest, request_rfc5389_authenticated) {
 
     precis::OpaqueString joe{"joe"};
     auto joe_password_rv = stun::Password::short_term(precis::OpaqueString("1234"), sha1);
-    ASSERT_TRUE(joe_password_rv.value().has_value());
-    auto joe_password = joe_password_rv.value()->get();
+    ASSERT_TRUE(joe_password_rv.is_value());
+    auto joe_password = joe_password_rv.assert_value();
     server.add_user(joe, joe_password);
 
     const stun::Message request {
@@ -111,8 +111,8 @@ TEST_P(STUNServerStatelessTest, request_rfc5389_authenticated) {
 
     stun::IntegrityData integrity_data{joe_password, sha1};
     const auto rv = request.build(integrity_data);
-    ASSERT_TRUE(rv.value().has_value());
-    const auto request_data = rv.value()->get();
+    ASSERT_TRUE(rv.is_value());
+    const auto request_data = rv.assert_value();
     const auto r = server.process(endpoint, util::ConstBinaryView(request_data));
 
     ASSERT_TRUE(std::holds_alternative<StunServer::Respond>(r));
@@ -251,10 +251,10 @@ TEST_P(STUNServerStatelessTest, request_with_integrity_attribute_without_usernam
     };
 
     auto maybepassword = stun::Password::short_term(precis::OpaqueString("1234"), sha1);
-    ASSERT_TRUE(maybepassword.value().has_value());
-    auto password = maybepassword.value()->get();
+    ASSERT_TRUE(maybepassword.is_value());
+    auto password = maybepassword.assert_value();
     const auto rv = request.build(stun::IntegrityData{password, sha1});
-    const auto request_data = rv.value()->get();
+    const auto request_data = rv.assert_value();
     const auto r = server.process(endpoint, util::ConstBinaryView(request_data));
     ASSERT_TRUE(std::holds_alternative<StunServer::Respond>(r));
     const auto& rsp = std::get<StunServer::Respond>(r).response;
@@ -278,10 +278,10 @@ TEST_P(STUNServerStatelessTest, unknown_username) {
     };
 
     auto maybepassword = stun::Password::short_term(precis::OpaqueString("1234"), sha1);
-    ASSERT_TRUE(maybepassword.value().has_value());
-    auto password = maybepassword.value()->get();
+    ASSERT_TRUE(maybepassword.is_value());
+    auto password = maybepassword.assert_value();
     const auto rv = request.build(stun::IntegrityData{password, sha1});
-    const auto request_data = rv.value()->get();
+    const auto request_data = rv.assert_value();
     const auto r = server.process(endpoint, util::ConstBinaryView(request_data));
     ASSERT_TRUE(std::holds_alternative<StunServer::Respond>(r));
     const auto& rsp = std::get<StunServer::Respond>(r).response;
@@ -306,16 +306,16 @@ TEST_P(STUNServerStatelessTest, wrong_password) {
     };
 
     auto joe_password_rv = stun::Password::short_term(precis::OpaqueString("4321"), sha1);
-    ASSERT_TRUE(joe_password_rv.value().has_value());
-    auto joe_password = joe_password_rv.value()->get();
+    ASSERT_TRUE(joe_password_rv.is_value());
+    auto joe_password = joe_password_rv.assert_value();
     server.add_user(joe, joe_password);
 
     auto wrong_password_rv = stun::Password::short_term(precis::OpaqueString("1234"), sha1);
-    ASSERT_TRUE(wrong_password_rv.value().has_value());
-    auto wrong_password = wrong_password_rv.value()->get();
+    ASSERT_TRUE(wrong_password_rv.is_value());
+    auto wrong_password = wrong_password_rv.assert_value();
     const auto rv = request.build(stun::IntegrityData{wrong_password, sha1});
-    ASSERT_TRUE(rv.value().has_value());
-    const auto request_data = rv.value()->get();
+    ASSERT_TRUE(rv.is_value());
+    const auto request_data = rv.assert_value();
     const auto r = server.process(endpoint, util::ConstBinaryView(request_data));
     ASSERT_TRUE(std::holds_alternative<StunServer::Respond>(r));
     const auto& rsp = std::get<StunServer::Respond>(r).response;
