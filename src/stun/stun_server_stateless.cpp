@@ -36,7 +36,7 @@ Message create_error(const Message& msg, ErrorCodeAttribute::Code error, MaybeSt
     );
     return Message {
         std::move(header),
-        attrset,
+        std::move(attrset),
         msg.is_rfc3489
     };
 }
