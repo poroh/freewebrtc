@@ -29,7 +29,11 @@ public:
     struct Error {
         std::error_code error;
     };
-    struct Ignore{};
+    struct Ignore {
+        // Message is set if message is parsed as STUN message bu
+        // it is not Request or has unknown method
+        std::optional<Message> message;
+    };
     using ProcessResult = std::variant<Respond, Ignore, Error>;
 
     ProcessResult process(const net::Endpoint&, const util::ConstBinaryView&);

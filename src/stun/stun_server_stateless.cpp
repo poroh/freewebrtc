@@ -54,16 +54,10 @@ Stateless::ProcessResult Stateless::process(const net::Endpoint& ep, const util:
         return Ignore{};
     }
     auto& msg = maybe_msg.value();
-    // RFC 5389: 7.3.1. Processing a Request
-    // If the request contains one or more unknown comprehension-required
-    // attributes, the server replies with an error response with an error
-    // code of 420 (Unknown Attribute), and includes an UNKNOWN-ATTRIBUTES
-    // attribute in the response that lists the unknown comprehension-
-    // required attributes.
     if (msg.header.cls == stun::Class::request()) {
         return process_request(ep, std::move(msg), view);
     }
-    return Ignore{};
+    return Ignore{std::move(msg)};
 }
 
 void Stateless::add_user(const precis::OpaqueString& name, const stun::Password& password) {
@@ -71,6 +65,12 @@ void Stateless::add_user(const precis::OpaqueString& name, const stun::Password&
 }
 
 Stateless::ProcessResult Stateless::process_request(const net::Endpoint& ep, Message&& msg, const util::ConstBinaryView& view) {
+    // RFC 5389: 7.3.1. Processing a Request
+    // If the request contains one or more unknown comprehension-required
+    // attributes, the server replies with an error response with an error
+    // code of 420 (Unknown Attribute), and includes an UNKNOWN-ATTRIBUTES
+    // attribute in the response that lists the unknown comprehension-
+    // required attributes.
     const auto unknown_comprehension_required = msg.attribute_set.unknown_comprehension_required();
     if (!unknown_comprehension_required.empty()) {
         auto rsp = create_error(msg, ErrorCodeAttribute::Code::UnknownAttribute);
@@ -155,7 +155,7 @@ Stateless::ProcessResult Stateless::process_request(const net::Endpoint& ep, Mes
             maybe_integrity_data
         };
     }
-    return Ignore{};
+    return Ignore{std::move(msg)};
 }
 
 }

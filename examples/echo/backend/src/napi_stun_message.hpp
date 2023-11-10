@@ -13,6 +13,7 @@
 
 namespace freewebrtc::napi {
 
+ReturnValue<Object> stun_message(const Env& env, const stun::Message& msg);
 ReturnValue<Value> stun_message_parse(Env& env, const CallbackInfo& ci);
 
 }

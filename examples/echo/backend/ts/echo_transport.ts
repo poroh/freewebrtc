@@ -37,10 +37,17 @@ export class EchoTransport {
             console.log('Request:', echob.stun.message_parse(msg));
         } catch (e) {
         }
-        let response = this.stunServer.process(msg, rinfo);
-        if (response) {
-            console.log('Response:', echob.stun.message_parse(response));
-            this.socket.send(response, rinfo.port, rinfo.address);
+        let v = this.stunServer.process(msg, rinfo);
+        switch (v.result) {
+            case 'ignore':
+                if (v.message) {
+                    console.log('Ignored STUN message', v.message);
+                }
+                break;
+            case 'respond':
+                console.log('Response:', echob.stun.message_parse(v.data));
+                this.socket.send(v.data, rinfo.port, rinfo.address);
+                break;
         }
     }
 };

@@ -7,7 +7,9 @@
 //
 
 #include "napi_stun_server_stateless.hpp"
+#include "napi_stun_message.hpp"
 #include "stun/stun_server_stateless.hpp"
+#include "util/util_fmap.hpp"
 #include "node_openssl_hash.hpp"
 #include "napi_error.hpp"
 
@@ -55,29 +57,37 @@ ReturnValue<Value> process_message(Env& env, const CallbackInfo& info) {
     auto rinfo_rv = info[1].fmap([](const auto& arg) { return extract_rinfo(arg); });
     auto obj_rvv = info.this_arg.unwrap<stun::server::Stateless>();
 
-    if (auto maybe_error = any_is_error(buffer_rv, rinfo_rv, obj_rvv); maybe_error.has_value()) {
-        return maybe_error.value();
-    }
     return combine(
         [&](auto&& message, auto&& endpoint, auto&& server) {
-            using RVV = ReturnValue<Value>;
+            using RVO = ReturnValue<Object>;
             auto result = server.get().process(endpoint, message);
             return std::visit(
                 util::overloaded {
-                    [&](const stun::server::Stateless::Ignore&) -> RVV {
-                        return env.create_undefined();
+                    [&](const stun::server::Stateless::Ignore& ign) -> RVO {
+                        return
+                            env.create_object({
+                                {"result", env.create_string("ignore")},
+                                {"message",
+                                        util::fmap(std::move(ign.message), [&](const auto& msg) {
+                                            return stun_message(env, msg);
+                                        })}
+                            });
                     },
-                    [&](const stun::server::Stateless::Error& err) -> RVV {
+                    [&](const stun::server::Stateless::Error& err) -> RVO {
                         return err.error;
                     },
-                    [&](const stun::server::Stateless::Respond& rsp) -> RVV {
-                        return rsp.response.build(rsp.maybe_integrity)
-                            .fmap([&](const auto& bytevec) {
-                                return env.create_buffer(util::ConstBinaryView(bytevec));
+                    [&](const stun::server::Stateless::Respond& rsp) -> RVO {
+                        return
+                            env.create_object({
+                                {"result", env.create_string("respond")},
+                                {"data",   rsp.response.build(rsp.maybe_integrity)
+                                        .fmap([&](const auto& bytevec) {
+                                            return env.create_buffer(util::ConstBinaryView(bytevec));
+                                        })}
                             });
                     }
                 },
-                result);
+                result).fmap(Object::fmap_to_value);
         },
         std::move(buffer_rv),
         std::move(rinfo_rv),
