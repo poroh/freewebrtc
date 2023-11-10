@@ -58,11 +58,11 @@ public:
     // fmap return also returns ReturnValue<SomeTime> instead of
     // ReturnValue<ReturnValue<SomeTime>>
     template<typename Fmap>
-    auto fmap(Fmap&& f) & -> ReturnValue<decltype(strip_rv(f(std::declval<V>())))>;
+    auto fmap(Fmap&& f) & -> ReturnValue<decltype(strip_rv(f(std::declval<V&>())))>;
     template<typename Fmap>
-    auto fmap(Fmap&& f) const& -> ReturnValue<decltype(strip_rv(f(std::declval<V>())))>;
+    auto fmap(Fmap&& f) const& -> ReturnValue<decltype(strip_rv(f(std::declval<const V&>())))>;
     template<typename Fmap>
-    auto fmap(Fmap&& f) && -> ReturnValue<decltype(strip_rv(f(std::declval<V>())))>;
+    auto fmap(Fmap&& f) && -> ReturnValue<decltype(strip_rv(f(std::declval<V&&>())))>;
 
 private:
     std::variant<Value, Error> m_result;
@@ -75,7 +75,7 @@ private:
 //   ReturnValue<double> v3 = std::make_error_code(std::errc::invalid_argument);
 //   assert(any_is_error(v1, v2, v3));
 template<typename T, typename... Ts>
-std::optional<std::error_code> any_is_error(ReturnValue<T> first, ReturnValue<Ts>... rest);
+std::optional<std::error_code> any_is_error(const ReturnValue<T>& first, const ReturnValue<Ts>&... rest);
 
 // Combine ReturnValue s with function
 // Example:
@@ -88,6 +88,8 @@ std::optional<std::error_code> any_is_error(ReturnValue<T> first, ReturnValue<Ts
 //   v1, v2, v3)
 template<typename F, typename... Ts>
 auto combine(F&& f, const ReturnValue<Ts>&... rvs) -> ReturnValue<decltype(strip_rv(f(std::declval<const Ts&>()...)))>;
+template<typename F, typename... Ts>
+auto combine(F&& f, ReturnValue<Ts>&... rvs) -> ReturnValue<decltype(strip_rv(f(std::declval<Ts&>()...)))>;
 template<typename F, typename... Ts>
 auto combine(F&& f, ReturnValue<Ts>&&... rvs) -> ReturnValue<decltype(strip_rv(f(std::declval<Ts&&>()...)))>;
 
@@ -166,9 +168,9 @@ ReturnValue<V>::assert_value() noexcept {
 
 template<typename V>
 template<typename Fmap>
-auto ReturnValue<V>::fmap(Fmap&& f) & -> ReturnValue<decltype(strip_rv(f(std::declval<V>())))> {
-    using FRetT = decltype(f(std::declval<V>()));
-    using FmapRet = decltype(strip_rv(f(std::declval<V>())));
+auto ReturnValue<V>::fmap(Fmap&& f) & -> ReturnValue<decltype(strip_rv(f(std::declval<V&>())))> {
+    using FRetT = decltype(f(std::declval<V&>()));
+    using FmapRet = decltype(strip_rv(f(std::declval<V&>())));
     if (is_error()) {
         return assert_error();
     }
@@ -185,9 +187,9 @@ auto ReturnValue<V>::fmap(Fmap&& f) & -> ReturnValue<decltype(strip_rv(f(std::de
 
 template<typename V>
 template<typename Fmap>
-auto ReturnValue<V>::fmap(Fmap&& f) const& -> ReturnValue<decltype(strip_rv(f(std::declval<V>())))> {
-    using FRetT = decltype(f(std::declval<V>()));
-    using FmapRet = decltype(strip_rv(f(std::declval<V>())));
+auto ReturnValue<V>::fmap(Fmap&& f) const& -> ReturnValue<decltype(strip_rv(f(std::declval<const V&>())))> {
+    using FRetT = decltype(f(std::declval<const V&>()));
+    using FmapRet = decltype(strip_rv(f(std::declval<const V&>())));
     if (is_error()) {
         return assert_error();
     }
@@ -204,7 +206,7 @@ auto ReturnValue<V>::fmap(Fmap&& f) const& -> ReturnValue<decltype(strip_rv(f(st
 
 template<typename V>
 template<typename Fmap>
-auto ReturnValue<V>::fmap(Fmap&& f) && -> ReturnValue<decltype(strip_rv(f(std::declval<V>())))> {
+auto ReturnValue<V>::fmap(Fmap&& f) && -> ReturnValue<decltype(strip_rv(f(std::declval<V&&>())))> {
     using FRetT = decltype(f(std::declval<V>()));
     using FmapRet = decltype(strip_rv(f(std::declval<V>())));
     if (is_error()) {
@@ -222,7 +224,7 @@ auto ReturnValue<V>::fmap(Fmap&& f) && -> ReturnValue<decltype(strip_rv(f(std::d
 }
 
 template<typename T, typename... Ts>
-std::optional<std::error_code> any_is_error(ReturnValue<T> first, ReturnValue<Ts>... rest) {
+std::optional<std::error_code> any_is_error(const ReturnValue<T>& first, const ReturnValue<Ts>&... rest) {
     if (first.is_error()) {
         return first.assert_error();
     }
@@ -234,23 +236,23 @@ std::optional<std::error_code> any_is_error(ReturnValue<T> first, ReturnValue<Ts
 }
 
 template<typename Func, typename... Vs, typename T>
-auto combine_with_values_h(Func func, std::tuple<const Vs&...>&& values, const ReturnValue<T>& rv) {
-    std::tuple<const T&> v{std::move(rv.assert_value())};
+auto combine_with_values_cref_h(Func func, std::tuple<const Vs&...>&& values, const ReturnValue<T>& rv) {
+    std::tuple<const T&> v{rv.assert_value()};
     auto final_tuple = std::tuple_cat(std::move(values), v);
     return std::apply(func, std::move(final_tuple));
 }
 
 template<typename F, typename... Vs, typename T, typename... Ts>
-auto combine_with_values_h(F func, const std::tuple<const Vs&...>& values, const ReturnValue<T>& rv, const ReturnValue<Ts>&... rest) {
+auto combine_with_values_cref_h(F func, std::tuple<const Vs&...>&& values, const ReturnValue<T>& rv, const ReturnValue<Ts>&... rest) {
     std::tuple<const T&> v{rv.assert_value()};
     auto next_tuple = std::tuple_cat(std::move(values), v);
-    return combine_with_values_h(func, std::move(next_tuple), std::forward<const ReturnValue<Ts>&>(rest)...);
+    return combine_with_values_cref_h(func, std::move(next_tuple), std::forward<const ReturnValue<Ts>&>(rest)...);
 }
 
 // Base function to start the process with an empty tuple
 template<typename Func, typename... Ts>
-auto combine_with_values(Func func, const ReturnValue<Ts>&... rvs) {
-    return combine_with_values_h(func, std::tuple<>{}, std::forward<const ReturnValue<Ts>&>(rvs)...);
+auto combine_with_values_cref(Func func, const ReturnValue<Ts>&... rvs) {
+    return combine_with_values_cref_h(func, std::tuple<>{}, std::forward<const ReturnValue<Ts>&>(rvs)...);
 }
 
 template<typename F, typename... Ts>
@@ -262,9 +264,48 @@ auto combine(F&& f, const ReturnValue<Ts>&... rvs) -> ReturnValue<decltype(strip
     using FmapRet = decltype(strip_rv(f(std::declval<const Ts&>()...)));
 
     if constexpr (std::is_same_v<FRetT, FmapRet>) {
-        return combine_with_values(f, std::forward<const ReturnValue<Ts>&>(rvs)...);
+        return combine_with_values_cref(f, std::forward<const ReturnValue<Ts>&>(rvs)...);
     } else {
-        auto result = combine_with_values(f, std::forward<const ReturnValue<Ts>&>(rvs)...);
+        auto result = combine_with_values_cref(f, std::forward<const ReturnValue<Ts>&>(rvs)...);
+        if (result.is_error()) {
+            return result.assert_error();
+        }
+        return result.assert_value();
+    }
+}
+
+template<typename Func, typename... Vs, typename T>
+auto combine_with_values_ref_h(Func func, std::tuple<Vs&...>&& values, ReturnValue<T>& rv) {
+    std::tuple<T&> v{rv.assert_value()};
+    auto final_tuple = std::tuple_cat(std::move(values), v);
+    return std::apply(func, std::move(final_tuple));
+}
+
+template<typename F, typename... Vs, typename T, typename... Ts>
+auto combine_with_values_ref_h(F func, std::tuple<Vs&...>&& values, ReturnValue<T>& rv, ReturnValue<Ts>&... rest) {
+    std::tuple<T&> v{rv.assert_value()};
+    auto next_tuple = std::tuple_cat(std::move(values), v);
+    return combine_with_values_ref_h(func, std::move(next_tuple), std::forward<ReturnValue<Ts>&>(rest)...);
+}
+
+// Base function to start the process with an empty tuple
+template<typename Func, typename... Ts>
+auto combine_with_values_ref(Func func, ReturnValue<Ts>&... rvs) {
+    return combine_with_values_ref_h(func, std::tuple<>{}, std::forward<ReturnValue<Ts>&>(rvs)...);
+}
+
+template<typename F, typename... Ts>
+auto combine(F&& f, ReturnValue<Ts>&... rvs) -> ReturnValue<decltype(strip_rv(f(std::declval<Ts&>()...)))> {
+    if (auto maybe_error = any_is_error(rvs...); maybe_error.has_value()) {
+        return maybe_error.value();
+    }
+    using FRetT = decltype(f(std::declval<Ts&>()...));
+    using FmapRet = decltype(strip_rv(f(std::declval<Ts&>()...)));
+
+    if constexpr (std::is_same_v<FRetT, FmapRet>) {
+        return combine_with_values_ref(f, std::forward<ReturnValue<Ts>&>(rvs)...);
+    } else {
+        auto result = combine_with_values(f, std::forward<ReturnValue<Ts>&>(rvs)...);
         if (result.is_error()) {
             return result.assert_error();
         }
