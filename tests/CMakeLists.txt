@@ -8,7 +8,9 @@ set(TEST_SOURCES
     stun_parse_tests.cpp
     stun_build_tests.cpp
     stun_server_stateless_tests.cpp
+    stun_client_udp_tests.cpp
     util_return_value_tests.cpp
+    clock_timepoint_tests.cpp
 )
 
 include(FetchContent)

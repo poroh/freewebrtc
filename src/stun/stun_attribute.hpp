@@ -115,6 +115,13 @@ struct ErrorCodeAttribute {
     util::ByteVec build() const;
 };
 
+struct AlternateServerAttribute {
+    net::ip::Address addr;
+    net::Port port;
+    static ReturnValue<AlternateServerAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    util::ByteVec build() const;
+};
+
 class Attribute {
 public:
     using Value =
@@ -130,7 +137,8 @@ public:
             IceControlledAttribute,
             UseCandidateAttribute,
             UnknownAttributesAttribute,
-            ErrorCodeAttribute
+            ErrorCodeAttribute,
+            AlternateServerAttribute
         >;
 
     AttributeType type() const noexcept;

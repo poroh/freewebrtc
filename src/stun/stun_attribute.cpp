@@ -41,6 +41,7 @@ ReturnValue<Attribute::ParseResult> Attribute::parse(const util::ConstBinaryView
     case attr_registry::ICE_CONTROLLED:     return IceControlledAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
     case attr_registry::USE_CANDIDATE:      return UseCandidateAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
     case attr_registry::ERROR_CODE:         return ErrorCodeAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
+    case attr_registry::ALTERNATE_SERVER:   return AlternateServerAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
     default:
         return ParseResult{UnknownAttribute(type, vv)};
     }
@@ -60,7 +61,8 @@ Attribute Attribute::create(Value&& v) {
             [](IceControlledAttribute&& a)     { return Attribute(AttributeType::from_uint16(attr_registry::ICE_CONTROLLED), std::move(a)); },
             [](UseCandidateAttribute&& a)      { return Attribute(AttributeType::from_uint16(attr_registry::USE_CANDIDATE), std::move(a)); },
             [](UnknownAttributesAttribute&& a) { return Attribute(AttributeType::from_uint16(attr_registry::UNKNOWN_ATTRIBUTES), std::move(a)); },
-            [](ErrorCodeAttribute&& a)         { return Attribute(AttributeType::from_uint16(attr_registry::ERROR_CODE), std::move(a)); }
+            [](ErrorCodeAttribute&& a)         { return Attribute(AttributeType::from_uint16(attr_registry::ERROR_CODE), std::move(a)); },
+            [](AlternateServerAttribute&& a)   { return Attribute(AttributeType::from_uint16(attr_registry::ALTERNATE_SERVER), std::move(a)); }
         },
         std::move(v));
 }
@@ -80,7 +82,7 @@ ReturnValue<MappedAddressAttribute> MappedAddressAttribute::parse(const util::Co
     if (!maybe_family.has_value() || !maybe_port.has_value() || !maybe_addr_view.has_value()) {
         stat.error.inc();
         stat.invalid_mapped_address.inc();
-        return make_error_code(Error::INVALID_MAPPED_ADDR);
+        return make_error_code(ParseError::invalid_mapped_addr);
     }
     const auto family = *maybe_family;
     const auto port = net::Port(*maybe_port);
@@ -95,7 +97,7 @@ ReturnValue<MappedAddressAttribute> MappedAddressAttribute::parse(const util::Co
                 return net::ip::AddressV6::from_view(addr_view)
                     .fmap([](auto&& addr) { return net::ip::Address(std::move(addr)); });
             }
-            return make_error_code(Error::UNKNOWN_ADDR_FAMILY);
+            return make_error_code(ParseError::unknown_addr_family);
         })();
     if (addr_rv.is_error()) {
         stat.error.inc();
@@ -137,7 +139,7 @@ ReturnValue<XorMappedAddressAttribute> XorMappedAddressAttribute::parse(const ut
     if (!maybe_family.has_value() || !maybe_xport.has_value() || !maybe_xaddr_view.has_value()) {
         stat.error.inc();
         stat.invalid_xor_mapped_address.inc();
-        return make_error_code(Error::INVALID_XOR_MAPPED_ADDR);
+        return make_error_code(ParseError::invalid_xor_mapped_addr);
     }
     // X-Port is computed by XOR'ing the mapped port with the most
     // significant 16 bits of the magic cookie.
@@ -174,7 +176,7 @@ ReturnValue<MessageIntegityAttribute> MessageIntegityAttribute::parse(const util
     if (!maybe_digest.has_value()) {
         stat.error.inc();
         stat.invalid_message_integrity.inc();
-        return make_error_code(Error::INTEGRITY_DIGEST_SIZE);
+        return make_error_code(ParseError::integrity_digest_size);
     }
     return MessageIntegityAttribute{Digest(std::move(*maybe_digest))};
 }
@@ -184,7 +186,7 @@ ReturnValue<FingerprintAttribute> FingerprintAttribute::parse(const util::ConstB
     if (!maybe_crc32.has_value()) {
         stat.error.inc();
         stat.invalid_fingerprint_size.inc();
-        return make_error_code(Error::FINGERPRINT_CRC_SIZE);
+        return make_error_code(ParseError::fingerprint_crc_size);
     }
     return FingerprintAttribute{*maybe_crc32 ^ FINGERPRINT_XOR};
 }
@@ -194,7 +196,7 @@ ReturnValue<PriorityAttribute> PriorityAttribute::parse(const util::ConstBinaryV
     if (!maybe_priority.has_value()) {
         stat.error.inc();
         stat.invalid_priority_size.inc();
-        return make_error_code(Error::PRIORITY_ATTRIBUTE_SIZE);
+        return make_error_code(ParseError::priority_attribute_size);
     }
     return PriorityAttribute{*maybe_priority};
 }
@@ -204,7 +206,7 @@ ReturnValue<IceControllingAttribute> IceControllingAttribute::parse(const util::
     if (!maybe_tiebreaker.has_value()) {
         stat.error.inc();
         stat.invalid_ice_controlling_size.inc();
-        return make_error_code(Error::ICE_CONTROLLING_SIZE);
+        return make_error_code(ParseError::ice_controlling_size);
     }
     return IceControllingAttribute{*maybe_tiebreaker};
 }
@@ -214,7 +216,7 @@ ReturnValue<IceControlledAttribute> IceControlledAttribute::parse(const util::Co
     if (!maybe_tiebreaker.has_value()) {
         stat.error.inc();
         stat.invalid_ice_controlled_size.inc();
-        return make_error_code(Error::ICE_CONTROLLED_SIZE);
+        return make_error_code(ParseError::ice_controlled_size);
     }
     return IceControlledAttribute{*maybe_tiebreaker};
 }
@@ -227,7 +229,7 @@ ReturnValue<UseCandidateAttribute> UseCandidateAttribute::parse(const util::Cons
     if (vv.size() != 0) {
         stat.error.inc();
         stat.invalid_use_candidate_size.inc();
-        return make_error_code(Error::USE_CANDIDATE_SIZE);
+        return make_error_code(ParseError::use_candidate_size);
     }
     return UseCandidateAttribute{};
 }
@@ -273,7 +275,7 @@ ReturnValue<ErrorCodeAttribute> ErrorCodeAttribute::parse(const util::ConstBinar
     if (!maybe_first_word.has_value()) {
         stat.error.inc();
         stat.invalid_error_code_size.inc();
-        return make_error_code(Error::ERROR_CODE_ATTRIBUTE_SIZE);
+        return make_error_code(ParseError::error_code_attribute_size);
     }
     int first_word = *maybe_first_word;
     return ErrorCodeAttribute{(first_word >> 8) * 100 + (first_word & 0xFF),
@@ -281,6 +283,26 @@ ReturnValue<ErrorCodeAttribute> ErrorCodeAttribute::parse(const util::ConstBinar
                                   return std::string(view.begin(), view.end());
                               })};
 }
+
+ReturnValue<AlternateServerAttribute> AlternateServerAttribute::parse(const util::ConstBinaryView& view, ParseStat& stat) {
+    // It is encoded in the same way as MAPPED-ADDRESS, and thus refers to a
+    // single server by IP address.  The IP address family MUST be identical
+    // to that of the source IP address of the request.
+    //
+    // TODO: It can be improved from error codes & statistics perspectice
+    // by creating common function that parses MAPPED-ADDRESS for this attribute
+    // and MAPPED-ADDRESS itself.
+    return MappedAddressAttribute::parse(view, stat)
+        .fmap([](MappedAddressAttribute&& attr) {
+            return AlternateServerAttribute{std::move(attr.addr), std::move(attr.port)};
+        });
+}
+
+util::ByteVec AlternateServerAttribute::build() const {
+    MappedAddressAttribute mapped{addr, port};
+    return mapped.build();
+}
+
 
 }
 

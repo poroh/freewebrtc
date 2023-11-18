@@ -35,6 +35,7 @@ public:
     bool has_use_candidate() const noexcept;
     MaybeAttr<ErrorCodeAttribute> error_code() const noexcept;
     MaybeAttr<UnknownAttributesAttribute> unknown_attributes() const noexcept;
+    MaybeAttr<AlternateServerAttribute> alternate_server() const noexcept;
     // Return list of uknown comprehension-required attributes
     std::vector<AttributeType> unknown_comprehension_required() const noexcept;
 

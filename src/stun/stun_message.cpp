@@ -22,7 +22,7 @@ ReturnValue<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& 
     if (vv.size() < STUN_HEADER_SIZE) {
         stat.error.inc();
         stat.invalid_size.inc();
-        return make_error_code(Error::INVALID_MESSAGE_SIZE);
+        return make_error_code(ParseError::invalid_message_size);
     }
     //  0                   1                   2                   3
     //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -47,12 +47,12 @@ ReturnValue<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& 
     if ((msg_length & 0x3) != 0) {
         stat.error.inc();
         stat.not_padded.inc();
-        return make_error_code(Error::NOT_PADDED_ATTRIBUTES);
+        return make_error_code(ParseError::not_padded_attributes);
     }
     if (msg_length != vv.size() - STUN_HEADER_SIZE) {
         stat.error.inc();
         stat.message_length_error.inc();
-        return make_error_code(Error::INVALID_MESSAGE_LEN);
+        return make_error_code(ParseError::invalid_message_len);
     }
 
     const auto cls = Class::from_msg_type(msg_type);
@@ -60,7 +60,7 @@ ReturnValue<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& 
     if (!is_rfc3489 && magic_cookie != details::MAGIC_COOKIE) {
         stat.error.inc();
         stat.magic_cookie_error.inc();
-        return make_error_code(Error::INVALID_MAGIC_COOKIE);
+        return make_error_code(ParseError::invalid_magic_cookie);
     }
 
     const auto transaction_id =
@@ -87,7 +87,7 @@ ReturnValue<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& 
         if (!maybe_type.has_value() || !maybe_length.has_value() || !maybe_attr_view.has_value()) {
             stat.error.inc();
             stat.invalid_attr_size.inc();
-            return make_error_code(Error::INVALID_ATTR_SIZE);
+            return make_error_code(ParseError::invalid_attr_size);
         }
         const auto type = *maybe_type;
         const auto attr_view = *maybe_attr_view;
@@ -137,7 +137,7 @@ ReturnValue<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& 
                             if (next_attr_offset < vv.size()) {
                                 stat.error.inc();
                                 stat.fingerprint_not_last.inc();
-                                return make_error_code(Error::FINGERPRINT_IS_NOT_LAST);
+                                return make_error_code(ParseError::fingerprint_is_not_last);
                             }
                             // Normative:
                             // The value of the attribute is computed as the CRC-32 of the STUN message
@@ -151,7 +151,7 @@ ReturnValue<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& 
                             if (v != fingerprint->crc32) {
                                 stat.error.inc();
                                 stat.invalid_fingerprint.inc();
-                                return make_error_code(Error::FINGERPRINT_NOT_VALID);
+                                return make_error_code(ParseError::fingerprint_not_valid);
                             }
                         }
                         attrs.emplace(std::move(attr));

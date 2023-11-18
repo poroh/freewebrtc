@@ -47,7 +47,7 @@ ReturnValue<XoredAddress> XoredAddress::from_view(Family f, const util::ConstBin
     switch (f.type()) {
         case Family::IPv4: {
             if (vv.size() != std::tuple_size<V4Holder>::value) {
-                return make_error_code(Error::INVALID_IPV4_ADDRESS_SIZE);
+                return make_error_code(ParseError::invalid_ipv4_address_size);
             }
             V4Holder holder;
             std::copy(vv.begin(), vv.end(), holder.begin());
@@ -55,14 +55,14 @@ ReturnValue<XoredAddress> XoredAddress::from_view(Family f, const util::ConstBin
         }
         case Family::IPv6: {
             if (vv.size() != std::tuple_size<V6Holder>::value) {
-                return make_error_code(Error::INVALID_IPV6_ADDRESS_SIZE);
+                return make_error_code(ParseError::invalid_ipv6_address_size);
             }
             V6Holder holder;
             std::copy(vv.begin(), vv.end(), holder.begin());
             return XoredAddress(std::move(holder));
         }
     }
-    return make_error_code(Error::UNKNOWN_ADDR_FAMILY);
+    return make_error_code(ParseError::unknown_addr_family);
 }
 
 XoredAddress XoredAddress::from_address(const net::ip::Address& addr, const TransactionId& tid) {

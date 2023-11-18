@@ -84,6 +84,13 @@ AttributeSet::MaybeAttr<UnknownAttributesAttribute> AttributeSet::unknown_attrib
     return std::nullopt;
 }
 
+AttributeSet::MaybeAttr<AlternateServerAttribute> AttributeSet::alternate_server() const noexcept {
+    if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::ALTERNATE_SERVER)); it != m_map.end()) {
+        return *it->second.as<AlternateServerAttribute>();
+    }
+    return std::nullopt;
+}
+
 bool AttributeSet::has_use_candidate() const noexcept {
     return m_map.find(AttributeType::from_uint16(attr_registry::USE_CANDIDATE)) != m_map.end();
 }
@@ -144,6 +151,7 @@ ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const Maybe
     uint64_t ice_controlled = 0;
     std::optional<util::ByteVec> error_code_data;
     std::optional<util::ByteVec> unknown_attributes_data;
+    std::optional<util::ByteVec> altenate_server_data;
 
     for (const auto& p: m_map) {
         const auto type = p.first.value();
@@ -186,6 +194,10 @@ ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const Maybe
                 [&](const UnknownAttributesAttribute& a) {
                     unknown_attributes_data = a.build();
                     add_attr(type, util::ConstBinaryView(*unknown_attributes_data));
+                },
+                [&](const AlternateServerAttribute& a) {
+                    altenate_server_data = a.build();
+                    add_attr(type, util::ConstBinaryView(*altenate_server_data));
                 },
                 [&](const MessageIntegityAttribute&) { /* Do not add integrity here */ },
                 [&](const FingerprintAttribute&) { /* Do not add fingerprint here */ }

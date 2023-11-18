@@ -14,6 +14,7 @@ set(SOURCES
     stun_method.cpp
     stun_address.cpp
     stun_server_stateless.cpp
+    stun_client_udp.cpp
     details/stun_fingerprint.cpp
 )
 file(GLOB HEADERS "*.hpp")

@@ -46,6 +46,21 @@ struct Message {
 
     // Build message as bytes
     ReturnValue<util::ByteVec> build(const MaybeIntegrity& maybe_integrity = std::nullopt) const noexcept;
+
+    // Check if message is alternate server response
+    bool is_alternate_server() const noexcept;
 };
+
+//
+// inlines
+//
+inline bool Message::is_alternate_server() const noexcept {
+    if (header.cls != Class::error_response()) {
+        return false;
+    }
+    auto maybe_error = attribute_set.error_code();
+    return maybe_error.has_value()
+        && maybe_error.value().get().code == ErrorCodeAttribute::TryAlternate;
+}
 
 }
