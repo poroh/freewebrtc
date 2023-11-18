@@ -7,6 +7,7 @@
 //
 
 #include "stun/stun_address.hpp"
+#include "stun/stun_error.hpp"
 #include "stun/stun_transaction_id.hpp"
 #include "stun/details/stun_attr_registry.hpp"
 #include "stun/details/stun_constants.hpp"
@@ -42,11 +43,11 @@ uint8_t Family::to_uint8() const noexcept {
     }
 }
 
-std::optional<XoredAddress> XoredAddress::from_view(Family f, const util::ConstBinaryView& vv) {
+ReturnValue<XoredAddress> XoredAddress::from_view(Family f, const util::ConstBinaryView& vv) {
     switch (f.type()) {
         case Family::IPv4: {
             if (vv.size() != std::tuple_size<V4Holder>::value) {
-                return std::nullopt;
+                return make_error_code(Error::INVALID_IPV4_ADDRESS_SIZE);
             }
             V4Holder holder;
             std::copy(vv.begin(), vv.end(), holder.begin());
@@ -54,13 +55,14 @@ std::optional<XoredAddress> XoredAddress::from_view(Family f, const util::ConstB
         }
         case Family::IPv6: {
             if (vv.size() != std::tuple_size<V6Holder>::value) {
-                return std::nullopt;
+                return make_error_code(Error::INVALID_IPV6_ADDRESS_SIZE);
             }
             V6Holder holder;
             std::copy(vv.begin(), vv.end(), holder.begin());
             return XoredAddress(std::move(holder));
         }
     }
+    return make_error_code(Error::UNKNOWN_ADDR_FAMILY);
 }
 
 XoredAddress XoredAddress::from_address(const net::ip::Address& addr, const TransactionId& tid) {

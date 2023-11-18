@@ -75,12 +75,12 @@ ReturnValue<Value> stun_message_parse(Env& env, const CallbackInfo& ci) {
         .fmap([](const auto& arg) { return arg.as_buffer(); })
         .fmap([&](const auto& view) {
             freewebrtc::stun::ParseStat parsestat;
-            auto maybe_msg = freewebrtc::stun::Message::parse(view, parsestat);
-            if (!maybe_msg.has_value()) {
-                return env.throw_error("Failed to parse STUN packet");
-            }
-            return stun_message(env, maybe_msg.value()).fmap(Object::fmap_to_value);
-        });
+            return freewebrtc::stun::Message::parse(view, parsestat);
+        })
+        .fmap([&](const auto& msg) {
+            return stun_message(env, msg);
+        })
+        .fmap(Object::fmap_to_value);
 }
 
 }

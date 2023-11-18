@@ -13,6 +13,7 @@
 
 #include "util/util_binary_view.hpp"
 #include "util/util_typed_bool.hpp"
+#include "util/util_return_value.hpp"
 
 #include "stun/stun_header.hpp"
 #include "stun/stun_attribute_set.hpp"
@@ -36,7 +37,7 @@ struct Message {
     // Data interval that is covered by MESSAGE-INTEGRITY attribute (if any).
     std::optional<util::ConstBinaryView::Interval> integrity_interval;
     // Parse message from binary view
-    static std::optional<Message> parse(const util::ConstBinaryView&, ParseStat&);
+    static ReturnValue<Message> parse(const util::ConstBinaryView&, ParseStat&);
     // Check that MESSAGE-INTEGRITY is valid (if present).
     // If MESSAGE-INTEGRITY is not present then function returns std::nullopt
     // Error may occue if hash function returns error. Otherwise return_value.value()

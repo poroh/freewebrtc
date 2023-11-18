@@ -7,6 +7,7 @@
 //
 
 #include "stun/stun_attribute.hpp"
+#include "stun/stun_error.hpp"
 #include "stun/stun_parse_stat.hpp"
 #include "stun/details/stun_attr_registry.hpp"
 #include "stun/details/stun_fingerprint.hpp"
@@ -26,22 +27,22 @@ Attribute::Attribute(AttributeType t, Value&& v)
     , m_value(std::move(v))
 {}
 
-std::optional<Attribute::ParseResult> Attribute::parse(const util::ConstBinaryView& vv, AttributeType type, ParseStat& stat) {
-    auto create_attr_fun = [=](auto&& attr) { return Attribute(type, attr); };
+ReturnValue<Attribute::ParseResult> Attribute::parse(const util::ConstBinaryView& vv, AttributeType type, ParseStat& stat) {
+    auto create_attr_fun = [=](Value&& attr) -> ReturnValue<ParseResult> { return ParseResult{Attribute(type, std::move(attr))}; };
     switch (type.value()) {
-    case attr_registry::MAPPED_ADDRESS:     return util::fmap(MappedAddressAttribute::parse(vv, stat),    std::move(create_attr_fun));
-    case attr_registry::XOR_MAPPED_ADDRESS: return util::fmap(XorMappedAddressAttribute::parse(vv, stat), std::move(create_attr_fun));
-    case attr_registry::USERNAME:           return util::fmap(UsernameAttribute::parse(vv, stat),         std::move(create_attr_fun));
-    case attr_registry::SOFTWARE:           return util::fmap(SoftwareAttribute::parse(vv, stat),         std::move(create_attr_fun));
-    case attr_registry::MESSAGE_INTEGRITY:  return util::fmap(MessageIntegityAttribute::parse(vv, stat),  std::move(create_attr_fun));
-    case attr_registry::FINGERPRINT:        return util::fmap(FingerprintAttribute::parse(vv, stat),      std::move(create_attr_fun));
-    case attr_registry::PRIORITY:           return util::fmap(PriorityAttribute::parse(vv, stat),         std::move(create_attr_fun));
-    case attr_registry::ICE_CONTROLLING:    return util::fmap(IceControllingAttribute::parse(vv, stat),   std::move(create_attr_fun));
-    case attr_registry::ICE_CONTROLLED:     return util::fmap(IceControlledAttribute::parse(vv, stat),    std::move(create_attr_fun));
-    case attr_registry::USE_CANDIDATE:      return util::fmap(UseCandidateAttribute::parse(vv, stat),     std::move(create_attr_fun));
-    case attr_registry::ERROR_CODE:         return util::fmap(ErrorCodeAttribute::parse(vv, stat),        std::move(create_attr_fun));
+    case attr_registry::MAPPED_ADDRESS:     return MappedAddressAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
+    case attr_registry::XOR_MAPPED_ADDRESS: return XorMappedAddressAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
+    case attr_registry::USERNAME:           return UsernameAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
+    case attr_registry::SOFTWARE:           return SoftwareAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
+    case attr_registry::MESSAGE_INTEGRITY:  return MessageIntegityAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
+    case attr_registry::FINGERPRINT:        return FingerprintAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
+    case attr_registry::PRIORITY:           return PriorityAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
+    case attr_registry::ICE_CONTROLLING:    return IceControllingAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
+    case attr_registry::ICE_CONTROLLED:     return IceControlledAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
+    case attr_registry::USE_CANDIDATE:      return UseCandidateAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
+    case attr_registry::ERROR_CODE:         return ErrorCodeAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
     default:
-        return UnknownAttribute(type, vv);
+        return ParseResult{UnknownAttribute(type, vv)};
     }
 }
 
@@ -64,7 +65,7 @@ Attribute Attribute::create(Value&& v) {
         std::move(v));
 }
 
-std::optional<MappedAddressAttribute> MappedAddressAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+ReturnValue<MappedAddressAttribute> MappedAddressAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
     //  0                   1                   2                   3
     //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
     // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -79,26 +80,29 @@ std::optional<MappedAddressAttribute> MappedAddressAttribute::parse(const util::
     if (!maybe_family.has_value() || !maybe_port.has_value() || !maybe_addr_view.has_value()) {
         stat.error.inc();
         stat.invalid_mapped_address.inc();
-        return std::nullopt;
+        return make_error_code(Error::INVALID_MAPPED_ADDR);
     }
     const auto family = *maybe_family;
     const auto port = net::Port(*maybe_port);
     const auto& addr_view = *maybe_addr_view;
-    std::optional<net::ip::Address> maybe_addr;
-    switch (family) {
-    case attr_registry::FAMILY_IPV4:
-        maybe_addr = net::ip::AddressV4::from_view(addr_view);
-        break;
-    case attr_registry::FAMILY_IPV6:
-        maybe_addr = net::ip::AddressV6::from_view(addr_view);
-        break;
-    }
-    if (!maybe_addr.has_value()) {
+    auto addr_rv =
+        ([&]() -> ReturnValue<net::ip::Address> {
+            switch (family) {
+            case attr_registry::FAMILY_IPV4:
+                return net::ip::AddressV4::from_view(addr_view)
+                    .fmap([](auto&& addr) { return net::ip::Address(std::move(addr)); });
+            case attr_registry::FAMILY_IPV6:
+                return net::ip::AddressV6::from_view(addr_view)
+                    .fmap([](auto&& addr) { return net::ip::Address(std::move(addr)); });
+            }
+            return make_error_code(Error::UNKNOWN_ADDR_FAMILY);
+        })();
+    if (addr_rv.is_error()) {
         stat.error.inc();
         stat.invalid_ip_address.inc();
-        return std::nullopt;
+        return addr_rv.assert_error();
     }
-    return MappedAddressAttribute{*maybe_addr, port};
+    return MappedAddressAttribute{std::move(addr_rv.assert_value()), port};
 }
 
 util::ByteVec MappedAddressAttribute::build() const {
@@ -119,7 +123,7 @@ util::ByteVec MappedAddressAttribute::build() const {
         });
 }
 
-std::optional<XorMappedAddressAttribute> XorMappedAddressAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+ReturnValue<XorMappedAddressAttribute> XorMappedAddressAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
     //  0                   1                   2                   3
     //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
     // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -133,18 +137,18 @@ std::optional<XorMappedAddressAttribute> XorMappedAddressAttribute::parse(const 
     if (!maybe_family.has_value() || !maybe_xport.has_value() || !maybe_xaddr_view.has_value()) {
         stat.error.inc();
         stat.invalid_xor_mapped_address.inc();
-        return std::nullopt;
+        return make_error_code(Error::INVALID_XOR_MAPPED_ADDR);
     }
     // X-Port is computed by XOR'ing the mapped port with the most
     // significant 16 bits of the magic cookie.
     auto port = net::Port(*maybe_xport ^ (details::MAGIC_COOKIE >> 16));
-    auto maybe_xaddr = XoredAddress::from_view(*maybe_family, *maybe_xaddr_view);
-    if (!maybe_xaddr.has_value()) {
+    auto xaddr_rv = XoredAddress::from_view(*maybe_family, *maybe_xaddr_view);
+    if (xaddr_rv.is_error()) {
         stat.error.inc();
         stat.invalid_ip_address.inc();
-        return std::nullopt;
+        return xaddr_rv.assert_error();
     }
-    return XorMappedAddressAttribute{*maybe_xaddr, port};
+    return XorMappedAddressAttribute{std::move(xaddr_rv.assert_value()), port};
 }
 
 util::ByteVec XorMappedAddressAttribute::build() const {
@@ -157,65 +161,65 @@ util::ByteVec XorMappedAddressAttribute::build() const {
         });
 }
 
-std::optional<SoftwareAttribute> SoftwareAttribute::parse(const util::ConstBinaryView& vv, ParseStat&) {
+ReturnValue<SoftwareAttribute> SoftwareAttribute::parse(const util::ConstBinaryView& vv, ParseStat&) {
     return SoftwareAttribute{std::string(vv.begin(), vv.end())};
 }
 
-std::optional<UsernameAttribute> UsernameAttribute::parse(const util::ConstBinaryView& vv, ParseStat&) {
+ReturnValue<UsernameAttribute> UsernameAttribute::parse(const util::ConstBinaryView& vv, ParseStat&) {
     return UsernameAttribute{precis::OpaqueString{std::string(vv.begin(), vv.end())}};
 }
 
-std::optional<MessageIntegityAttribute> MessageIntegityAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+ReturnValue<MessageIntegityAttribute> MessageIntegityAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
     auto maybe_digest = Digest::Value::from_view(vv);
     if (!maybe_digest.has_value()) {
         stat.error.inc();
         stat.invalid_message_integrity.inc();
-        return std::nullopt;
+        return make_error_code(Error::INTEGRITY_DIGEST_SIZE);
     }
     return MessageIntegityAttribute{Digest(std::move(*maybe_digest))};
 }
 
-std::optional<FingerprintAttribute> FingerprintAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+ReturnValue<FingerprintAttribute> FingerprintAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
     auto maybe_crc32 = vv.read_u32be(0);
     if (!maybe_crc32.has_value()) {
         stat.error.inc();
         stat.invalid_fingerprint_size.inc();
-        return std::nullopt;
+        return make_error_code(Error::FINGERPRINT_CRC_SIZE);
     }
     return FingerprintAttribute{*maybe_crc32 ^ FINGERPRINT_XOR};
 }
 
-std::optional<PriorityAttribute> PriorityAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+ReturnValue<PriorityAttribute> PriorityAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
     auto maybe_priority = vv.read_u32be(0);
     if (!maybe_priority.has_value()) {
         stat.error.inc();
         stat.invalid_priority_size.inc();
-        return std::nullopt;
+        return make_error_code(Error::PRIORITY_ATTRIBUTE_SIZE);
     }
     return PriorityAttribute{*maybe_priority};
 }
 
-std::optional<IceControllingAttribute> IceControllingAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+ReturnValue<IceControllingAttribute> IceControllingAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
     auto maybe_tiebreaker = vv.read_u64be(0);
     if (!maybe_tiebreaker.has_value()) {
         stat.error.inc();
         stat.invalid_ice_controlling_size.inc();
-        return std::nullopt;
+        return make_error_code(Error::ICE_CONTROLLING_SIZE);
     }
     return IceControllingAttribute{*maybe_tiebreaker};
 }
 
-std::optional<IceControlledAttribute> IceControlledAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+ReturnValue<IceControlledAttribute> IceControlledAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
     auto maybe_tiebreaker = vv.read_u64be(0);
     if (!maybe_tiebreaker.has_value()) {
         stat.error.inc();
         stat.invalid_ice_controlled_size.inc();
-        return std::nullopt;
+        return make_error_code(Error::ICE_CONTROLLED_SIZE);
     }
     return IceControlledAttribute{*maybe_tiebreaker};
 }
 
-std::optional<UseCandidateAttribute> UseCandidateAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+ReturnValue<UseCandidateAttribute> UseCandidateAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
     // The USE-CANDIDATE attribute indicates that the candidate pair
     // resulting from this check will be used for transmission of data.  The
     // attribute has no content (the Length field of the attribute is zero);
@@ -223,7 +227,7 @@ std::optional<UseCandidateAttribute> UseCandidateAttribute::parse(const util::Co
     if (vv.size() != 0) {
         stat.error.inc();
         stat.invalid_use_candidate_size.inc();
-        return std::nullopt;
+        return make_error_code(Error::USE_CANDIDATE_SIZE);
     }
     return UseCandidateAttribute{};
 }
@@ -263,13 +267,13 @@ util::ByteVec ErrorCodeAttribute::build() const {
         });
 }
 
-std::optional<ErrorCodeAttribute> ErrorCodeAttribute::parse(const util::ConstBinaryView& v, ParseStat& stat) {
+ReturnValue<ErrorCodeAttribute> ErrorCodeAttribute::parse(const util::ConstBinaryView& v, ParseStat& stat) {
     auto maybe_first_word = v.read_u32be(0);
     auto maybe_reason = v.subview(4);
     if (!maybe_first_word.has_value()) {
         stat.error.inc();
         stat.invalid_error_code_size.inc();
-        return std::nullopt;
+        return make_error_code(Error::ERROR_CODE_ATTRIBUTE_SIZE);
     }
     int first_word = *maybe_first_word;
     return ErrorCodeAttribute{(first_word >> 8) * 100 + (first_word & 0xFF),

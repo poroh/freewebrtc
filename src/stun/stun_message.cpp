@@ -7,6 +7,7 @@
 //
 
 #include "stun/stun_message.hpp"
+#include "stun/stun_error.hpp"
 #include "stun/details/stun_attr_registry.hpp"
 #include "stun/details/stun_fingerprint.hpp"
 #include "stun/details/stun_constants.hpp"
@@ -16,12 +17,12 @@
 namespace freewebrtc::stun {
 
 
-std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+ReturnValue<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
     using namespace details;
     if (vv.size() < STUN_HEADER_SIZE) {
         stat.error.inc();
         stat.invalid_size.inc();
-        return std::nullopt;
+        return make_error_code(Error::INVALID_MESSAGE_SIZE);
     }
     //  0                   1                   2                   3
     //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -46,12 +47,12 @@ std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat
     if ((msg_length & 0x3) != 0) {
         stat.error.inc();
         stat.not_padded.inc();
-        return std::nullopt;
+        return make_error_code(Error::NOT_PADDED_ATTRIBUTES);
     }
     if (msg_length != vv.size() - STUN_HEADER_SIZE) {
         stat.error.inc();
         stat.message_length_error.inc();
-        return std::nullopt;
+        return make_error_code(Error::INVALID_MESSAGE_LEN);
     }
 
     const auto cls = Class::from_msg_type(msg_type);
@@ -59,7 +60,7 @@ std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat
     if (!is_rfc3489 && magic_cookie != details::MAGIC_COOKIE) {
         stat.error.inc();
         stat.magic_cookie_error.inc();
-        return std::nullopt;
+        return make_error_code(Error::INVALID_MAGIC_COOKIE);
     }
 
     const auto transaction_id =
@@ -86,7 +87,7 @@ std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat
         if (!maybe_type.has_value() || !maybe_length.has_value() || !maybe_attr_view.has_value()) {
             stat.error.inc();
             stat.invalid_attr_size.inc();
-            return std::nullopt;
+            return make_error_code(Error::INVALID_ATTR_SIZE);
         }
         const auto type = *maybe_type;
         const auto attr_view = *maybe_attr_view;
@@ -108,19 +109,19 @@ std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat
             attr_offset = next_attr_offset;
             continue;
         }
-        auto maybe_attr = Attribute::parse(attr_view, attr_type, stat);
-        if (!maybe_attr.has_value()) {
+        auto attr_rv = Attribute::parse(attr_view, attr_type, stat);
+        if (attr_rv.is_error()) {
             // statisitics is increased by Attribute::parse.
-            return std::nullopt;
+            return attr_rv.assert_error();
         }
-        const bool success =
+        const auto maybe_error =
             std::visit(
                 util::overloaded {
                     [&](UnknownAttribute&& attr) {
                         attrs.emplace(std::move(attr));
-                        return true;
+                        return success();
                     },
-                    [&](Attribute&& attr) {
+                    [&](Attribute&& attr) -> MaybeError {
                         if (attr.as<MessageIntegityAttribute>() != nullptr) {
                             // 15.4.  MESSAGE-INTEGRITY
                             // The text used as input to HMAC is the STUN message,
@@ -136,7 +137,7 @@ std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat
                             if (next_attr_offset < vv.size()) {
                                 stat.error.inc();
                                 stat.fingerprint_not_last.inc();
-                                return false;
+                                return make_error_code(Error::FINGERPRINT_IS_NOT_LAST);
                             }
                             // Normative:
                             // The value of the attribute is computed as the CRC-32 of the STUN message
@@ -150,16 +151,16 @@ std::optional<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat
                             if (v != fingerprint->crc32) {
                                 stat.error.inc();
                                 stat.invalid_fingerprint.inc();
-                                return false;
+                                return make_error_code(Error::FINGERPRINT_NOT_VALID);
                             }
                         }
                         attrs.emplace(std::move(attr));
-                        return true;
+                        return success();
                     }
                 },
-                std::move(*maybe_attr));
-        if (!success) {
-            return std::nullopt;
+                std::move(attr_rv.assert_value()));
+        if (maybe_error.is_error()) {
+            return maybe_error.assert_error();
         }
         attr_offset = next_attr_offset;
     }

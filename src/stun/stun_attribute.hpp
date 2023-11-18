@@ -13,6 +13,7 @@
 #include <variant>
 
 #include "util/util_binary_view.hpp"
+#include "util/util_return_value.hpp"
 #include "net/ip/ip_address.hpp"
 #include "net/net_port.hpp"
 #include "stun/stun_attribute_type.hpp"
@@ -39,7 +40,7 @@ struct UnknownAttribute {
 struct MappedAddressAttribute {
     net::ip::Address addr;
     net::Port port;
-    static std::optional<MappedAddressAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static ReturnValue<MappedAddressAttribute> parse(const util::ConstBinaryView&, ParseStat&);
     util::ByteVec build() const;
 };
 
@@ -47,48 +48,48 @@ struct XorMappedAddressAttribute {
     XoredAddress addr;
     net::Port port;
     bool operator==(const XorMappedAddressAttribute&) const noexcept = default;
-    static std::optional<XorMappedAddressAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static ReturnValue<XorMappedAddressAttribute> parse(const util::ConstBinaryView&, ParseStat&);
     util::ByteVec build() const;
 };
 
 struct UsernameAttribute {
     precis::OpaqueString name;
-    static std::optional<UsernameAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static ReturnValue<UsernameAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct SoftwareAttribute {
     std::string name;
-    static std::optional<SoftwareAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static ReturnValue<SoftwareAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct MessageIntegityAttribute {
     using Digest = crypto::hmac::Digest<crypto::SHA1Hash>;
     Digest digest;
-    static std::optional<MessageIntegityAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static ReturnValue<MessageIntegityAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct FingerprintAttribute {
     uint32_t crc32;
-    static std::optional<FingerprintAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static ReturnValue<FingerprintAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct PriorityAttribute {
     uint32_t priority;
-    static std::optional<PriorityAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static ReturnValue<PriorityAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct UseCandidateAttribute {
-    static std::optional<UseCandidateAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static ReturnValue<UseCandidateAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct IceControllingAttribute {
     uint64_t tiebreaker;
-    static std::optional<IceControllingAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static ReturnValue<IceControllingAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct IceControlledAttribute {
     uint64_t tiebreaker;
-    static std::optional<IceControlledAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static ReturnValue<IceControlledAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct UnknownAttributesAttribute {
@@ -110,7 +111,7 @@ struct ErrorCodeAttribute {
     std::optional<std::string> reason_phrase;
 
     bool operator==(const ErrorCodeAttribute&) const noexcept = default;
-    static std::optional<ErrorCodeAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static ReturnValue<ErrorCodeAttribute> parse(const util::ConstBinaryView&, ParseStat&);
     util::ByteVec build() const;
 };
 
@@ -139,7 +140,7 @@ public:
     const AttrType *as() const noexcept;
 
     using ParseResult = std::variant<Attribute, UnknownAttribute>;
-    static std::optional<ParseResult> parse(const util::ConstBinaryView&, AttributeType type, ParseStat&);
+    static ReturnValue<ParseResult> parse(const util::ConstBinaryView&, AttributeType type, ParseStat&);
     static Attribute create(Value&&);
 
 private:

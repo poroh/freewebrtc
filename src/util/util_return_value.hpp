@@ -29,7 +29,6 @@ public:
     using Value = V;
     using Error = std::error_code;
 
-    using MaybeError = std::optional<Error>;
     using MaybeValue = std::optional<std::reference_wrapper<Value>>;
     using MaybeConstValue = std::optional<std::reference_wrapper<const Value>>;
 
@@ -43,7 +42,6 @@ public:
     ReturnValue& operator=(ReturnValue&&) = default;
 
     bool is_error() const noexcept;
-    MaybeError maybe_error() const noexcept;
     const Error& assert_error() const noexcept;
 
     bool is_value() const noexcept;
@@ -67,6 +65,11 @@ public:
 private:
     std::variant<Value, Error> m_result;
 };
+
+struct ReturnValueUnitType{};
+using MaybeError = ReturnValue<ReturnValueUnitType>;
+MaybeError success() noexcept;
+
 
 // Check that any of the ReturnValue is error.
 // Example:
@@ -120,13 +123,6 @@ inline ReturnValue<V>::ReturnValue(const std::error_code& c)
 template<typename V>
 inline bool ReturnValue<V>::is_error() const noexcept {
     return std::holds_alternative<Error>(m_result);
-}
-
-template<typename V>
-inline std::optional<typename ReturnValue<V>::Error>
-ReturnValue<V>::maybe_error() const noexcept {
-    auto err = std::get_if<Error>(&m_result);
-    return err != nullptr ? *err : std::optional<Error>(std::nullopt);
 }
 
 template<typename V>
@@ -350,6 +346,10 @@ auto combine(F&& f, ReturnValue<Ts>&&... rvs) -> ReturnValue<decltype(strip_rv(f
         }
         return result.assert_value();
     }
+}
+
+inline MaybeError success() noexcept {
+    return MaybeError{ReturnValueUnitType{}};
 }
 
 

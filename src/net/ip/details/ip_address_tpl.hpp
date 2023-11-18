@@ -9,8 +9,9 @@
 #pragma once
 
 #include <array>
-#include <optional>
+#include "net/net_error.hpp"
 #include "util/util_binary_view.hpp"
+#include "util/util_return_value.hpp"
 
 namespace freewebrtc::net::ip::details {
 
@@ -20,7 +21,7 @@ public:
     using Value = std::array<uint8_t, SIZE>;
 
     static constexpr size_t size();
-    static std::optional<Address> from_view(const util::ConstBinaryView&);
+    static ReturnValue<Address> from_view(const util::ConstBinaryView&);
 
     Address(Value&&);
     util::ConstBinaryView view() const noexcept;
@@ -49,9 +50,9 @@ inline util::ConstBinaryView Address<SIZE>::view() const noexcept {
 }
 
 template<size_t SIZE>
-inline std::optional<Address<SIZE>> Address<SIZE>::from_view(const util::ConstBinaryView& vv) {
+inline ReturnValue<Address<SIZE>> Address<SIZE>::from_view(const util::ConstBinaryView& vv) {
     if (vv.size() != std::tuple_size<Value>::value) {
-        return std::nullopt;
+        return make_error_code(Error::INVALID_ADDRESS_SIZE);
     }
     Value v;
     std::copy(vv.begin(), vv.end(), v.begin());

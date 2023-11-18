@@ -59,7 +59,6 @@ Algorithm<T>& AlgorithmSingleton<T, I>::get() noexcept {
     return instance;
 }
 
-
 template<typename T>
 template<typename AlgoSingleton>
 Hash<T> Hash<T>::create() {
@@ -77,7 +76,6 @@ template<typename T>
 std::size_t Hash<T>::operator()(const T& v) const noexcept {
     return m_algo.hash(v);
 }
-
 
 }
 

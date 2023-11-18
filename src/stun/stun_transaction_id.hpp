@@ -19,6 +19,8 @@ public:
     explicit TransactionId(const util::ConstBinaryView&);
     TransactionId(TransactionId&&) = default;
     TransactionId(const TransactionId&) = default;
+    TransactionId& operator=(const TransactionId&) = default;
+    TransactionId& operator=(TransactionId&&) = default;
 
     template<typename RandomGen>
     static TransactionId generate(RandomGen&);

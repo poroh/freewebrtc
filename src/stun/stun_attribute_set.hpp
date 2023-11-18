@@ -38,7 +38,9 @@ public:
     // Return list of uknown comprehension-required attributes
     std::vector<AttributeType> unknown_comprehension_required() const noexcept;
 
-    static AttributeSet create(std::vector<Attribute::Value>, std::vector<UnknownAttribute> = {});
+    using AttrVec = std::vector<Attribute::Value>;
+    using UnknownAttrVec = std::vector<UnknownAttribute>;
+    static AttributeSet create(AttrVec&&, UnknownAttrVec&& = {});
 
     ReturnValue<util::ByteVec> build(const Header&, const MaybeIntegrity&) const;
 private:

@@ -20,7 +20,7 @@ public:
         std::random_device random;
         return stun::TransactionId::generate(random);
     }
-    std::optional<stun::Message> rebuild(const stun::Message& msg, const stun::MaybeIntegrity& maybe_integrity = std::nullopt) {
+    ReturnValue<stun::Message> rebuild(const stun::Message& msg, const stun::MaybeIntegrity& maybe_integrity = std::nullopt) {
         const auto rv = msg.build(maybe_integrity);
         assert(!rv.is_error());
         const auto& data = rv.assert_value();
@@ -48,9 +48,9 @@ TEST_F(STUNMessageBuildTest, build_simple_binding_request) {
         stun::IsRFC3489{false}
     };
 
-    const auto& maybe_req = rebuild(request);
-    ASSERT_TRUE(maybe_req.has_value());
-    const auto& req = maybe_req.value();
+    const auto& req_rv = rebuild(request);
+    ASSERT_TRUE(req_rv.is_value());
+    const auto& req = req_rv.assert_value();
     expect_headers_are_equal(req, request);
 }
 
@@ -64,9 +64,9 @@ TEST_F(STUNMessageBuildTest, build_binding_request_with_fingerprint) {
         stun::AttributeSet::create({stun::FingerprintAttribute{0}}),
         stun::IsRFC3489{false}
     };
-    const auto& maybe_req = rebuild(request);
-    ASSERT_TRUE(maybe_req.has_value());
-    const auto& req = maybe_req.value();
+    const auto& req_rv = rebuild(request);
+    ASSERT_TRUE(req_rv.is_value());
+    const auto& req = req_rv.assert_value();
     expect_headers_are_equal(req, request);
 }
 
@@ -88,9 +88,9 @@ TEST_F(STUNMessageBuildTest, build_binding_request_with_integrity) {
     assert(!rv.is_error());
     const auto& data = rv.assert_value();
     stun::ParseStat stat;
-    const auto& maybe_req = stun::Message::parse(util::ConstBinaryView(data), stat);
-    ASSERT_TRUE(maybe_req.has_value());
-    const auto& req = maybe_req.value();
+    const auto& req_rv = stun::Message::parse(util::ConstBinaryView(data), stat);
+    ASSERT_TRUE(req_rv.is_value());
+    const auto& req = req_rv.assert_value();
     auto is_valid_rv = req.is_valid(util::ConstBinaryView(data), integrity_data);
     ASSERT_TRUE(is_valid_rv.is_value());
     EXPECT_TRUE(is_valid_rv.assert_value().value_or(false));
@@ -108,9 +108,9 @@ TEST_F(STUNMessageBuildTest, build_error_response_with_errocode) {
             }),
         stun::IsRFC3489{false}
     };
-    const auto& maybe_rsp = rebuild(response);
-    ASSERT_TRUE(maybe_rsp.has_value());
-    const auto& rsp = maybe_rsp.value();
+    const auto& rsp_rv = rebuild(response);
+    ASSERT_TRUE(rsp_rv.is_value());
+    const auto& rsp = rsp_rv.assert_value();
     expect_headers_are_equal(rsp, response);
 
     ASSERT_TRUE(rsp.attribute_set.error_code().has_value());
@@ -120,7 +120,7 @@ TEST_F(STUNMessageBuildTest, build_error_response_with_errocode) {
 
 TEST_F(STUNMessageBuildTest, build_success_response_with_xor_mapped) {
     auto tid = rand_tid();
-    auto xaddr = stun::XoredAddress::from_address(net::ip::Address::from_string("127.0.0.1").value(), tid);
+    auto xaddr = stun::XoredAddress::from_address(net::ip::Address::from_string("127.0.0.1").assert_value(), tid);
     const stun::Message response {
         stun::Header {
             stun::Class::success_response(),
@@ -132,9 +132,9 @@ TEST_F(STUNMessageBuildTest, build_success_response_with_xor_mapped) {
             }),
         stun::IsRFC3489{false}
     };
-    const auto& maybe_rsp = rebuild(response);
-    ASSERT_TRUE(maybe_rsp.has_value());
-    const auto& rsp = maybe_rsp.value();
+    const auto& rsp_rv = rebuild(response);
+    ASSERT_TRUE(rsp_rv.is_value());
+    const auto& rsp = rsp_rv.assert_value();
     expect_headers_are_equal(rsp, response);
 
     ASSERT_TRUE(rsp.attribute_set.xor_mapped().has_value());

@@ -98,7 +98,7 @@ std::vector<AttributeType> AttributeSet::unknown_comprehension_required() const 
     return result;
 }
 
-AttributeSet AttributeSet::create(std::vector<Attribute::Value> ka, std::vector<UnknownAttribute> ua) {
+AttributeSet AttributeSet::create(std::vector<Attribute::Value>&& ka, std::vector<UnknownAttribute>&& ua) {
     AttributeSet newset;
     for (auto&& a: ka) {
         newset.emplace(Attribute::create(std::move(a)));

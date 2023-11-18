@@ -26,7 +26,6 @@ TEST_F(UtilReturnValueTest, check_value) {
     ASSERT_TRUE(rv.maybe_value().has_value());
     EXPECT_EQ(rv.maybe_value().value(), 1);
     EXPECT_FALSE(rv.is_error());
-    EXPECT_FALSE(rv.maybe_error().has_value());
 }
 
 TEST_F(UtilReturnValueTest, check_error) {
@@ -34,8 +33,6 @@ TEST_F(UtilReturnValueTest, check_error) {
     ReturnValue<int> rv(ec);
     ASSERT_TRUE(rv.is_error());
     EXPECT_EQ(rv.assert_error(), ec);
-    ASSERT_TRUE(rv.maybe_error().has_value());
-    EXPECT_EQ(rv.maybe_error().value(), ec);
     EXPECT_FALSE(rv.is_value());
     EXPECT_FALSE(rv.maybe_value().has_value());
 }

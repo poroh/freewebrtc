@@ -54,8 +54,8 @@ public:
 
 const auto all_endpoints =
     testing::Values(
-        net::UdpEndpoint{net::ip::Address::from_string("127.0.0.1").value(), net::Port(2023)},
-        net::UdpEndpoint{net::ip::Address::from_string("::1").value(), net::Port(2023)}
+        net::UdpEndpoint{net::ip::Address::from_string("127.0.0.1").assert_value(), net::Port(2023)},
+        net::UdpEndpoint{net::ip::Address::from_string("::1").assert_value(), net::Port(2023)}
     );
 
 // ================================================================================

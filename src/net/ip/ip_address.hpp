@@ -29,7 +29,7 @@ public:
     Address(AddressV4&&);
     Address(AddressV6&&);
 
-    static std::optional<Address> from_string(const std::string_view&);
+    static ReturnValue<Address> from_string(const std::string_view&);
 
     const Value& value() const noexcept;
 

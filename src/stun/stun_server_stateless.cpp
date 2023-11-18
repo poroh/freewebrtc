@@ -50,10 +50,10 @@ Stateless::Stateless(crypto::SHA1Hash::Func sha1, const std::optional<Settings>&
 
 Stateless::ProcessResult Stateless::process(const net::Endpoint& ep, const util::ConstBinaryView& view) {
     auto maybe_msg = stun::Message::parse(view, m_stat);
-    if (!maybe_msg.has_value()) {
+    if (!maybe_msg.is_value()) {
         return Ignore{};
     }
-    auto& msg = maybe_msg.value();
+    auto& msg = maybe_msg.assert_value();
     if (msg.header.cls == stun::Class::request()) {
         return process_request(ep, std::move(msg), view);
     }

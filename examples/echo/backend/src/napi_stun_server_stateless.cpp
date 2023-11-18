@@ -31,13 +31,7 @@ ReturnValue<net::Endpoint> extract_rinfo(const Value& v) {
     auto addr_rv = v_as_obj
         .fmap([](auto obj) { return obj.named_property("address"); })
         .fmap([](auto v)   { return v.as_string(); })
-        .fmap([](auto v) -> ReturnValue<net::ip::Address> {
-            auto addr = net::ip::Address::from_string(v);
-            if (addr.has_value()) {
-                return addr.value();
-            }
-            return make_error_code(WrapperError::INVALID_IP_ADDRESS);
-        });
+        .fmap([](auto v)   { return net::ip::Address::from_string(v); });
 
     auto port_rv = v_as_obj
         .fmap([](auto obj) { return obj.named_property("port"); })
