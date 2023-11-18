@@ -53,7 +53,9 @@ typename Hash::Result MessageDigest::calc(const typename Hash::Input& input) {
     }
 
     for (const auto& chunk: input) {
-        update(chunk);
+        if (auto maybe_err = update(chunk); maybe_err.has_value()) {
+            return *maybe_err;
+        }
     }
 
     typename Hash::Value v;
