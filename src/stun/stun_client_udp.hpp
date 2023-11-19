@@ -129,7 +129,8 @@ public:
 
     // SendData returns const references to message data
     // and maybe integrity data. Lifetime of these reference
-    // guaranteed until next call of next() function.
+    // guaranteed until TransactionFail / TransactionOk with the
+    // same handle received
     struct SendData {
         Handle handle;
         util::ConstBinaryView message_view;
@@ -140,7 +141,7 @@ public:
         // External IP address / Port
         net::UdpEndpoint result;
         // Parsed response message
-        Message msg;
+        Message response;
         // Round-trip time maybe not calculated if
         // we used retransmissions and no cerainty about attributing
         // response to act of sending request.

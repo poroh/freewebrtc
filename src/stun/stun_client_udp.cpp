@@ -307,7 +307,6 @@ MaybeError ClientUDP::handle_error_response(Timepoint now, Handle hnd, const Mes
     return success();
 }
 
-
 ClientUDP::Handle ClientUDP::allocate_handle() noexcept {
     while (true) {
         if (auto hnd = Handle{m_next_handle_value++}; !m_tmap.contains(hnd)) {
