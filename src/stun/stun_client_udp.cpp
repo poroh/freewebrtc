@@ -8,12 +8,14 @@
 
 #include "stun/stun_client_udp.hpp"
 #include "stun/stun_error.hpp"
+#include "stun/stun_transaction_id_hash.hpp"
 
 namespace freewebrtc::stun {
 
 class ClientUDP::RetransmitAlgo {
 public:
     explicit RetransmitAlgo(const Settings::RetransmitDefault& settings, Timepoint now);
+    MaybeTimepoint init(Timepoint now);
     MaybeTimepoint next(Timepoint now);
     enum class Process5xxResult {
         TransactionFailed,
@@ -22,8 +24,20 @@ public:
     Process5xxResult process_5xx(Timepoint, int code);
 private:
     const Settings::RetransmitDefault m_settings;
-    std::optional<MaybeTimepoint> m_next_rtx;
+    MaybeTimepoint m_maybe_next;
+    Duration m_last_timeout;
+    unsigned m_rtx_count = 0;
+    unsigned m_5xx_count = 0;
 };
+
+
+ClientUDP::ClientUDP(const Settings& settings)
+    : m_settings(settings)
+    , m_tid_to_handle(0,
+        m_settings
+          .maybe_tid_hash
+          .value_or(MurmurTransactionIdHash<>::create()))
+{}
 
 MaybeError ClientUDP::response(Timepoint now, util::ConstBinaryView view, std::optional<stun::Message>&& maybe_msg) {
     if (!maybe_msg.has_value()) {
@@ -86,7 +100,7 @@ ClientUDP::Next ClientUDP::next(Timepoint now) {
                 m_stat.retransmits.inc();
                 t.rtx_count++;
                 m_tid_timeline.emplace(std::make_pair(*next, hnd));
-                m_effects.emplace(SendData{util::ConstBinaryView(t.msg_data)});
+                m_effects.emplace(SendData{hnd, util::ConstBinaryView(t.msg_data)});
             } else {
                 auto reason = TransactionFailed::Timeout{};
                 m_effects.emplace(TransactionFailed{hnd, reason});
@@ -144,7 +158,11 @@ ReturnValue<ClientUDP::Handle> ClientUDP::do_create(Timepoint now, TransactionId
                                     std::move(data),
                                     std::move(rtx_algo));
             auto [it, _] = m_tmap.emplace(handle, std::move(transaction));
-            m_effects.emplace(SendData{util::ConstBinaryView(it->second.msg_data)});
+            auto& t = it->second;
+            m_effects.emplace(SendData{handle, util::ConstBinaryView(t.msg_data)});
+            if (auto maybe_timepoint = t.rtx_algo->init(now); maybe_timepoint.has_value()) {
+                m_tid_timeline.emplace(maybe_timepoint.value(), handle);
+            }
             m_stat.started.inc();
             return handle;
         });
@@ -329,18 +347,55 @@ ClientUDP::Transaction::Transaction(Timepoint now, TransactionId&& t, util::Byte
 ClientUDP::Transaction::~Transaction()
 {}
 
+bool ClientUDP::TimelineGreater::operator()(const TimelineItem& lhs, const TimelineItem& rhs) const noexcept {
+    if (lhs.first.is_after(rhs.first)) {
+        return true;
+    }
+    if (rhs.first.is_after(lhs.first)) {
+        return false;
+    }
+    return lhs.second.value > rhs.second.value;
+}
+
 ClientUDP::RetransmitAlgo::RetransmitAlgo(const Settings::RetransmitDefault& settings, Timepoint now)
     : m_settings(settings)
-    , m_next_rtx(now.advance(settings.initial_rto))
+    , m_maybe_next(now.advance(settings.initial_rto))
+    , m_last_timeout(settings.initial_rto)
 {}
 
-ClientUDP::MaybeTimepoint ClientUDP::RetransmitAlgo::next(Timepoint) {
-    return {};
+ClientUDP::MaybeTimepoint ClientUDP::RetransmitAlgo::init(Timepoint now) {
+    m_maybe_next = now.advance(m_last_timeout);
+    return m_maybe_next.value();
+}
+
+ClientUDP::MaybeTimepoint ClientUDP::RetransmitAlgo::next(Timepoint now) {
+    if (!m_maybe_next.has_value() || now.is_before(m_maybe_next.value())) {
+        return m_maybe_next;
+    }
+    if (m_rtx_count >= m_settings.request_count + m_5xx_count) {
+        m_maybe_next.reset();
+        return std::nullopt;
+    }
+    auto timeout = m_last_timeout * 2;
+    if (m_settings.max_rto.has_value()) {
+        timeout = std::max(timeout, m_settings.max_rto.value());
+    }
+    m_last_timeout = timeout;
+    m_maybe_next = now.advance(timeout);
+    return m_maybe_next.value();
 }
 
 ClientUDP::RetransmitAlgo::Process5xxResult
-ClientUDP::RetransmitAlgo::process_5xx(Timepoint, int) {
-    return Process5xxResult::TransactionFailed;
+ClientUDP::RetransmitAlgo::process_5xx(Timepoint now, int) {
+    if (!m_settings.server_error_timeout.has_value()) {
+        return Process5xxResult::TransactionFailed;
+    }
+    if (m_5xx_count >= m_settings.server_error_max_retransmits) {
+        return Process5xxResult::TransactionFailed;
+    }
+    m_5xx_count++;
+    m_maybe_next = now.advance(m_settings.server_error_timeout.value());
+    return Process5xxResult::RetransmitScheduled;
 }
 
 }

@@ -105,6 +105,10 @@ std::vector<AttributeType> AttributeSet::unknown_comprehension_required() const 
     return result;
 }
 
+bool AttributeSet::has_fingerprint() const noexcept {
+    return m_map.find(AttributeType::from_uint16(attr_registry::FINGERPRINT)) != m_map.end();
+}
+
 AttributeSet AttributeSet::create(std::vector<Attribute::Value>&& ka, std::vector<UnknownAttribute>&& ua) {
     AttributeSet newset;
     for (auto&& a: ka) {

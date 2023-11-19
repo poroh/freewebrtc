@@ -16,7 +16,13 @@ namespace freewebrtc::stun {
 
 using TransactionIdHash = util::hash::dynamic::Hash<TransactionId>;
 
-template<typename RandomGen>
+struct NoRandom {
+    size_t operator()() {
+        return 0;
+    }
+};
+
+template<typename RandomGen = NoRandom>
 class MurmurTransactionIdHash : public util::hash::dynamic::Algorithm<TransactionId> {
 public:
     MurmurTransactionIdHash();

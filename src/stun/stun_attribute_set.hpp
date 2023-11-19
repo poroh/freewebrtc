@@ -38,6 +38,7 @@ public:
     MaybeAttr<AlternateServerAttribute> alternate_server() const noexcept;
     // Return list of uknown comprehension-required attributes
     std::vector<AttributeType> unknown_comprehension_required() const noexcept;
+    bool has_fingerprint() const noexcept;
 
     using AttrVec = std::vector<Attribute::Value>;
     using UnknownAttrVec = std::vector<UnknownAttribute>;
