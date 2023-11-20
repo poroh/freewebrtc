@@ -13,10 +13,70 @@ stack exist in this world but this implementation is different:
 - Code highly relies on strong typing
 - Thorough unit testing (117 tests and counting)
 - No quirky practicies with raw pointers and type casts.
+- Test coverage
+- Address sanitizer
+- -Wall -Werror -pedantic from the beginning
+- No global variables and side effects
+- References to standards everywhere where these standards implemented
 
 # Maturity
 
 Project is on very early stages in terms of completeness of WebRTC implementation. But pieces that are already built
 should be very high level of quality.
+
+# Build
+
+Known environment that can compile this code:
+- Ubuntu 22.04 with gcc/g++ compiler
+- macOS 12.4 with clang/clang++ compiler
+
+To build static library and tests:
+```
+cd freewebrtc
+cmake -S . -B _build
+make -C _build
+```
+
+Run tests
+```
+_build/tests/freewebrtc_tests
+```
+
+# Node.js examples
+
+As an example and to make development closer to real-life node.js example is implemented. 
+This is very early stage example of echo server that in future will
+
+- Negotiate ICE connectivity
+- Establish DTLS 
+- Receive RTP streams and return it back to client
+
+Build and run of the example:
+
+Client:
+```
+cd freewebrtc/examples/echo/frontend
+npm install
+npm run start
+```
+
+Server:
+```
+cd freewebrtc/examples/echo/backend
+npm install
+npm run build
+```
+
+After running server you can connect to localhost:8000 and this will be test.
+And don't expect too much from it. It is in the early stage.
+
+
+
+
+
+
+
+
+
 
 
