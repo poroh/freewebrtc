@@ -41,6 +41,7 @@ uint8_t Family::to_uint8() const noexcept {
     case IPv6:
         return attr_registry::FAMILY_IPV6;
     }
+    return attr_registry::FAMILY_IPV4;
 }
 
 ReturnValue<XoredAddress> XoredAddress::from_view(Family f, const util::ConstBinaryView& vv) {

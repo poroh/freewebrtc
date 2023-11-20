@@ -6,6 +6,7 @@
 // STUN client over UDP
 //
 
+#include <memory>
 #include "stun/stun_client_udp.hpp"
 #include "stun/stun_error.hpp"
 #include "stun/stun_transaction_id_hash.hpp"

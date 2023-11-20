@@ -8,6 +8,7 @@
 
 #include <openssl/evp.h>
 #include <openssl/err.h>
+#include <memory>
 
 #include "crypto/openssl/openssl_hash.hpp"
 #include "crypto/openssl/openssl_error.hpp"
