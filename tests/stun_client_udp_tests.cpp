@@ -10,6 +10,7 @@
 #include "stun/stun_client_udp.hpp"
 #include "crypto/openssl/openssl_hash.hpp"
 #include "stun/stun_server_stateless.hpp"
+#include "stun/stun_error.hpp"
 
 namespace freewebrtc::test {
 
@@ -210,7 +211,7 @@ TEST_F(StunClientTest, request_response_happy_path_no_auth) {
     const auto response_data = server_reponse(sent_data.message_view);
 
     // Process response by Client
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), std::nullopt).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_value());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& ok = std::get<ClientUDP::TransactionOk>(next);
@@ -234,7 +235,7 @@ TEST_F(StunClientTest, request_response_happy_path_with_auth) {
     const auto response_data = server_reponse(sent_data.message_view);
 
     // Process response by Client
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), std::nullopt).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_value());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& ok = std::get<ClientUDP::TransactionOk>(next);
@@ -272,7 +273,7 @@ TEST_F(StunClientTest, request_response_parallel_transactions_abab) {
     const auto response_data2 = server_reponse(sent_data2.message_view);
 
     // Process First response by Client
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data1), std::nullopt).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data1)).is_value());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& ok1 = std::get<ClientUDP::TransactionOk>(next);
@@ -281,7 +282,7 @@ TEST_F(StunClientTest, request_response_parallel_transactions_abab) {
     tick(now);
 
     // Process Second response by Client
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data2), std::nullopt).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data2)).is_value());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& ok2 = std::get<ClientUDP::TransactionOk>(next);
@@ -321,7 +322,7 @@ TEST_F(StunClientTest, request_response_parallel_transactions_abba) {
     const auto response_data2 = server_reponse(sent_data2.message_view);
 
     // Process First response by Client
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data2), std::nullopt).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data2)).is_value());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& ok2 = std::get<ClientUDP::TransactionOk>(next);
@@ -330,7 +331,7 @@ TEST_F(StunClientTest, request_response_parallel_transactions_abba) {
     tick(now);
 
     // Process Second response by Client
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data1), std::nullopt).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data1)).is_value());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& ok1 = std::get<ClientUDP::TransactionOk>(next);
@@ -385,7 +386,7 @@ TEST_F(StunClientTest, retransmits) {
     EXPECT_EQ(fail.handle, hnd);
 }
 
-TEST_F(StunClientTest, retransmits_rfc5389_timing_checks) {
+TEST_F(StunClientTest, retransmits_rfc5389_example_timing_checks) {
     // Idea of the test is to check example of timingsfrom RFC5389
     Settings settings;
 
@@ -421,6 +422,188 @@ TEST_F(StunClientTest, retransmits_rfc5389_timing_checks) {
     // client will consider the transaction to have timed out.
     EXPECT_EQ(now - start, 39500ms);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed>(next));
+    const auto& tfailed = std::get<ClientUDP::TransactionFailed>(next);
+    EXPECT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed::Timeout>(tfailed.reason));
 }
+
+// ================================================================================
+// STUN error response handling
+
+TEST_F(StunClientTest, success_response_with_unknown_comprehension_required_attribute) {
+    // Test idea is to send well-formed success response but with
+    // attribute that client does not understand but requires to understand.
+    ClientUDP client({});
+    auto now = Timepoint::epoch();
+    auto hnd = client.create(rnd, now, ClientUDP::Request{stun_server_ep4, {}}).assert_value();
+    auto next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+    auto sent_data = std::get<ClientUDP::SendData>(next);
+    stun::ParseStat parse_stat;
+    auto req = Message::parse(sent_data.message_view, parse_stat).assert_value();
+    auto xaddr = stun::XoredAddress::from_address(nat_ep4.address, req.header.transaction_id);
+    const stun::UnknownAttribute unknown_attr1(stun::AttributeType::from_uint16(0x7fff), util::ConstBinaryView({}));
+    const stun::UnknownAttribute unknown_attr2(stun::AttributeType::from_uint16(0x7ff3), util::ConstBinaryView({}));
+    Message response{
+        stun::Header {
+            stun::Class::success_response(),
+            stun::Method::binding(),
+            req.header.transaction_id
+        },
+        stun::AttributeSet::create({
+                stun::XorMappedAddressAttribute{xaddr, nat_ep4.port}
+            },{
+                unknown_attr1,
+                unknown_attr2
+            }),
+        stun::IsRFC3489{false}
+    };
+    auto response_data = response.build().assert_value();
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), response).is_value());
+    next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed>(next));
+    const auto& tfailed = std::get<ClientUDP::TransactionFailed>(next);
+    EXPECT_EQ(tfailed.handle, hnd);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed::UnknownComprehensionRequiredAttribute>(tfailed.reason));
+    const auto& ucra = std::get<ClientUDP::TransactionFailed::UnknownComprehensionRequiredAttribute>(tfailed.reason);
+    std::vector<stun::AttributeType> unknown_attrs{unknown_attr1.type, unknown_attr2.type};
+    EXPECT_EQ(ucra.attrs, unknown_attrs);
+}
+
+TEST_F(StunClientTest, error_response_with_unknown_comprehension_required_attribute) {
+    // Test idea is to send well-formed success response but with
+    // attribute that client does not understand but requires to understand.
+    ClientUDP client({});
+    auto now = Timepoint::epoch();
+    auto hnd = client.create(rnd, now, ClientUDP::Request{stun_server_ep4, {}}).assert_value();
+    auto next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+    auto sent_data = std::get<ClientUDP::SendData>(next);
+    stun::ParseStat parse_stat;
+    auto req = Message::parse(sent_data.message_view, parse_stat).assert_value();
+    const stun::UnknownAttribute unknown_attr1(stun::AttributeType::from_uint16(0x7fff), util::ConstBinaryView({}));
+    const stun::UnknownAttribute unknown_attr2(stun::AttributeType::from_uint16(0x7ff3), util::ConstBinaryView({}));
+    Message response{
+        stun::Header {
+            stun::Class::error_response(),
+            stun::Method::binding(),
+            req.header.transaction_id
+        },
+        stun::AttributeSet::create({
+                stun::ErrorCodeAttribute{stun::ErrorCodeAttribute::BadRequest, "Bad request"},
+            },{
+                unknown_attr1,
+                unknown_attr2
+            }),
+        stun::IsRFC3489{false}
+    };
+    auto response_data = response.build().assert_value();
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), response).is_value());
+    next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed>(next));
+    const auto& tfailed = std::get<ClientUDP::TransactionFailed>(next);
+    EXPECT_EQ(tfailed.handle, hnd);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed::UnknownComprehensionRequiredAttribute>(tfailed.reason));
+    const auto& ucra = std::get<ClientUDP::TransactionFailed::UnknownComprehensionRequiredAttribute>(tfailed.reason);
+    std::vector<stun::AttributeType> unknown_attrs{unknown_attr1.type, unknown_attr2.type};
+    EXPECT_EQ(ucra.attrs, unknown_attrs);
+}
+
+TEST_F(StunClientTest, error_response_300_alternate_server) {
+    // Test idea is to send well-formed 300 response on
+    // STUN request and check that client fails transaction
+    // and provides correct reason
+    ClientUDP client({});
+    auto now = Timepoint::epoch();
+    auto hnd = client.create(rnd, now, ClientUDP::Request{stun_server_ep4, {}}).assert_value();
+    auto next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+    auto sent_data = std::get<ClientUDP::SendData>(next);
+    stun::ParseStat parse_stat;
+    auto req = Message::parse(sent_data.message_view, parse_stat).assert_value();
+    const auto alternate_server_ipv4(net::ip::Address::from_string("192.168.0.2").assert_value());
+    const auto alternate_server_port = net::Port{3478};
+    Message response{
+        stun::Header {
+            stun::Class::error_response(),
+            stun::Method::binding(),
+            req.header.transaction_id
+        },
+        stun::AttributeSet::create({
+            stun::ErrorCodeAttribute{stun::ErrorCodeAttribute::TryAlternate, "Try alternate server"},
+            stun::AlternateServerAttribute{alternate_server_ipv4, alternate_server_port}
+        }),
+        stun::IsRFC3489{false}
+    };
+    auto response_data = response.build().assert_value();
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), response).is_value());
+    next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed>(next));
+    const auto& tfailed = std::get<ClientUDP::TransactionFailed>(next);
+    EXPECT_EQ(tfailed.handle, hnd);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed::AlternateServer>(tfailed.reason));
+    const auto& asrv = std::get<ClientUDP::TransactionFailed::AlternateServer>(tfailed.reason);
+    EXPECT_EQ(asrv.server.address, alternate_server_ipv4);
+    EXPECT_EQ(asrv.server.port, alternate_server_port);
+}
+
+TEST_F(StunClientTest, error_response_300_alternate_server_without_attribute) {
+    // Test idea is to send well-formed 300 response on
+    // STUN request and check that client fails transaction
+    // and provides correct reason
+    ClientUDP client({});
+    auto now = Timepoint::epoch();
+    auto hnd = client.create(rnd, now, ClientUDP::Request{stun_server_ep4, {}}).assert_value();
+    auto next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+    auto sent_data = std::get<ClientUDP::SendData>(next);
+    stun::ParseStat parse_stat;
+    auto req = Message::parse(sent_data.message_view, parse_stat).assert_value();
+    Message response{
+        stun::Header {
+            stun::Class::error_response(),
+            stun::Method::binding(),
+            req.header.transaction_id
+        },
+        stun::AttributeSet::create({
+            stun::ErrorCodeAttribute{stun::ErrorCodeAttribute::TryAlternate, "Try alternate server"},
+        }),
+        stun::IsRFC3489{false}
+    };
+    auto response_data = response.build().assert_value();
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), response).is_value());
+    next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed>(next));
+    const auto& tfailed = std::get<ClientUDP::TransactionFailed>(next);
+    EXPECT_EQ(tfailed.handle, hnd);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed::Error>(tfailed.reason));
+    const auto& error = std::get<ClientUDP::TransactionFailed::Error>(tfailed.reason);
+    EXPECT_EQ(error.code.category(), stun::stun_client_error_category());
+    EXPECT_EQ(error.code.value(), (int)stun::ClientError::no_alternate_server_in_response);
+}
+
+TEST_F(StunClientTest, error_response_420_from_server) {
+    // Test idea is to send well-formed success response but with
+    // attribute that client does not understand but requires to understand.
+    ClientUDP client({});
+    auto now = Timepoint::epoch();
+    const stun::UnknownAttribute unknown_attr1(stun::AttributeType::from_uint16(0x7fff), util::ConstBinaryView({}));
+    const stun::UnknownAttribute unknown_attr2(stun::AttributeType::from_uint16(0x7ff3), util::ConstBinaryView({}));
+    std::vector<stun::AttributeType> unknown_attrs{unknown_attr1.type, unknown_attr2.type};
+    auto hnd = client.create(rnd, now, ClientUDP::Request{stun_server_ep4, {}, {unknown_attr1, unknown_attr2}}).assert_value();
+    auto next = client.next(now);
+    auto sent_data = std::get<ClientUDP::SendData>(next);
+
+    // Response using StunServer
+    const auto response_data = server_reponse(sent_data.message_view);
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_value());
+    next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed>(next));
+    const auto& tfailed = std::get<ClientUDP::TransactionFailed>(next);
+    EXPECT_EQ(tfailed.handle, hnd);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed::UnknownAttributeReported>(tfailed.reason));
+    const auto& uar = std::get<ClientUDP::TransactionFailed::UnknownAttributeReported>(tfailed.reason);
+    EXPECT_EQ(uar.attrs, unknown_attrs);
+}
+
 
 }

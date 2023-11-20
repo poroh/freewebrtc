@@ -32,7 +32,8 @@ enum class ParseError {
     ice_controlling_size,
     use_candidate_size,
     error_code_attribute_size,
-    unknown_addr_family,
+    unknown_attributes_attribute_size,
+    unknown_addr_family
 };
 
 enum class ClientError {

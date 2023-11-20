@@ -94,6 +94,7 @@ struct IceControlledAttribute {
 
 struct UnknownAttributesAttribute {
     std::vector<AttributeType> types;
+    static ReturnValue<UnknownAttributesAttribute> parse(const util::ConstBinaryView&, ParseStat&);
     util::ByteVec build() const;
 };
 

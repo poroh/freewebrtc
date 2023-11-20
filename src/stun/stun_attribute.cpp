@@ -42,6 +42,7 @@ ReturnValue<Attribute::ParseResult> Attribute::parse(const util::ConstBinaryView
     case attr_registry::USE_CANDIDATE:      return UseCandidateAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
     case attr_registry::ERROR_CODE:         return ErrorCodeAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
     case attr_registry::ALTERNATE_SERVER:   return AlternateServerAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
+    case attr_registry::UNKNOWN_ATTRIBUTES: return UnknownAttributesAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
     default:
         return ParseResult{UnknownAttribute(type, vv)};
     }
@@ -234,6 +235,21 @@ ReturnValue<UseCandidateAttribute> UseCandidateAttribute::parse(const util::Cons
     return UseCandidateAttribute{};
 }
 
+ReturnValue<UnknownAttributesAttribute> UnknownAttributesAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+    if (vv.size() % 2 != 0) {
+        stat.error.inc();
+        stat.invalid_unknown_attributes_attr_size.inc();
+        return make_error_code(ParseError::unknown_attributes_attribute_size);
+    }
+    unsigned num = vv.size() / 2;
+    UnknownAttributesAttribute attr;
+    attr.types.reserve(num);
+    for (unsigned i = 0; i < num; ++i) {
+        attr.types.emplace_back(AttributeType::from_uint16(vv.assured_read_u16be(i * 2)));
+    }
+    return std::move(attr);
+}
+
 util::ByteVec UnknownAttributesAttribute::build() const {
     //  0                   1                   2                   3
     //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -252,6 +268,7 @@ util::ByteVec UnknownAttributesAttribute::build() const {
     }
     return result;
 }
+
 
 util::ByteVec ErrorCodeAttribute::build() const {
     //  0                   1                   2                   3

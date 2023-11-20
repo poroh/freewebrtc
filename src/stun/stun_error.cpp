@@ -36,6 +36,7 @@ public:
         case ParseError::ice_controlling_size:      return "invalid ice controlling attribute size";
         case ParseError::use_candidate_size:        return "invalid use candidate size";
         case ParseError::error_code_attribute_size: return "invalid error code attribute size";
+        case ParseError::unknown_attributes_attribute_size: return "invalid unknown attributes attribute size";
         case ParseError::unknown_addr_family:       return "unknown addr family";
         }
         return "unknown stun error";
