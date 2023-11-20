@@ -373,17 +373,28 @@ ClientUDP::MaybeTimepoint ClientUDP::RetransmitAlgo::next(Timepoint now) {
     if (!m_maybe_next.has_value() || now.is_before(m_maybe_next.value())) {
         return m_maybe_next;
     }
-    if (m_rtx_count >= m_settings.request_count + m_5xx_count) {
+    if (m_rtx_count + 1 >= m_settings.request_count + m_5xx_count) {
         m_maybe_next.reset();
         return std::nullopt;
     }
-    auto timeout = m_last_timeout * 2;
-    if (m_settings.max_rto.has_value()) {
-        timeout = std::max(timeout, m_settings.max_rto.value());
+    ++m_rtx_count;
+    if (m_rtx_count + 1 == m_settings.request_count) {
+        auto timeout = m_settings.initial_rto * m_settings.retransmission_multiplier;
+        if (m_settings.max_rto.has_value()) {
+            timeout = std::max(timeout, m_settings.max_rto.value());
+        }
+        m_last_timeout = timeout;
+        m_maybe_next = now.advance(timeout);
+        return m_maybe_next.value();
+    } else {
+        auto timeout = m_last_timeout * 2;
+        if (m_settings.max_rto.has_value()) {
+            timeout = std::max(timeout, m_settings.max_rto.value());
+        }
+        m_last_timeout = timeout;
+        m_maybe_next = now.advance(timeout);
+        return m_maybe_next.value();
     }
-    m_last_timeout = timeout;
-    m_maybe_next = now.advance(timeout);
-    return m_maybe_next.value();
 }
 
 ClientUDP::RetransmitAlgo::Process5xxResult

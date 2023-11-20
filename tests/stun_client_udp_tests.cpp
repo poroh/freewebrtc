@@ -35,6 +35,7 @@ public:
         server.add_user(default_auth.username, default_auth.integrity.password);
     }
     using Timepoint = clock::Timepoint;
+    using Duration  = clock::NativeDuration;
     using ClientUDP = stun::ClientUDP;
     using Settings  = stun::ClientUDP::Settings;
     using StunServer = stun::server::Stateless;
@@ -46,7 +47,7 @@ public:
     const net::UdpEndpoint nat_ep4;
     const crypto::SHA1Hash::Func sha1 = crypto::openssl::sha1;
     const Settings::Auth default_auth;
-    const clock::NativeDuration tick_size {1};
+    const Duration tick_size {1};
 
     StunServer server;
     std::random_device rnd;
@@ -340,7 +341,86 @@ TEST_F(StunClientTest, request_response_parallel_transactions_abba) {
     ASSERT_TRUE(std::holds_alternative<ClientUDP::Idle>(next));
 }
 
+// ================================================================================
+// Retransmits
 
+TEST_F(StunClientTest, retransmits) {
+    Settings settings;
+    ClientUDP client(settings);
+    auto rtx_settings = std::get<Settings::RetransmitDefault>(settings.retransmit);
+    auto now = Timepoint::epoch();
+    auto hnd = client.create(rnd, now, ClientUDP::Request{stun_server_ep4, {}}).assert_value();
+    auto next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+    auto send_time = now;
+    advance_sleeps(client, now, next);
 
+    unsigned backoff = 1;
+    for (unsigned i = 0; i + 1 < rtx_settings.request_count; ++i) {
+        auto expected_timeout = rtx_settings.initial_rto * backoff;
+        if (rtx_settings.max_rto.has_value()) {
+            expected_timeout = std::max(expected_timeout, rtx_settings.max_rto.value());
+        }
+        EXPECT_EQ(now - send_time, expected_timeout);
+        ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+        send_time = now;
+        backoff = backoff * 2;
+        advance_sleeps(client, now, next);
+    }
+
+    // RFC5389:
+    // 7.2.1.  Sending over UDP:
+    // If, after the last request, a duration equal to Rm times the
+    // RTO has passed without a response (providing ample time to get
+    // a response if only this final request actually succeeds), the
+    // client SHOULD consider the transaction to have failed.  Rm
+    // SHOULD be configurable and SHOULD have a default of 16.
+    auto expected_timeout = rtx_settings.initial_rto * rtx_settings.retransmission_multiplier;
+    if (rtx_settings.max_rto.has_value()) {
+        expected_timeout = std::max(expected_timeout, rtx_settings.max_rto.value());
+    }
+    EXPECT_EQ(now - send_time, expected_timeout);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed>(next));
+    const auto& fail = std::get<ClientUDP::TransactionFailed>(next);
+    EXPECT_EQ(fail.handle, hnd);
+}
+
+TEST_F(StunClientTest, retransmits_rfc5389_timing_checks) {
+    // Idea of the test is to check example of timingsfrom RFC5389
+    Settings settings;
+
+    // Force RFC5389 settings:
+    Settings::RetransmitDefault rtx_settings;
+    rtx_settings.initial_rto = 500ms;
+    rtx_settings.max_rto = std::nullopt;
+    rtx_settings.request_count = 7;
+    settings.retransmit = rtx_settings;
+
+    ClientUDP client(settings);
+    std::vector<Duration> send_times;
+    auto now = Timepoint::epoch();
+    auto start = now;
+    client.create(rnd, now, ClientUDP::Request{stun_server_ep4, {}}).assert_value();
+    auto next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+    send_times.emplace_back(now - start);
+    advance_sleeps(client, now, next);
+
+    for (unsigned i = 0; i + 1 < rtx_settings.request_count; ++i) {
+        ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+        send_times.emplace_back(now - start);
+        advance_sleeps(client, now, next);
+    }
+    // For example, assuming an RTO of 500 ms, requests would be sent
+    // at times 0 ms, 500 ms, 1500 ms, 3500 ms, 7500 ms, 15500 ms, and
+    // 31500 ms.
+    const std::vector<Duration> test_vec{0ms, 500ms, 1500ms, 3500ms, 7500ms, 15500ms, 31500ms};
+    EXPECT_EQ(send_times, test_vec);
+
+    // If the client has not received a response after 39500 ms, the
+    // client will consider the transaction to have timed out.
+    EXPECT_EQ(now - start, 39500ms);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed>(next));
+}
 
 }
