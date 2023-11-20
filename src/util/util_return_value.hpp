@@ -232,18 +232,20 @@ std::optional<std::error_code> any_is_error(const ReturnValue<T>& first, const R
     }
 }
 
-template<typename Func, typename... Vs, typename T>
-auto combine_with_values_cref_h(Func func, std::tuple<const Vs&...>&& values, const ReturnValue<T>& rv) {
-    std::tuple<const T&> v{rv.assert_value()};
-    auto final_tuple = std::tuple_cat(std::move(values), v);
-    return std::apply(func, std::move(final_tuple));
+template<typename Func, typename... Vs>
+auto combine_with_values_cref_hh(Func func, std::tuple<const Vs&...>&& values) {
+    return std::apply(func, std::move(values));
 }
 
 template<typename F, typename... Vs, typename T, typename... Ts>
 auto combine_with_values_cref_h(F func, std::tuple<const Vs&...>&& values, const ReturnValue<T>& rv, const ReturnValue<Ts>&... rest) {
     std::tuple<const T&> v{rv.assert_value()};
     auto next_tuple = std::tuple_cat(std::move(values), v);
-    return combine_with_values_cref_h(func, std::move(next_tuple), std::forward<const ReturnValue<Ts>&>(rest)...);
+    if constexpr (sizeof...(rest) > 0) {
+        return combine_with_values_cref_h(func, std::move(next_tuple), std::forward<const ReturnValue<Ts>&>(rest)...);
+    } else {
+        return combine_with_values_cref_hh(func, std::move(next_tuple));
+    }
 }
 
 // Base function to start the process with an empty tuple
@@ -271,18 +273,20 @@ auto combine(F&& f, const ReturnValue<Ts>&... rvs) -> ReturnValue<decltype(strip
     }
 }
 
-template<typename Func, typename... Vs, typename T>
-auto combine_with_values_ref_h(Func func, std::tuple<Vs&...>&& values, ReturnValue<T>& rv) {
-    std::tuple<T&> v{rv.assert_value()};
-    auto final_tuple = std::tuple_cat(std::move(values), v);
-    return std::apply(func, std::move(final_tuple));
+template<typename Func, typename... Vs>
+auto combine_with_values_ref_hh(Func func, std::tuple<Vs&...>&& values) {
+    return std::apply(func, std::move(values));
 }
 
 template<typename F, typename... Vs, typename T, typename... Ts>
 auto combine_with_values_ref_h(F func, std::tuple<Vs&...>&& values, ReturnValue<T>& rv, ReturnValue<Ts>&... rest) {
     std::tuple<T&> v{rv.assert_value()};
     auto next_tuple = std::tuple_cat(std::move(values), v);
-    return combine_with_values_ref_h(func, std::move(next_tuple), std::forward<ReturnValue<Ts>&>(rest)...);
+    if constexpr (sizeof...(rest) > 0) {
+        return combine_with_values_ref_h(func, std::move(next_tuple), std::forward<ReturnValue<Ts>&>(rest)...);
+    } else {
+        return combine_with_values_ref_hh(func, std::move(next_tuple));
+    }
 }
 
 // Base function to start the process with an empty tuple
@@ -310,18 +314,20 @@ auto combine(F&& f, ReturnValue<Ts>&... rvs) -> ReturnValue<decltype(strip_rv(f(
     }
 }
 
-template<typename F, typename... Values, typename T>
-auto combine_rv_with_values_h(F&& func, std::tuple<Values&&...>&& values, ReturnValue<T>&& rv) {
-    std::tuple<T&&> v{std::move(rv.assert_value())};
-    auto final_tuple = std::tuple_cat(std::move(values), std::move(v));
-    return std::apply(func, std::move(final_tuple));
+template<typename F, typename... Values>
+auto combine_rv_with_values_hh(F&& func, std::tuple<Values&&...>&& values) {
+    return std::apply(func, std::move(values));
 }
 
 template<typename F, typename... Ts, typename T, typename... Rest>
 auto combine_rv_with_values_h(F&& func, std::tuple<Ts&&...>&& values, ReturnValue<T>&& rv, ReturnValue<Rest>&&... rest) {
     std::tuple<T&&> v{std::move(rv.assert_value())};
     auto next_tuple = std::tuple_cat(std::move(values), std::move(v));
-    return combine_rv_with_values_h(std::move(func), std::move(next_tuple), std::forward<ReturnValue<Rest>>(rest)...);
+    if constexpr (sizeof...(rest) > 0) {
+        return combine_rv_with_values_h(std::move(func), std::move(next_tuple), std::forward<ReturnValue<Rest>>(rest)...);
+    } else {
+        return combine_rv_with_values_hh(std::move(func), std::move(next_tuple));
+    }
 }
 
 // Base function to start the process with an empty tuple
