@@ -19,7 +19,7 @@ class STUNMessageParserTest : public ::testing::Test {
 // ================================================================================
 // Positive cases
 
-TEST_F(STUNMessageParserTest, rfc5796_2_1_sample_request) {
+TEST_F(STUNMessageParserTest, rfc5769_2_1_sample_request) {
     // This request uses the following parameters:
     //
     // Software name:  "STUN test client" (without quotes)
@@ -78,7 +78,7 @@ TEST_F(STUNMessageParserTest, rfc5796_2_1_sample_request) {
     EXPECT_EQ(software->get(), "STUN test client");
 }
 
-TEST_F(STUNMessageParserTest, rfc5796_2_2_sample_response) {
+TEST_F(STUNMessageParserTest, rfc5769_2_2_sample_response) {
     // 2.2.  Sample IPv4 Response
     //
     // Password:  "VOkJxbRl1RmTxUk/WvJxBt" (without quotes)
@@ -136,7 +136,7 @@ TEST_F(STUNMessageParserTest, rfc5796_2_2_sample_response) {
               net::ip::Address::from_string("192.0.2.1").assert_value());
 }
 
-TEST_F(STUNMessageParserTest, rfc5796_2_3_sample_ipv6_response) {
+TEST_F(STUNMessageParserTest, rfc5769_2_3_sample_ipv6_response) {
     // This response uses the following parameter:
     //
     // Password:  "VOkJxbRl1RmTxUk/WvJxBt" (without quotes)
@@ -503,7 +503,7 @@ TEST_F(STUNMessageParserTest, truncated_xor_mapped_address_truncated_ipv6_addres
 
 TEST_F(STUNMessageParserTest, invalid_integrity_sha1_hmac) {
     auto Change = [](uint8_t v) { return v+1; };
-    // This is response from RFC5796 2.2 without FINGERPRINT attribute
+    // This is response from RFC5769 2.2 without FINGERPRINT attribute
     std::vector<uint8_t> response = {
         0x01, 0x01, 0x00, 0x34,         //    Response type and message length
         0x21, 0x12, 0xa4, 0x42,         //    Magic cookie
