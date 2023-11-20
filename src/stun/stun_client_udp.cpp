@@ -64,17 +64,18 @@ MaybeError ClientUDP::response(Timepoint now, util::ConstBinaryView view, std::o
         // We don't check username because per:
         // RFC5389: 10.1.2.  Receiving a Request or Indication:
         // The response MUST NOT contain the USERNAME attribute.
-        auto is_valid_rv = msg.is_valid(view, auth.integrity);
-        if (is_valid_rv.is_error()) {
-            return is_valid_rv.assert_error();
+        auto maybe_is_valid_rv = msg.is_valid(view, auth.integrity);
+        if (maybe_is_valid_rv.is_error()) {
+            return maybe_is_valid_rv.assert_error();
         }
 
-        if (!is_valid_rv.assert_value().has_value()) {
+        const auto maybe_is_valid = maybe_is_valid_rv.assert_value();
+        if (!maybe_is_valid.has_value()) {
             if (!m_settings.allow_unauthenticated_alternate || !msg.is_alternate_server()) {
                 m_stat.integrity_missing.inc();
                 return make_error_code(ClientError::no_integrity_attribute_in_response);
             } // otherwise process as authenticated alternate server response
-        } else  if (!is_valid_rv.assert_value().value()) {
+        } else if (!maybe_is_valid.value()) {
             m_stat.integrity_check_errors.inc();
             return make_error_code(ClientError::digest_is_not_valid);
         }

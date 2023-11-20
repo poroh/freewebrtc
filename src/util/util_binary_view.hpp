@@ -10,8 +10,10 @@
 
 #include <string_view>
 #include <cstdint>
+#include <cstring>
 #include <optional>
 #include <vector>
+#include <array>
 
 #include "util/util_endian.hpp"
 

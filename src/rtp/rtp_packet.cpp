@@ -6,6 +6,7 @@
 // RTP Packet routines
 //
 
+#include <cassert>
 #include "rtp/rtp_packet.hpp"
 #include "rtp/rtp_payload_map.hpp"
 #include "rtp/details/rtp_header_details.hpp"
