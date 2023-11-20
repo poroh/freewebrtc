@@ -20,6 +20,9 @@
 #include "stun/stun_message.hpp"
 #include "stun/stun_attribute_set.hpp"
 #include "stun/stun_parse_stat.hpp"
+#include "stun/stun_client_udp_settings.hpp"
+#include "stun/stun_client_udp_handle.hpp"
+#include "stun/stun_client_udp_effects.hpp"
 #include "net/net_endpoint.hpp"
 
 namespace freewebrtc::stun {
@@ -29,56 +32,18 @@ using namespace std::literals::chrono_literals;
 class ClientUDP {
 public:
     using Timepoint = clock::Timepoint;
-    using Duration = clock::NativeDuration;
     using MaybeTimepoint = std::optional<Timepoint>;
-    using TransactionIdHash = util::hash::dynamic::Hash<TransactionId>;
+    using Settings   = client_udp::Settings;
+    using Handle     = client_udp::Handle;
+    using HandleHash = client_udp::HandleHash;
 
-    struct Settings {
-        // Authenticaiton information. If no specified
-        // the message is created without username / integrity
-        // attributes.
-        struct Auth {
-            precis::OpaqueString username;
-            IntegrityData integrity;
-        };
-        std::optional<Auth> maybe_auth;
-
-        // Use FINGERPRINT mechanism of RFC5389
-        struct UseFingerprintTag{};
-        using UseFingerprint = util::TypedBool<UseFingerprintTag>;
-        UseFingerprint use_fingerprint = UseFingerprint{true};
-
-        // Possible retransmit mechanisms settings.
-        // Default is RFC5389-defined mechanism
-        struct RetransmitDefault {
-            // Initial retransmit timeout
-            Duration initial_rto = 500ms;
-            // Maximum of retransmission interval.
-            // In libwebrtc this parameter is set to 8s
-            std::optional<clock::NativeDuration> max_rto = std::nullopt;
-            // Request count (Rc)
-            unsigned request_count = 7;
-            // Retransmission multiplier for last request (Rm)
-            unsigned retransmission_multiplier = 16;
-            // 5xx handling. If not defined then transaction
-            // is failed instantly
-            std::optional<Duration> server_error_timeout;
-            // Maximum number of retransmits in case of 5xx
-            // responses
-            unsigned server_error_max_retransmits = 5;
-        };
-        using Retransmit = std::variant<RetransmitDefault>;
-        Retransmit retransmit = RetransmitDefault{};
-
-        // Allow alternate server error without authentication
-        // This case is described in RFC5389 in section
-        // 11.  ALTERNATE-SERVER Mechanism
-        bool allow_unauthenticated_alternate = false;
-
-        // Hash of transaction ID. By default murmur hash without
-        // seed randomization.
-        std::optional<TransactionIdHash> maybe_tid_hash;
-    };
+    // Effects:
+    using Effect            = client_udp::Effect;
+    using SendData          = client_udp::SendData;
+    using TransactionOk     = client_udp::TransactionOk;
+    using TransactionFailed = client_udp::TransactionFailed;
+    using Sleep             = client_udp::Sleep;
+    using Idle              = client_udp::Idle;
 
     struct Statistics {
         ParseStat parse;
@@ -100,14 +65,6 @@ public:
         stat::Counter no_mapped_address;
     };
 
-    struct Handle {
-        unsigned value;
-        bool operator<=>(const Handle&) const noexcept = default;
-    };
-
-    struct HandleHash {
-        std::size_t operator()(Handle) const noexcept;
-    };
 
     explicit ClientUDP(const Settings&);
 
@@ -127,75 +84,12 @@ public:
     // in any case by binary view.
     MaybeError response(Timepoint, util::ConstBinaryView, std::optional<stun::Message>&& = {});
 
-    // SendData returns const references to message data
-    // and maybe integrity data. Lifetime of these reference
-    // guaranteed until TransactionFail / TransactionOk with the
-    // same handle received
-    struct SendData {
-        Handle handle;
-        util::ConstBinaryView message_view;
-    };
-
-    struct TransactionOk {
-        Handle handle;
-        // External IP address / Port
-        net::UdpEndpoint result;
-        // Parsed response message
-        Message response;
-        // Round-trip time maybe not calculated if
-        // we used retransmissions and no cerainty about attributing
-        // response to act of sending request.
-        std::optional<Duration> round_trip;
-    };
-
-    struct TransactionFailed {
-        // Response contains attributes that requires
-        // comprehension but we don't know it.
-        struct UnknownComprehensionRequiredAttribute {
-            std::vector<AttributeType> attrs;
-        };
-        // UNKNOWN-ATTRIBUTE attribute value of 420 error code
-        struct UnknownAttributeReported {
-            std::vector<AttributeType> attrs;
-        };
-        // ALTERNATE-SERVER meachanism in use
-        struct AlternateServer {
-            net::UdpEndpoint server;
-        };
-        // Error code
-        struct ErrorCode {
-            ErrorCodeAttribute attr;
-        };
-        // Error occurred during transaction processing
-        struct Error {
-            std::error_code code;
-        };
-
-        struct Timeout{};
-
-        using Reason = std::variant<
-            UnknownComprehensionRequiredAttribute,
-            UnknownAttributeReported,
-            AlternateServer,
-            ErrorCode,
-            Error,
-            Timeout
-        >;
-        Handle handle;
-        Reason reason;
-    };
-
-    struct Sleep { Duration sleep; };
-
-    // No more actions needed until next start() is called.
-    struct Idle {};
-
-    using Next = std::variant<SendData, TransactionOk, TransactionFailed, Sleep, Idle>;
-
     // Do next step of the client processing
-    Next next(Timepoint);
+    Effect next(Timepoint);
 
 private:
+    using Duration = clock::NativeDuration;
+    using TransactionIdHash = util::hash::dynamic::Hash<TransactionId>;
     class RetransmitAlgo;
     using RetransmitAlgoPtr = std::unique_ptr<RetransmitAlgo>;
     struct Transaction {
@@ -232,17 +126,12 @@ private:
     // Next timeline across all existing transacitons.
     std::priority_queue<TimelineItem, std::vector<TimelineItem>,  TimelineGreater> m_tid_timeline;
     // Pending effects that returned to user from next() function.
-    std::queue<Next> m_effects;
+    std::queue<Effect> m_effects;
 };
 
 //
 // implementation
 //
-inline std::size_t ClientUDP::HandleHash::operator()(Handle hnd) const noexcept {
-    std::hash<decltype(hnd.value)> h;
-    return h(hnd.value);
-}
-
 template<typename RandomDevice>
 inline ReturnValue<ClientUDP::Handle>
 ClientUDP::create(RandomDevice& rand, Timepoint now, Request&& req) {

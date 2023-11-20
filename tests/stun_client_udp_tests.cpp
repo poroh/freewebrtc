@@ -54,7 +54,7 @@ public:
     std::random_device rnd;
 
     void initial_request_check(ClientUDP&, std::optional<Message>&, std::optional<util::ConstBinaryView>&);
-    void advance_sleeps(ClientUDP&, Timepoint& now, ClientUDP::Next&);
+    void advance_sleeps(ClientUDP&, Timepoint& now, ClientUDP::Effect&);
     void tick(Timepoint& now);
     util::ByteVec server_reponse(util::ConstBinaryView req_view);
 };
@@ -89,7 +89,7 @@ void StunClientTest::initial_request_check(
     EXPECT_EQ(msg->header.method, stun::Method::binding());
 }
 
-void StunClientTest::advance_sleeps(ClientUDP& client, Timepoint& now, ClientUDP::Next& next) {
+void StunClientTest::advance_sleeps(ClientUDP& client, Timepoint& now, ClientUDP::Effect& next) {
     while (true) {
         next = client.next(now);
         if (!std::holds_alternative<ClientUDP::Sleep>(next)) {

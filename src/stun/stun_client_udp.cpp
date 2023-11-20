@@ -91,7 +91,7 @@ MaybeError ClientUDP::response(Timepoint now, util::ConstBinaryView view, std::o
     return success();
 }
 
-ClientUDP::Next ClientUDP::next(Timepoint now) {
+ClientUDP::Effect ClientUDP::next(Timepoint now) {
     // Progress with pending transactions
     while (!m_tid_timeline.empty() && !m_tid_timeline.top().first.is_after(now)) {
         Handle hnd = m_tid_timeline.top().second;
