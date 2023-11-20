@@ -24,6 +24,21 @@ stack exist in this world but this implementation is different:
 Project is on very early stages in terms of completeness of WebRTC implementation. But pieces that are already built
 should be very high level of quality.
 
+What is implemented:
+- RFC 2104: HMAC: Keyed-Hashing for Message Authentication
+- RFC 8489: Session Traversal Utilities for NAT (STUN)
+  - Conformant STUN message parser
+  - FINGERPRINT mechanism
+  - Authentication with short-term credential mechanism
+  - ALTERNATE-SERVER mechanism
+  - Backward compatibility with RFC3489
+  - All STUN attributes
+  - STUN statless server
+  - STUN UDP client with full transaction support
+- RFC 5769: Test Vectors for Session Traversal Utilities for NAT (STUN)
+- RFC 8445: Interactive Connectivity Establishment (ICE)
+  - STUN Extensions (PRIORITY, ICE-CONTROLLED, ICE-CONTROLLING, USE-CANDIDATE)
+
 # Build
 
 Known environment that can compile this code:
