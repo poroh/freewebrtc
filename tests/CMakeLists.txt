@@ -7,6 +7,7 @@ set(TEST_SOURCES
     crypto_hmac_openssl_tests.cpp
     stun_parse_tests.cpp
     stun_build_tests.cpp
+    stun_server_stateful_tests.cpp
     stun_server_stateless_tests.cpp
     stun_client_udp_tests.cpp
     util_return_value_tests.cpp

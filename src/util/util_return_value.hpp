@@ -9,6 +9,7 @@
 #pragma once
 
 #include <variant>
+#include <tuple>
 #include <system_error>
 #include <type_traits>
 #include <optional>

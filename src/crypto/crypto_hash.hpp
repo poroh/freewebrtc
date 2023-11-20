@@ -13,6 +13,7 @@
 #include <vector>
 #include <array>
 #include <system_error>
+#include <functional>
 
 #include "util/util_binary_view.hpp"
 #include "util/util_return_value.hpp"
