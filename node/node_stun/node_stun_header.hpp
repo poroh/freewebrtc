@@ -8,12 +8,11 @@
 
 #pragma once
 
-#include "stun/stun_message.hpp"
-#include "napi_wrapper.hpp"
+#include "stun/stun_header.hpp"
+#include "node/napi_wrapper/napi_wrapper.hpp"
 
 namespace freewebrtc::napi {
 
-ReturnValue<Object> stun_message(const Env& env, const stun::Message& msg);
-ReturnValue<Value> stun_message_parse(Env& env, const CallbackInfo& ci);
+ReturnValue<Object> stun_header(const Env& env, const stun::Header& hdr) noexcept;
 
 }

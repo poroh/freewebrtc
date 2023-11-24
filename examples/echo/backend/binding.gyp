@@ -3,21 +3,21 @@
         {
             "target_name": "echo_backend",
             "sources": [
-                "src/echo_backend.cpp",
-                "src/napi_error.cpp",
-                "src/napi_wrapper.cpp",
-                "src/napi_stun_message.cpp",
-                "src/napi_stun_header.cpp",
-                "src/napi_stun_server_stateless.cpp",
-                "src/node_openssl_hash.cpp",
-                "src/node_openssl_error.cpp"
+                "src/echo_backend.cpp"
             ],
             "include_dirs": [
-                "../../../src"
+                "../../../src",
+                "../../.."
             ],
             "libraries": [
                 "-L../../../../_build/src",
-                "-lfreewebrtc"
+                "-lfreewebrtc",
+                "-L../../../../_build/node/napi_wrapper",
+                "-L../../../../_build/node/node_stun",
+                "-L../../../../_build/node/openssl",
+                "-lfreewebrtc_napi_wrapper",
+                "-lfreewebrtc_node_stun",
+                "-lfreewebrtc_node_openssl"
             ],
             "cflags_cc": [ "-std=c++20" ],
             "xcode_settings": {

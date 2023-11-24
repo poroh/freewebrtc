@@ -6,8 +6,10 @@
 // OpenSSL implementation for hash functions
 //
 
-#include <openssl/evp.h>
-#include <openssl/err.h>
+#include <memory>
+
+#include "openssl/evp.h"
+#include "openssl/err.h"
 
 #include "node_openssl_hash.hpp"
 #include "node_openssl_error.hpp"

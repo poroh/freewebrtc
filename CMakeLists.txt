@@ -29,6 +29,7 @@ if(CODE_COVERAGE)
 endif()
 
 add_subdirectory(src)
+add_subdirectory(node)
 
 target_include_directories(freewebrtc PRIVATE ${CMAKE_SOURCE_DIR}/src)
 

@@ -6,12 +6,12 @@
 // Mapping of stateless STUN server to NAPI
 //
 
-#include "napi_stun_server_stateless.hpp"
-#include "napi_stun_message.hpp"
+#include "node_stun_server_stateless.hpp"
+#include "node_stun_message.hpp"
 #include "stun/stun_server_stateless.hpp"
 #include "util/util_fmap.hpp"
-#include "node_openssl_hash.hpp"
-#include "napi_error.hpp"
+#include "node/openssl/node_openssl_hash.hpp"
+#include "node/napi_wrapper/napi_error.hpp"
 
 namespace freewebrtc::napi {
 
@@ -19,7 +19,7 @@ namespace {
 
 using ServerRefWrap = std::reference_wrapper<stun::server::Stateless>;
 
-ReturnValue<Value> constructor(Env& env, const CallbackInfo& info) {
+ReturnValue<Value> constructor(Env&, const CallbackInfo& info) {
     return info.this_arg.as_object()
         .fmap([](const auto& obj) {
             return obj.wrap(std::make_unique<stun::server::Stateless>(crypto::node_openssl::sha1));

@@ -7,8 +7,8 @@
 //
 
 #include "stun/stun_header.hpp"
-#include "napi_stun_header.hpp"
-#include "napi_error.hpp"
+#include "node/napi_wrapper/napi_error.hpp"
+#include "node_stun_header.hpp"
 
 namespace freewebrtc::napi {
 
@@ -19,6 +19,7 @@ ReturnValue<Value> stun_class(const Env& env, const stun::Class& cls) {
     case stun::Class::SUCCESS_RESPONSE: return env.create_string("success_response");
     case stun::Class::ERROR_RESPONSE:   return env.create_string("error_response");
     }
+    return make_error_code(WrapperError::UNKNOWN_STUN_CLASS);
 }
 
 ReturnValue<Value> stun_method(const Env& env, const stun::Method& method) {

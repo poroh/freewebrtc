@@ -1,7 +1,7 @@
 #include <node_api.h>
 #include "stun/stun_message.hpp"
-#include "napi_stun_message.hpp"
-#include "napi_stun_server_stateless.hpp"
+#include "node/node_stun/node_stun_message.hpp"
+#include "node/node_stun/node_stun_server_stateless.hpp"
 
 namespace freewebrtc::napi {
 

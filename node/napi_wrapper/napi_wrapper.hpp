@@ -11,6 +11,8 @@
 #include <node_api.h>
 #include <vector>
 #include <optional>
+#include <functional>
+#include <memory>
 #include "util/util_return_value.hpp"
 #include "util/util_binary_view.hpp"
 #include "napi_error.hpp"
@@ -115,7 +117,7 @@ private:
 //
 template<typename T>
 ReturnValue<Value> Object::wrap(std::unique_ptr<T> native_obj) const noexcept {
-    auto dtor = [](napi_env env, void *data, void *finalize_hint) {
+    auto dtor = [](napi_env, void *data, void *) {
         delete static_cast<T *>(data);
     };
     if (auto status = napi_wrap(m_env, m_value, native_obj.get(), dtor, nullptr, nullptr); status != napi_ok) {

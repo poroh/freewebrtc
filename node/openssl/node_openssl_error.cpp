@@ -6,8 +6,7 @@
 // OpenSSL std::error_code wrapper
 //
 
-#include <openssl/err.h>
-
+#include "openssl/err.h"
 #include "node_openssl_error.hpp"
 
 namespace freewebrtc::crypto::node_openssl {

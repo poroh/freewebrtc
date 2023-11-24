@@ -6,8 +6,8 @@
 // Mapping of STUN to node.js type
 //
 
-#include "napi_stun_message.hpp"
-#include "napi_stun_header.hpp"
+#include "node_stun_message.hpp"
+#include "node_stun_header.hpp"
 #include "util/util_fmap.hpp"
 
 namespace freewebrtc::napi {
