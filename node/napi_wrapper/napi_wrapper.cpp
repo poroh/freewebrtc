@@ -71,6 +71,14 @@ ReturnValue<int32_t> Value::as_int32() const noexcept {
     return result;
 }
 
+ReturnValue<bool> Value::as_boolean() const noexcept {
+    bool result;
+    if (auto status = napi_get_value_bool(m_env, m_value, &result); status != napi_ok) {
+        return make_error_code(status);
+    }
+    return result;
+}
+
 Object::Object(napi_env env, napi_value value)
     : m_env(env)
     , m_value(value)
@@ -80,7 +88,7 @@ MaybeError Object::set_named_property(const std::string& k, const Value& v) noex
     if (auto status = napi_set_named_property(m_env, m_value, k.c_str(), v.to_napi()); status != napi_ok) {
         return make_error_code(status);
     }
-    return std::nullopt;
+    return success();
 }
 
 ReturnValue<Value> Object::named_property(const std::string& k) const noexcept {
@@ -89,6 +97,20 @@ ReturnValue<Value> Object::named_property(const std::string& k) const noexcept {
         return make_error_code(status);
     }
     return Value(m_env, result);
+}
+
+ReturnValue<std::optional<Value>> Object::maybe_named_property(const std::string& k) const noexcept {
+    bool has_property = false;
+    if (auto status = napi_has_named_property(m_env, m_value, k.c_str(), &has_property); status != napi_ok) {
+        return make_error_code(status);
+    }
+    if (!has_property) {
+        return std::optional<Value>{std::nullopt};
+    }
+    return named_property(k)
+        .fmap([](Value&& val) {
+            return std::optional<Value>{std::move(val)};
+        });
 }
 
 
@@ -157,8 +179,8 @@ ReturnValue<Object> Env::create_object(const ObjectSpec& spec) const noexcept {
             return rvv.assert_error();
         }
         const auto& vv = rvv.assert_value();
-        if (auto maybe_error = object.set_named_property(k, vv); maybe_error.has_value()) {
-            return maybe_error.value();
+        if (auto maybe_error = object.set_named_property(k, vv); maybe_error.is_error()) {
+            return maybe_error.assert_error();
         }
     }
     return object_result;

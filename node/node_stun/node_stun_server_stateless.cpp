@@ -6,12 +6,12 @@
 // Mapping of stateless STUN server to NAPI
 //
 
-#include "node_stun_server_stateless.hpp"
-#include "node_stun_message.hpp"
-#include "stun/stun_server_stateless.hpp"
 #include "util/util_fmap.hpp"
+#include "stun/stun_server_stateless.hpp"
 #include "node/openssl/node_openssl_hash.hpp"
 #include "node/napi_wrapper/napi_error.hpp"
+#include "node_stun_server_stateless.hpp"
+#include "node_stun_message.hpp"
 
 namespace freewebrtc::node_stun {
 
@@ -21,8 +21,6 @@ using Env = napi::Env;
 using CallbackInfo = napi::CallbackInfo;
 
 namespace {
-
-using ServerRefWrap = std::reference_wrapper<stun::server::Stateless>;
 
 ReturnValue<Value> constructor(Env&, const CallbackInfo& info) {
     return info.this_arg.as_object()
@@ -87,10 +85,10 @@ ReturnValue<Value> process_message(Env& env, const CallbackInfo& info) {
                     }
                 },
                 result).fmap(Object::fmap_to_value);
-        },
-        std::move(buffer_rv),
-        std::move(rinfo_rv),
-        std::move(obj_rvv));
+        }
+        , std::move(buffer_rv)
+        , std::move(rinfo_rv)
+        , std::move(obj_rvv));
 
 }
 
@@ -113,11 +111,10 @@ ReturnValue<Value> add_user(Env& env, const CallbackInfo& info) {
         [&](auto&& username, auto&& password, auto&& server) {
             server.get().add_user(username, password);
             return env.create_undefined();
-        },
-        std::move(username_rv),
-        std::move(password_rv),
-        std::move(obj_rvv));
-
+        }
+        , std::move(username_rv)
+        , std::move(password_rv)
+        , std::move(obj_rvv));
 }
 
 }

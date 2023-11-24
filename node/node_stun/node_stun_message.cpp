@@ -75,7 +75,7 @@ ReturnValue<Object> message(const Env& env, const stun::Message& msg) {
             });
 }
 
-ReturnValue<Value> stun_message_parse(Env& env, const CallbackInfo& ci) {
+ReturnValue<Value> message_parse(Env& env, const CallbackInfo& ci) {
     return ci[0]
         .fmap([](const auto& arg) { return arg.as_buffer(); })
         .fmap([&](const auto& view) {

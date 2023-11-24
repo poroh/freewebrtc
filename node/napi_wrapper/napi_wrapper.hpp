@@ -22,8 +22,6 @@ namespace freewebrtc::napi {
 class Buffer;
 class Value;
 
-using MaybeError = std::optional<std::error_code>;
-
 class Object {
 public:
     Object(napi_env, napi_value);
@@ -31,6 +29,7 @@ public:
     MaybeError set_named_property(const std::string&, const Value&) noexcept;
     Value to_value() const noexcept;
     ReturnValue<Value> named_property(const std::string& name) const noexcept;
+    ReturnValue<std::optional<Value>> maybe_named_property(const std::string& name) const noexcept;
 
     template<typename T>
     ReturnValue<Value> wrap(std::unique_ptr<T> native_obj) const noexcept;
@@ -49,11 +48,14 @@ public:
     ReturnValue<Object> as_object() const noexcept;
     ReturnValue<std::string> as_string() const noexcept;
     ReturnValue<int32_t> as_int32() const noexcept;
+    ReturnValue<bool> as_boolean() const noexcept;
 
     napi_value to_napi() const noexcept;
 
     template<typename T>
     ReturnValue<std::reference_wrapper<T>> unwrap() const noexcept;
+
+    static ReturnValue<Object> to_object(const Value& obj) noexcept;
 
 private:
     napi_env m_env;
@@ -156,5 +158,10 @@ inline Value Object::to_value() const noexcept {
 inline Value Object::fmap_to_value(const Object& obj) noexcept {
     return obj.to_value();
 }
+
+inline ReturnValue<Object> Value::to_object(const Value& val) noexcept {
+    return val.as_object();
+}
+
 
 }
