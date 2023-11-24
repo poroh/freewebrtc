@@ -10,7 +10,12 @@
 #include "node_stun_header.hpp"
 #include "util/util_fmap.hpp"
 
-namespace freewebrtc::napi {
+namespace freewebrtc::node_stun {
+
+using Value = napi::Value;
+using Object = napi::Object;
+using Env = napi::Env;
+using CallbackInfo = napi::CallbackInfo;
 
 ReturnValue<Object> stun_attributes(const Env& env, const stun::TransactionId& tid, const stun::AttributeSet& attrs) {
     using MaybeRVV = std::optional<ReturnValue<Value>>;
@@ -61,10 +66,10 @@ ReturnValue<Object> stun_attributes(const Env& env, const stun::TransactionId& t
         });
 }
 
-ReturnValue<Object> stun_message(const Env& env, const stun::Message& msg) {
+ReturnValue<Object> message(const Env& env, const stun::Message& msg) {
     return
         env.create_object({
-                { "header", stun_header(env, msg.header) },
+                { "header", header(env, msg.header) },
                 { "is_rfc3489", env.create_boolean(msg.is_rfc3489) },
                 { "attributes", stun_attributes(env, msg.header.transaction_id, msg.attribute_set) }
             });
@@ -78,7 +83,7 @@ ReturnValue<Value> stun_message_parse(Env& env, const CallbackInfo& ci) {
             return freewebrtc::stun::Message::parse(view, parsestat);
         })
         .fmap([&](const auto& msg) {
-            return stun_message(env, msg);
+            return message(env, msg);
         })
         .fmap(Object::fmap_to_value);
 }

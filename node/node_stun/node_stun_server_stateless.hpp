@@ -11,8 +11,8 @@
 #include <string_view>
 #include "node/napi_wrapper/napi_wrapper.hpp"
 
-namespace freewebrtc::napi {
+namespace freewebrtc::node_stun {
 
-ReturnValue<Value> stun_server_class(Env& env, std::string_view name);
+ReturnValue<napi::Value> server_stateless_class(napi::Env& env, std::string_view name);
 
 }

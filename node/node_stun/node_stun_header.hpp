@@ -11,8 +11,8 @@
 #include "stun/stun_header.hpp"
 #include "node/napi_wrapper/napi_wrapper.hpp"
 
-namespace freewebrtc::napi {
+namespace freewebrtc::node_stun {
 
-ReturnValue<Object> stun_header(const Env& env, const stun::Header& hdr) noexcept;
+ReturnValue<napi::Object> header(const napi::Env& env, const stun::Header& hdr) noexcept;
 
 }

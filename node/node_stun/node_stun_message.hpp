@@ -11,9 +11,9 @@
 #include "stun/stun_message.hpp"
 #include "node/napi_wrapper/napi_wrapper.hpp"
 
-namespace freewebrtc::napi {
+namespace freewebrtc::node_stun {
 
-ReturnValue<Object> stun_message(const Env& env, const stun::Message& msg);
-ReturnValue<Value> stun_message_parse(Env& env, const CallbackInfo& ci);
+ReturnValue<napi::Object> message(const napi::Env& env, const stun::Message& msg);
+ReturnValue<napi::Value> message_parse(napi::Env& env, const napi::CallbackInfo& ci);
 
 }

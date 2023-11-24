@@ -13,7 +13,12 @@
 #include "node/openssl/node_openssl_hash.hpp"
 #include "node/napi_wrapper/napi_error.hpp"
 
-namespace freewebrtc::napi {
+namespace freewebrtc::node_stun {
+
+using Value = napi::Value;
+using Object = napi::Object;
+using Env = napi::Env;
+using CallbackInfo = napi::CallbackInfo;
 
 namespace {
 
@@ -63,7 +68,7 @@ ReturnValue<Value> process_message(Env& env, const CallbackInfo& info) {
                                 {"result", env.create_string("ignore")},
                                 {"message",
                                         util::fmap(std::move(ign.message), [&](const auto& msg) {
-                                            return stun_message(env, msg);
+                                            return node_stun::message(env, msg);
                                         })}
                             });
                     },
@@ -117,7 +122,7 @@ ReturnValue<Value> add_user(Env& env, const CallbackInfo& info) {
 
 }
 
-ReturnValue<Value> stun_server_class(Env& env, std::string_view name) {
+ReturnValue<Value> server_stateless_class(Env& env, std::string_view name) {
     return
         env.create_class(
             name,
