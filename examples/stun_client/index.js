@@ -26,13 +26,15 @@ class UdpSocket extends EventEmitter {
             return this.q.shift();
         }
         return new Promise((resolve) => {
-            let alarm = setTimeout(() => {
-                resolve(null);
-            }, timeout);
-            this.once('message', () => {
+            const listener = () => {
                 clearTimeout(alarm);
                 resolve(this.q.shift());
-            });
+            };
+            let alarm = setTimeout(() => {
+                this.removeListener('message', listener);
+                resolve(null);
+            }, timeout);
+            this.once('message', listener);
         });
     }
     close() {
@@ -86,7 +88,7 @@ async function request(host, port) {
 }
 
 let host = 'stun.l.google.com';
-let port = 19303;
+let port = 19302;
 
 request(host, port)
     .then(console.log);
