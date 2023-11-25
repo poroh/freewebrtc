@@ -60,6 +60,20 @@ _build/tests/freewebrtc_tests
 
 # Node.js examples
 
+## STUN UDP client
+
+And example of STUN client using node.js.
+
+Prerequisite: build freewebrtc (see above)
+
+```
+cd freewebrtc/examples/stun_client
+npm run build
+node ./index.js
+```
+
+## Echo server
+
 As an example and to make development closer to real-life node.js example is implemented. 
 This is very early stage example of echo server that in future will
 
