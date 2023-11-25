@@ -62,6 +62,16 @@ ReturnValue<std::string> Address::to_string() const {
     return std::string(result);
 }
 
+util::ConstBinaryView Address::view() const noexcept {
+    return
+        std::visit(
+            util::overloaded {
+                [](const AddressV4& v) { return v.view(); },
+                [](const AddressV6& v) { return v.view(); }
+                },
+            m_value);
+}
+
 
 }
 

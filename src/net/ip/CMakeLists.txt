@@ -6,6 +6,7 @@
 
 set(SOURCES
     ip_address.cpp
+    ip_address_hash.cpp
 )
 file(GLOB HEADERS "*.hpp")
 file(GLOB DETAILS_HEADERS "details/*.hpp")

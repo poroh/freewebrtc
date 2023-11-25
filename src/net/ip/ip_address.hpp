@@ -35,10 +35,11 @@ public:
 
     ReturnValue<std::string> to_string() const;
     bool operator==(const Address&) const noexcept = default;
+
+    util::ConstBinaryView view() const noexcept;
 private:
     Value m_value;
 };
-
 
 //
 // implementation

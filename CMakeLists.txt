@@ -34,9 +34,9 @@ add_subdirectory(node)
 target_include_directories(freewebrtc PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 install(TARGETS freewebrtc
-        ARCHIVE DESTINATION lib
-        LIBRARY DESTINATION lib
-        RUNTIME DESTINATION bin)
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin)
 
 # Add tests
 enable_testing()

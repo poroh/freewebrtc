@@ -10,7 +10,7 @@
 
 namespace freewebrtc::util::hash {
 
-uint64_t murmur64(const ConstBinaryView& view, uint64_t seed) {
+uint64_t murmur64(const ConstBinaryView& view, uint64_t seed) noexcept {
   const uint64_t m = 0xc6a4a7935bd1e995ULL;
   const int r = 47;
   uint64_t h = seed ^ (view.size() * m);
@@ -45,7 +45,7 @@ uint64_t murmur64(const ConstBinaryView& view, uint64_t seed) {
   return h;
 }
 
-std::size_t murmur(const ConstBinaryView& view, uint64_t seed) {
+std::size_t murmur(const ConstBinaryView& view, uint64_t seed) noexcept {
     return murmur64(view, seed);
 }
 

@@ -24,7 +24,9 @@
 #include "stun/stun_client_udp_settings.hpp"
 #include "stun/stun_client_udp_handle.hpp"
 #include "stun/stun_client_udp_effects.hpp"
-#include "net/net_endpoint.hpp"
+#include "net/net_path.hpp"
+
+namespace freewebrtc::stun::details { class ClientUDPRtoCalculator; }
 
 namespace freewebrtc::stun {
 
@@ -68,9 +70,10 @@ public:
 
 
     explicit ClientUDP(const Settings&);
+    ~ClientUDP();
 
     struct Request {
-        net::UdpEndpoint target;
+        net::Path path;
         AttributeSet::AttrVec attrs;
         AttributeSet::UnknownAttrVec unknown_attrs;
     };
@@ -95,13 +98,14 @@ private:
     using RetransmitAlgoPtr = std::unique_ptr<RetransmitAlgo>;
     struct Transaction {
         ~Transaction();
-        Transaction(Timepoint now, TransactionId&&, util::ByteVec&& msg_data, RetransmitAlgoPtr&& rtx_algo);
+        Transaction(Timepoint now, TransactionId&&, util::ByteVec&& msg_data, RetransmitAlgoPtr&& rtx_algo, net::Path&&);
         Transaction(const Transaction&) = delete;
         Transaction(Transaction&&) = default;
 
         TransactionId tid;
         util::ByteVec msg_data;
         RetransmitAlgoPtr rtx_algo;
+        net::Path path;
         Timepoint create_time;
         unsigned rtx_count = 0;
     };
@@ -109,12 +113,14 @@ private:
     struct TimelineGreater {
         bool operator()(const TimelineItem&, const TimelineItem&) const noexcept;
     };
+    using RtoCalculator = details::ClientUDPRtoCalculator;
+    using RtoCalculatorPtr = std::unique_ptr<RtoCalculator>;
 
     ReturnValue<Handle> do_create(Timepoint, TransactionId&&, Request&&);
     MaybeError handle_success_response(Timepoint now, Handle hnd, Message& msg);
     MaybeError handle_error_response(Timepoint now, Handle hnd, const Message& msg);
     Handle allocate_handle() noexcept;
-    RetransmitAlgoPtr allocate_rtx_algo(Timepoint now);
+    RetransmitAlgoPtr allocate_rtx_algo(const net::Path& path, Timepoint now);
     void cleanup(const Handle&);
 
     const Settings m_settings;
@@ -128,6 +134,8 @@ private:
     std::priority_queue<TimelineItem, std::vector<TimelineItem>,  TimelineGreater> m_tid_timeline;
     // Pending effects that returned to user from next() function.
     std::queue<Effect> m_effects;
+    // Initial RTO calculator
+    RtoCalculatorPtr m_rto_calc;
 };
 
 //

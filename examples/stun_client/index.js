@@ -8,6 +8,8 @@ const dgram = require('dgram');
 const resolver = new Resolver();
 const resolve = util.promisify(resolver.resolve4.bind(resolver));
 
+const udpClient = new stun.ClientUDP({});
+
 class UdpSocket extends EventEmitter {
     constructor() {
         super();
@@ -43,17 +45,14 @@ class UdpSocket extends EventEmitter {
 }
 
 async function request(host, port) {
-    const udpClient = new stun.ClientUDP({});
     let addr = await resolve(host);
     if (addr.length === 0) {
         throw new Error(`Cannot resolve: ${host}`);
     }
     addr = addr[0];
     const hnd = udpClient.create({
-        target: {
-            addr,
-            port
-        }
+        source: '127.0.0.1',
+        target: addr
     });
     const sock = new UdpSocket();
     let result = null;
@@ -90,5 +89,8 @@ async function request(host, port) {
 let host = 'stun.l.google.com';
 let port = 19302;
 
-request(host, port)
-    .then(console.log);
+setInterval(
+    () => {
+        request(host, port)
+            .then(console.log);
+    }, 2000);

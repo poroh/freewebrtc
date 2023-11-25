@@ -9,6 +9,7 @@
 #include <iostream>
 
 #include "stun/stun_client_udp.hpp"
+#include "stun/details/stun_client_udp_rto.hpp"
 #include "clock/clock_std.hpp"
 
 #include "node_stun_client_udp.hpp"
@@ -34,32 +35,18 @@ ReturnValue<napi::Value> constructor(napi::Env&, const napi::CallbackInfo& info)
 }
 
 ReturnValue<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj) {
+    auto source_rv = obj.named_property("source")
+        .fmap(napi::Value::to_string)
+        .fmap(net::ip::Address::from_string);
     auto target_rv = obj.named_property("target")
-        .fmap(napi::Value::to_object)
-        .fmap([](auto&& obj) {
-            auto addr_rv = obj.named_property("addr")
-                .fmap(napi::Value::to_string)
-                .fmap(net::ip::Address::from_string);
-            auto port_rv = obj.named_property("port")
-                .fmap(napi::Value::to_int32)
-                .fmap([](auto value) -> ReturnValue<uint16_t> {
-                    if (value > 0xFFFF || value < 0) {
-                        return make_error_code(napi::WrapperError::INVALID_PORT_NUMBER);
-                    }
-                    return (uint16_t)value;
-                });
-            return combine(
-                [](net::ip::Address&& addr, auto&& port) {
-                    return net::UdpEndpoint{std::move(addr), net::Port{port}};
-                }
-                , std::move(addr_rv)
-                , std::move(port_rv));
-        });
+        .fmap(napi::Value::to_string)
+        .fmap(net::ip::Address::from_string);
 
     return combine(
-        [](net::UdpEndpoint&& ep) {
-            return stun::ClientUDP::Request{ep};
+        [](net::ip::Address&& src, net::ip::Address&& dst) {
+            return stun::ClientUDP::Request{{std::move(src), std::move(dst)}};
         }
+        , std::move(source_rv)
         , std::move(target_rv));
 }
 

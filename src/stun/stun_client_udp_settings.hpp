@@ -41,8 +41,6 @@ struct Settings {
     // Possible retransmit mechanisms settings.
     // Default is RFC8489-defined mechanism
     struct RetransmitDefault {
-        // Initial retransmit timeout
-        Duration initial_rto = 500ms;
         // Maximum of retransmission interval.
         // In libwebrtc this parameter is set to 8s
         std::optional<Duration> max_rto = std::nullopt;
@@ -63,6 +61,16 @@ struct Settings {
     };
     using Retransmit = std::variant<RetransmitDefault>;
     Retransmit retransmit = RetransmitDefault{};
+
+    struct RtoCalculatorSettings {
+        // Initial retransmit timeout
+        Duration initial_rto = 500ms;
+        // How long do we keep history for each individual
+        // network path
+        Duration history_duration = 1h;
+    };
+
+    RtoCalculatorSettings rto_settings = {};
 
     // Allow alternate server error without authentication
     // This case is described in RFC5389 in section

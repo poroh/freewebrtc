@@ -10,12 +10,13 @@
 #include "stun/stun_client_udp.hpp"
 #include "stun/stun_error.hpp"
 #include "stun/stun_transaction_id_hash.hpp"
+#include "stun/details/stun_client_udp_rto.hpp"
 
 namespace freewebrtc::stun {
 
 class ClientUDP::RetransmitAlgo {
 public:
-    explicit RetransmitAlgo(const Settings::RetransmitDefault& settings, Timepoint now);
+    explicit RetransmitAlgo(Duration initial_rto, const Settings::RetransmitDefault& settings, Timepoint now);
     MaybeTimepoint init(Timepoint now);
     MaybeTimepoint next(Timepoint now);
     enum class Process5xxResult {
@@ -23,7 +24,9 @@ public:
         RetransmitScheduled
     };
     Process5xxResult process_5xx(Timepoint, int code);
+    Duration last_timeout() const;
 private:
+    const Duration m_initial_rto;
     const Settings::RetransmitDefault m_settings;
     MaybeTimepoint m_maybe_next;
     Duration m_last_timeout;
@@ -31,13 +34,16 @@ private:
     unsigned m_5xx_count = 0;
 };
 
-
 ClientUDP::ClientUDP(const Settings& settings)
     : m_settings(settings)
     , m_tid_to_handle(0,
         m_settings
           .maybe_tid_hash
           .value_or(MurmurTransactionIdHash<>::create()))
+    , m_rto_calc(std::make_unique<RtoCalculator>(m_settings.rto_settings))
+{}
+
+ClientUDP::~ClientUDP()
 {}
 
 MaybeError ClientUDP::response(Timepoint now, util::ConstBinaryView view, std::optional<stun::Message>&& maybe_msg) {
@@ -154,11 +160,12 @@ ReturnValue<ClientUDP::Handle> ClientUDP::do_create(Timepoint now, TransactionId
             Handle handle = allocate_handle();
             m_tid_to_handle.emplace(request.header.transaction_id, handle);
 
-            auto rtx_algo = allocate_rtx_algo(now);
+            auto rtx_algo = allocate_rtx_algo(rq.path, now);
             Transaction transaction(now,
                                     std::move(request.header.transaction_id),
                                     std::move(data),
-                                    std::move(rtx_algo));
+                                    std::move(rtx_algo),
+                                    std::move(rq.path));
             auto [it, _] = m_tmap.emplace(handle, std::move(transaction));
             auto& t = it->second;
             m_effects.emplace(SendData{handle, util::ConstBinaryView(t.msg_data)});
@@ -189,7 +196,15 @@ MaybeError ClientUDP::handle_success_response(Timepoint now, Handle hnd, Message
     if (auto it = m_tmap.find(hnd); it != m_tmap.end()) {
         auto& trans = it->second;
         if (trans.rtx_count == 0) {
+            // Karn's algorithm to select retransmit timeout.
+            // (http://ccr.sigcomm.org/archive/1995/jan95/ccr-9501-partridge87.pdf)
+            // TLDR; Two ideas:
+            //   1. Don't use RTT calculated based on retransmit
+            //   2. Maintain back-off RTO when send next packet
             maybe_rtt = now - trans.create_time;
+            m_rto_calc->new_rtt(now, trans.path, maybe_rtt.value());
+        } else {
+            m_rto_calc->backoff(now, trans.path, trans.rtx_algo->last_timeout());
         }
     }
 
@@ -317,12 +332,13 @@ ClientUDP::Handle ClientUDP::allocate_handle() noexcept {
     }
 }
 
-ClientUDP::RetransmitAlgoPtr ClientUDP::allocate_rtx_algo(Timepoint now) {
+ClientUDP::RetransmitAlgoPtr ClientUDP::allocate_rtx_algo(const net::Path& path, Timepoint now) {
+    auto rto = m_rto_calc->rto(path);
     return
         std::visit(
             util::overloaded {
                 [&](const Settings::RetransmitDefault& settings) {
-                    return std::make_unique<RetransmitAlgo>(settings, now);
+                    return std::make_unique<RetransmitAlgo>(rto, settings, now);
                 }
             },
             m_settings.retransmit);
@@ -338,10 +354,11 @@ void ClientUDP::cleanup(const Handle& hnd) {
     }
 }
 
-ClientUDP::Transaction::Transaction(Timepoint now, TransactionId&& t, util::ByteVec&& data, RetransmitAlgoPtr&& algo)
+ClientUDP::Transaction::Transaction(Timepoint now, TransactionId&& t, util::ByteVec&& data, RetransmitAlgoPtr&& algo, net::Path&& p)
     : tid(std::move(t))
     , msg_data(std::move(data))
     , rtx_algo(std::move(algo))
+    , path(std::move(p))
     , create_time(now)
 {}
 
@@ -358,10 +375,11 @@ bool ClientUDP::TimelineGreater::operator()(const TimelineItem& lhs, const Timel
     return lhs.second.value > rhs.second.value;
 }
 
-ClientUDP::RetransmitAlgo::RetransmitAlgo(const Settings::RetransmitDefault& settings, Timepoint now)
-    : m_settings(settings)
-    , m_maybe_next(now.advance(settings.initial_rto))
-    , m_last_timeout(settings.initial_rto)
+ClientUDP::RetransmitAlgo::RetransmitAlgo(Duration initial_rto, const Settings::RetransmitDefault& settings, Timepoint now)
+    : m_initial_rto(initial_rto)
+    , m_settings(settings)
+    , m_maybe_next(now.advance(initial_rto))
+    , m_last_timeout(initial_rto)
 {}
 
 ClientUDP::MaybeTimepoint ClientUDP::RetransmitAlgo::init(Timepoint now) {
@@ -379,7 +397,7 @@ ClientUDP::MaybeTimepoint ClientUDP::RetransmitAlgo::next(Timepoint now) {
     }
     ++m_rtx_count;
     if (m_rtx_count + 1 == m_settings.request_count) {
-        auto timeout = m_settings.initial_rto * m_settings.retransmission_multiplier;
+        auto timeout = m_initial_rto * m_settings.retransmission_multiplier;
         if (m_settings.max_rto.has_value()) {
             timeout = std::max(timeout, m_settings.max_rto.value());
         }
@@ -408,6 +426,10 @@ ClientUDP::RetransmitAlgo::process_5xx(Timepoint now, int) {
     m_5xx_count++;
     m_maybe_next = now.advance(m_settings.server_error_timeout.value());
     return Process5xxResult::RetransmitScheduled;
+}
+
+ClientUDP::Duration ClientUDP::RetransmitAlgo::last_timeout() const {
+    return m_last_timeout;
 }
 
 }
