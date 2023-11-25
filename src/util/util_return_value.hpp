@@ -306,7 +306,7 @@ auto combine(F&& f, ReturnValue<Ts>&... rvs) -> ReturnValue<decltype(strip_rv(f(
     if constexpr (std::is_same_v<FRetT, FmapRet>) {
         return combine_with_values_ref(f, std::forward<ReturnValue<Ts>&>(rvs)...);
     } else {
-        auto result = combine_with_values(f, std::forward<ReturnValue<Ts>&>(rvs)...);
+        auto result = combine_with_values_ref(f, std::forward<ReturnValue<Ts>&>(rvs)...);
         if (result.is_error()) {
             return result.assert_error();
         }

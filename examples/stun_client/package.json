@@ -1,0 +1,14 @@
+{
+    "name": "STUN client example",
+    "version": "1.0.0",
+    "description": "STUN client using freewebrtc library",
+    "main": "index.js",
+    "scripts": {
+        "build": "node-gyp rebuild --verbose"
+    },
+    "dependencies": {
+    },
+    "devDependencies": {
+    },
+    "gypfile": true
+}

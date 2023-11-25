@@ -12,6 +12,7 @@
 #include <random>
 #include <functional>
 #include <queue>
+#include <memory>
 
 #include "clock/clock_timepoint.hpp"
 #include "precis/precis_opaque_string.hpp"

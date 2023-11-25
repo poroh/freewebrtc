@@ -55,7 +55,10 @@ public:
     template<typename T>
     ReturnValue<std::reference_wrapper<T>> unwrap() const noexcept;
 
+    static ReturnValue<util::ConstBinaryView> to_buffer(const Value& obj) noexcept;
     static ReturnValue<Object> to_object(const Value& obj) noexcept;
+    static ReturnValue<std::string> to_string(const Value& obj) noexcept;
+    static ReturnValue<int32_t> to_int32(const Value& obj) noexcept;
 
 private:
     napi_env m_env;
@@ -159,9 +162,20 @@ inline Value Object::fmap_to_value(const Object& obj) noexcept {
     return obj.to_value();
 }
 
+inline ReturnValue<util::ConstBinaryView> Value::to_buffer(const Value& val) noexcept {
+    return val.as_buffer();
+}
+
 inline ReturnValue<Object> Value::to_object(const Value& val) noexcept {
     return val.as_object();
 }
 
+inline ReturnValue<std::string> Value::to_string(const Value& val) noexcept {
+    return val.as_string();
+}
+
+inline ReturnValue<int32_t> Value::to_int32(const Value& val) noexcept {
+    return val.as_int32();
+}
 
 }

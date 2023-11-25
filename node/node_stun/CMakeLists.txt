@@ -10,6 +10,7 @@ set(SOURCES
   node_stun_server_stateless.cpp
   node_stun_client_udp.cpp
   node_stun_client_udp_settings.cpp
+  node_stun_client_udp_effects.cpp
 )
 
 file(GLOB HEADERS "*.hpp")
