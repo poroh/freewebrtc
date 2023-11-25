@@ -35,6 +35,7 @@ What is implemented:
   - All STUN attributes
   - STUN statless server
   - STUN UDP client with full transaction support
+  - Initial RTO adjustment using Karn's algorithm and RFC6298
 - RFC 5769: Test Vectors for Session Traversal Utilities for NAT (STUN)
 - RFC 8445: Interactive Connectivity Establishment (ICE)
   - STUN Extensions (PRIORITY, ICE-CONTROLLED, ICE-CONTROLLING, USE-CANDIDATE)
