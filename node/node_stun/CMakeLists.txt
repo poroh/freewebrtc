@@ -19,3 +19,10 @@ add_library(freewebrtc_node_stun STATIC ${SOURCES} ${HEADERS})
 target_include_directories(freewebrtc_node_stun PUBLIC ${NODE_JS_ROOT_DIR}/include/node)
 target_include_directories(freewebrtc_node_stun PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_include_directories(freewebrtc_node_stun PRIVATE ${CMAKE_SOURCE_DIR})
+
+install(TARGETS freewebrtc_node_stun
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin)
+
+install(FILES ${HEADERS} DESTINATION include/freewebrtc/node/node_stun)

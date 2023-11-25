@@ -10,6 +10,9 @@ set(SUBLIBS
     stun
     net
     util
+    clock
+    precis
+    stat
 )
 
 add_library(freewebrtc)

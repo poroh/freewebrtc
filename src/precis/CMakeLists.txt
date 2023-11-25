@@ -4,8 +4,6 @@
 # Distributed under the terms of the MIT License. See the LICENSE file.
 #
 
-add_subdirectory(openssl)
-
 file(GLOB HEADERS "*.hpp")
+install(FILES ${HEADERS} DESTINATION include/freewebrtc/precis)
 
-install(FILES ${HEADERS} DESTINATION include/freewebrtc/crypto)

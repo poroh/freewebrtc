@@ -18,9 +18,11 @@ set(SOURCES
     details/stun_fingerprint.cpp
 )
 file(GLOB HEADERS "*.hpp")
+file(GLOB DETAILS_HEADERS "details/*.hpp")
 
 list(TRANSFORM SOURCES PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/)
 
-target_sources(freewebrtc PRIVATE ${SOURCES} ${HEADERS})
+target_sources(freewebrtc PRIVATE ${SOURCES} PUBLIC ${HEADERS} ${DETAILS_HEADERS})
 
-
+install(FILES ${HEADERS} DESTINATION include/freewebrtc/stun)
+install(FILES ${DETAILS_HEADERS} DESTINATION include/freewebrtc/stun/details)

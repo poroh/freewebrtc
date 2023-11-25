@@ -52,6 +52,13 @@ if(OPENSSL_FOUND)
    add_library(freewebrtc_openssl STATIC ${SOURCES} ${HEADERS})
    target_include_directories(freewebrtc_openssl PUBLIC ${OPENSSL_ROOT_DIR}/include)
    target_include_directories(freewebrtc_openssl PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+   install(FILES ${HEADERS} DESTINATION include/freewebrtc/crypto/openssl)
+   install(TARGETS freewebrtc_openssl
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin)
+
 else()
    message(STATUS "OpenSSL not found bindings building omitted")
 endif()

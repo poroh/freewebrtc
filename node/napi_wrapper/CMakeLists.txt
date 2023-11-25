@@ -15,5 +15,11 @@ add_library(freewebrtc_napi_wrapper STATIC ${SOURCES} ${HEADERS})
 target_include_directories(freewebrtc_napi_wrapper PUBLIC ${NODE_JS_ROOT_DIR}/include/node)
 target_include_directories(freewebrtc_napi_wrapper PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
+install(TARGETS freewebrtc_napi_wrapper
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin)
+
+install(FILES ${HEADERS} DESTINATION include/freewebrtc/node/napi_wrapper)
 
 
