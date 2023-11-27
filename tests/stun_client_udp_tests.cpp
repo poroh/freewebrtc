@@ -21,6 +21,7 @@ public:
     StunClientTest()
         : local_ipv4(net::ip::Address::from_string("192.168.0.1").assert_value())
         , stun_server_ipv4(net::ip::Address::from_string("192.168.0.2").assert_value())
+        , stun_server_ipv4_2(net::ip::Address::from_string("192.168.0.3").assert_value())
         , nat_ipv4(net::ip::Address::from_string("10.0.0.1").assert_value())
         , nat_ep4(net::UdpEndpoint{nat_ipv4, net::Port(3478)})
         , default_auth{
@@ -44,6 +45,7 @@ public:
 
     const net::ip::Address local_ipv4;
     const net::ip::Address stun_server_ipv4;
+    const net::ip::Address stun_server_ipv4_2;
     const net::ip::Address nat_ipv4;
     const net::UdpEndpoint nat_ep4;
     const crypto::SHA1Hash::Func sha1 = crypto::openssl::sha1;
@@ -491,6 +493,48 @@ TEST_F(StunClientTest, don_adjust_on_retransmit_of_request) {
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     // use backoff (2x initial RTO) for second try as timeout
     EXPECT_EQ(now - second_rtx_start, 2*settings.rto_settings.initial_rto);
+}
+
+TEST_F(StunClientTest, clear_history_after_history_duration) {
+    auto now = Timepoint::epoch();
+    Settings settings;
+    ClientUDP client(settings);
+    // Send first request
+    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    auto next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+    auto sent_data = std::get<ClientUDP::SendData>(next);
+    const auto rtt = 100ms;
+    now = now.advance(rtt);
+    const auto response_data = server_reponse(sent_data.message_view);
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_value());
+    next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
+    const auto& tok = std::get<ClientUDP::TransactionOk>(next);
+    ASSERT_TRUE(tok.round_trip.has_value());
+    ASSERT_EQ(tok.round_trip.value(), rtt);
+
+    // Wait history timeout
+    now = now.advance(settings.rto_settings.history_duration);
+    now = now.advance(1ms);
+    // Create request to another destination to trigger cleanup
+    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4_2}, {}}).assert_value();
+    next = client.next(now);
+    auto sent_data2 = std::get<ClientUDP::SendData>(next);
+    const auto response_data2 = server_reponse(sent_data2.message_view);
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data2)).is_value());
+    next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
+
+    // Send second request to the initial destination
+    auto second_rtx_start = now;
+    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    next = client.next(now);
+    // Retransmit:
+    EXPECT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+    advance_sleeps(client, now, next);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+    EXPECT_EQ(now - second_rtx_start, settings.rto_settings.initial_rto);
 }
 
 // ================================================================================
