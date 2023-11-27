@@ -19,6 +19,7 @@
 #include <unordered_map>
 
 #include "clock/clock_timepoint.hpp"
+#include "util/util_intrusive_list.hpp"
 #include "net/net_path.hpp"
 #include "net/net_path_hash.hpp"
 #include "stun/stun_client_udp_settings.hpp"
@@ -40,7 +41,14 @@ public:
     void backoff(Timepoint now, const net::Path&, Duration backoff);
 
 private:
+    void clear_outdated(Timepoint now);
+    struct Data;
+    using Timeline = util::IntrusiveList<Data>;
     struct Data {
+        Data(const net::Path&, Timepoint);
+        Data(const net::Path&, Timepoint, Duration);
+        Data(Data&&);
+        net::Path path;
         Timepoint last_update;
         struct SmoothVals {
             Duration srtt;
@@ -48,15 +56,13 @@ private:
         };
         std::optional<SmoothVals> smooth;
         std::optional<Duration> backoff;
-    };
-    using TimelineItem = std::pair<Timepoint, net::Path>;
-    struct TimelineGreater {
-        bool operator()(const TimelineItem&, const TimelineItem&) const noexcept;
+        Timeline::Link link;
     };
     using ByPath = std::unordered_map<net::Path, Data, net::PathHash>;
 
     const Settings m_settings;
     ByPath   m_by_path;
+    Timeline m_timeline;
 };
 
 }

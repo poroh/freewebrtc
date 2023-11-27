@@ -16,6 +16,7 @@ using Duration = ClientUDPRtoCalculator::Duration;
 
 ClientUDPRtoCalculator::ClientUDPRtoCalculator(const Settings& settings)
     : m_settings(settings)
+    , m_timeline(&Data::link)
 {}
 
 Duration ClientUDPRtoCalculator::rto(const net::Path& path) const {
@@ -37,11 +38,13 @@ Duration ClientUDPRtoCalculator::rto(const net::Path& path) const {
 void ClientUDPRtoCalculator::new_rtt(Timepoint now, const net::Path& path, Duration rtt) {
     auto it = m_by_path.find(path);
     if (it == m_by_path.end()) {
-        auto [it2, _] = m_by_path.emplace(path, Data{now});
+        auto [it2, _] = m_by_path.emplace(path, Data{path, now});
         it = it2;
     }
     auto& data = it->second;
     data.last_update = now;
+    m_timeline.push_back(data);
+    clear_outdated(now);
     // Clear backoff value for further requests
     data.backoff.reset();
     // Update SRTT
@@ -74,13 +77,48 @@ void ClientUDPRtoCalculator::new_rtt(Timepoint now, const net::Path& path, Durat
 void ClientUDPRtoCalculator::backoff(Timepoint now, const net::Path& path, Duration backoff) {
     auto it = m_by_path.find(path);
     if (it == m_by_path.end()) {
-        m_by_path.emplace(path, Data{now, std::nullopt, backoff});
+        auto [it, _] = m_by_path.emplace(path, Data{path, now, backoff});
+        m_timeline.push_back(it->second);
         return;
     }
     auto& data = it->second;
     data.last_update = now;
+    m_timeline.push_back(data);
     data.backoff = backoff;
+    clear_outdated(now);
 }
+
+void ClientUDPRtoCalculator::clear_outdated(Timepoint now) {
+    while (true) {
+        const auto& front = m_timeline.front();
+        if (!front.has_value()
+            || now - front.value().get().last_update <= m_settings.history_duration) {
+            break;
+        }
+        m_by_path.erase(front.value().get().path);
+    }
+}
+
+ClientUDPRtoCalculator::Data::Data(const net::Path& p, Timepoint now)
+    : path(p)
+    , last_update(now)
+    , link(*this)
+{}
+
+ClientUDPRtoCalculator::Data::Data(const net::Path& p, Timepoint now, Duration backoff_)
+    : path(p)
+    , last_update(now)
+    , backoff(backoff_)
+    , link(*this)
+{}
+
+ClientUDPRtoCalculator::Data::Data(Data&& other)
+    : path(std::move(other.path))
+    , last_update(other.last_update)
+    , smooth(other.smooth)
+    , backoff(other.backoff)
+    , link(*this, std::move(other.link))
+{}
 
 }
 

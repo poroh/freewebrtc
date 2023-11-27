@@ -426,6 +426,74 @@ TEST_F(StunClientTest, retransmits_rfc5389_example_timing_checks) {
 }
 
 // ================================================================================
+// Karn's algorithm and RFC629
+
+TEST_F(StunClientTest, adjustment_of_rto_for_subsequent_request) {
+    auto now = Timepoint::epoch();
+    ClientUDP client({});
+    // Send first request
+    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    auto next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+    auto sent_data = std::get<ClientUDP::SendData>(next);
+    const auto rtt = 100ms;
+    now = now.advance(rtt);
+    const auto response_data = server_reponse(sent_data.message_view);
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_value());
+    next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
+    const auto& tok = std::get<ClientUDP::TransactionOk>(next);
+    ASSERT_TRUE(tok.round_trip.has_value());
+    ASSERT_EQ(tok.round_trip.value(), rtt);
+
+    // Send second request
+    auto second_rtx_start = now;
+    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    next = client.next(now);
+    // Retransmit:
+    EXPECT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+    advance_sleeps(client, now, next);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+    // rtt + K * rtt/2 where K = 4 => 100 + 200 == 300ms
+    EXPECT_EQ(now - second_rtx_start, 300ms);
+}
+
+TEST_F(StunClientTest, don_adjust_on_retransmit_of_request) {
+    auto now = Timepoint::epoch();
+    Settings settings;
+    ClientUDP client(settings);
+    // Send first request
+    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    auto next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+    // ignore first send
+    advance_sleeps(client, now, next);
+    EXPECT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+    auto sent_data = std::get<ClientUDP::SendData>(next);
+
+    const auto rtt = 100ms;
+    now = now.advance(rtt);
+
+    const auto response_data = server_reponse(sent_data.message_view);
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_value());
+    next = client.next(now);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
+    const auto& tok = std::get<ClientUDP::TransactionOk>(next);
+    EXPECT_FALSE(tok.round_trip.has_value()); // No RTT value on retransmit
+
+    // Check that subsequent request is sent within initial_rto timeout
+    auto second_rtx_start = now;
+    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    next = client.next(now);
+    EXPECT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+    // Retransmit:
+    advance_sleeps(client, now, next);
+    ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
+    // use backoff (2x initial RTO) for second try as timeout
+    EXPECT_EQ(now - second_rtx_start, 2*settings.rto_settings.initial_rto);
+}
+
+// ================================================================================
 // STUN error response handling
 
 TEST_F(StunClientTest, success_response_with_unknown_comprehension_required_attribute) {
