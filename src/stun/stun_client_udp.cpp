@@ -58,16 +58,22 @@ MaybeError ClientUDP::response(Timepoint now, util::ConstBinaryView view, std::o
     // Find transaction handle first not to spend time on
     // message validation if we don't know anything about
     // transaction
-    auto it = m_tid_to_handle.find(msg.header.transaction_id);
-    if (it == m_tid_to_handle.end()) {
+    auto i = m_tid_to_handle.find(msg.header.transaction_id);
+    if (i == m_tid_to_handle.end()) {
         m_stat.transaction_not_found.inc();
         return make_error_code(ClientError::transaction_not_found);
     }
-    auto hnd = it->second;
+    auto hnd = i->second;
+    auto j = m_tmap.find(hnd);
+    if (j == m_tmap.end()) {
+        m_stat.transaction_not_found.inc();
+        return make_error_code(ClientError::transaction_not_found);
+    }
+    const auto& trans = j->second;
 
     // Check authorization
-    if (m_settings.maybe_auth.has_value()) {
-        auto& auth = m_settings.maybe_auth.value();
+    if (trans.maybe_auth.has_value()) {
+        auto& auth = trans.maybe_auth.value();
         // We don't check username because per:
         // RFC5389: 10.1.2.  Receiving a Request or Indication:
         // The response MUST NOT contain the USERNAME attribute.
@@ -144,8 +150,8 @@ ReturnValue<ClientUDP::Handle> ClientUDP::do_create(Timepoint now, TransactionId
     };
 
     MaybeIntegrity maybe_integrity;
-    if (m_settings.maybe_auth.has_value()) {
-        const auto& auth = m_settings.maybe_auth.value();
+    if (rq.maybe_auth.has_value()) {
+        const auto& auth = rq.maybe_auth.value();
         request.attribute_set.emplace(Attribute::create(UsernameAttribute{auth.username}));
         maybe_integrity = auth.integrity;
     }
@@ -165,7 +171,8 @@ ReturnValue<ClientUDP::Handle> ClientUDP::do_create(Timepoint now, TransactionId
                                     std::move(request.header.transaction_id),
                                     std::move(data),
                                     std::move(rtx_algo),
-                                    std::move(rq.path));
+                                    std::move(rq.path),
+                                    std::move(rq.maybe_auth));
             auto [it, _] = m_tmap.emplace(handle, std::move(transaction));
             auto& t = it->second;
             m_effects.emplace(SendData{handle, util::ConstBinaryView(t.msg_data)});
@@ -354,12 +361,14 @@ void ClientUDP::cleanup(const Handle& hnd) {
     }
 }
 
-ClientUDP::Transaction::Transaction(Timepoint now, TransactionId&& t, util::ByteVec&& data, RetransmitAlgoPtr&& algo, net::Path&& p)
+ClientUDP::Transaction::Transaction(Timepoint now, TransactionId&& t, util::ByteVec&& data,
+                                    RetransmitAlgoPtr&& algo, net::Path&& p, MaybeAuth&& a)
     : tid(std::move(t))
     , msg_data(std::move(data))
     , rtx_algo(std::move(algo))
     , path(std::move(p))
     , create_time(now)
+    , maybe_auth(std::move(a))
 {}
 
 ClientUDP::Transaction::~Transaction()

@@ -24,15 +24,6 @@ using namespace std::chrono_literals;
 struct Settings {
     using Duration = clock::NativeDuration;
 
-    // Authenticaiton information. If no specified
-    // the message is created without username / integrity
-    // attributes.
-    struct Auth {
-        precis::OpaqueString username;
-        IntegrityData integrity;
-    };
-    std::optional<Auth> maybe_auth;
-
     // Use FINGERPRINT mechanism of RFC5389
     struct UseFingerprintTag{};
     using UseFingerprint = util::TypedBool<UseFingerprintTag>;

@@ -49,13 +49,17 @@ public:
     const net::ip::Address nat_ipv4;
     const net::UdpEndpoint nat_ep4;
     const crypto::SHA1Hash::Func sha1 = crypto::openssl::sha1;
-    const Settings::Auth default_auth;
+    const ClientUDP::Auth default_auth;
     const Duration tick_size {1};
 
     StunServer server;
     std::random_device rnd;
 
-    void initial_request_check(ClientUDP&, std::optional<Message>&, std::optional<util::ConstBinaryView>&);
+    void initial_request_check(
+        ClientUDP&,
+        std::optional<Message>&,
+        std::optional<util::ConstBinaryView>&,
+        const ClientUDP::MaybeAuth& maybe_auth = std::nullopt);
     void advance_sleeps(ClientUDP&, Timepoint& now, ClientUDP::Effect&);
     void tick(Timepoint& now);
     util::ByteVec server_reponse(util::ConstBinaryView req_view);
@@ -65,7 +69,8 @@ public:
 void StunClientTest::initial_request_check(
         ClientUDP& client,
         std::optional<Message>& msg,
-        std::optional<util::ConstBinaryView>& view)
+        std::optional<util::ConstBinaryView>& view,
+        const ClientUDP::MaybeAuth& maybe_auth)
 {
     auto now = Timepoint::epoch();
     // Send request / receive response
@@ -74,7 +79,7 @@ void StunClientTest::initial_request_check(
         now,
         ClientUDP::Request{
             {local_ipv4, stun_server_ipv4},
-            {}
+            .maybe_auth = maybe_auth
         });
     ASSERT_TRUE(hnd_rv.is_value());
     const auto handle = hnd_rv.assert_value();
@@ -126,7 +131,7 @@ TEST_F(StunClientTest, initial_request_check_no_auth) {
 }
 
 TEST_F(StunClientTest, initial_request_check_no_auth_no_fingerprint) {
-    ClientUDP client({std::nullopt, Settings::UseFingerprint{false}});
+    ClientUDP client({Settings::UseFingerprint{false}});
     std::optional<util::ConstBinaryView> maybe_msg_view;
     std::optional<Message> maybe_msg;
     initial_request_check(client, maybe_msg, maybe_msg_view);
@@ -136,10 +141,10 @@ TEST_F(StunClientTest, initial_request_check_no_auth_no_fingerprint) {
 }
 
 TEST_F(StunClientTest, initial_request_check_auth_with_fingerprint) {
-    ClientUDP client({default_auth});
+    ClientUDP client({});
     std::optional<util::ConstBinaryView> maybe_msg_view;
     std::optional<Message> maybe_msg;
-    initial_request_check(client, maybe_msg, maybe_msg_view);
+    initial_request_check(client, maybe_msg, maybe_msg_view, default_auth);
     ASSERT_TRUE(maybe_msg.has_value() && maybe_msg_view.has_value());
     const auto& msg_view = maybe_msg_view.value();
     const auto& msg = maybe_msg.value();
@@ -151,10 +156,10 @@ TEST_F(StunClientTest, initial_request_check_auth_with_fingerprint) {
 }
 
 TEST_F(StunClientTest, initial_request_check_auth_no_fingerprint) {
-    ClientUDP client({default_auth, Settings::UseFingerprint{false}});
+    ClientUDP client({Settings::UseFingerprint{false}});
     std::optional<util::ConstBinaryView> maybe_msg_view;
     std::optional<Message> maybe_msg;
-    initial_request_check(client, maybe_msg, maybe_msg_view);
+    initial_request_check(client, maybe_msg, maybe_msg_view, default_auth);
     ASSERT_TRUE(maybe_msg.has_value() && maybe_msg_view.has_value());
     const auto& msg_view = maybe_msg_view.value();
     const auto& msg = maybe_msg.value();
@@ -166,7 +171,7 @@ TEST_F(StunClientTest, initial_request_check_auth_no_fingerprint) {
 }
 
 TEST_F(StunClientTest, initial_request_rto_default) {
-    Settings settings{std::nullopt};
+    Settings settings;
     ClientUDP client(settings);
     auto now = Timepoint::epoch();
     /* auto hnd = */ client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
@@ -197,7 +202,7 @@ TEST_F(StunClientTest, initial_request_rto_set) {
 // Request / response
 
 TEST_F(StunClientTest, request_response_happy_path_no_auth) {
-    Settings settings{std::nullopt};
+    Settings settings;
     ClientUDP client(settings);
     // Create request
     auto now = Timepoint::epoch();
@@ -222,11 +227,11 @@ TEST_F(StunClientTest, request_response_happy_path_no_auth) {
 }
 
 TEST_F(StunClientTest, request_response_happy_path_with_auth) {
-    Settings settings{default_auth};
+    Settings settings;
     ClientUDP client(settings);
     // Create request
     auto now = Timepoint::epoch();
-    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, .maybe_auth = default_auth}).assert_value();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     auto sent_data = std::get<ClientUDP::SendData>(next);
@@ -249,7 +254,7 @@ TEST_F(StunClientTest, request_response_parallel_transactions_abab) {
     // Idea of the test that UDP client is requested to create second
     // transaction when the first transaction is not responded.
     // then responses are received in direct order
-    Settings settings{std::nullopt};
+    Settings settings;
     ClientUDP client(settings);
     auto now = Timepoint::epoch();
 
@@ -298,7 +303,7 @@ TEST_F(StunClientTest, request_response_parallel_transactions_abba) {
     // Idea of the test that UDP client is requested to create second
     // transaction when the first transaction is not responded.
     // then responses are received in direct order
-    Settings settings{std::nullopt};
+    Settings settings;
     ClientUDP client(settings);
     auto now = Timepoint::epoch();
 

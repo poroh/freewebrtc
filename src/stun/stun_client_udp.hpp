@@ -72,10 +72,19 @@ public:
     explicit ClientUDP(const Settings&);
     ~ClientUDP();
 
+    // Authenticaiton information. If no specified
+    // the message is created without username / integrity
+    // attributes.
+    struct Auth {
+        precis::OpaqueString username;
+        IntegrityData integrity;
+    };
+    using MaybeAuth = std::optional<Auth>;
     struct Request {
         net::Path path;
         AttributeSet::AttrVec attrs;
         AttributeSet::UnknownAttrVec unknown_attrs;
+        MaybeAuth maybe_auth;
     };
     // Create transaction with unique identifier. Random device
     // may be override with cryptographic random if needed.
@@ -98,7 +107,7 @@ private:
     using RetransmitAlgoPtr = std::unique_ptr<RetransmitAlgo>;
     struct Transaction {
         ~Transaction();
-        Transaction(Timepoint now, TransactionId&&, util::ByteVec&& msg_data, RetransmitAlgoPtr&& rtx_algo, net::Path&&);
+        Transaction(Timepoint now, TransactionId&&, util::ByteVec&& msg_data, RetransmitAlgoPtr&& rtx_algo, net::Path&&, MaybeAuth&&);
         Transaction(const Transaction&) = delete;
         Transaction(Transaction&&) = default;
 
@@ -107,6 +116,7 @@ private:
         RetransmitAlgoPtr rtx_algo;
         net::Path path;
         Timepoint create_time;
+        MaybeAuth maybe_auth;
         unsigned rtx_count = 0;
     };
     using TimelineItem = std::pair<Timepoint, Handle>;

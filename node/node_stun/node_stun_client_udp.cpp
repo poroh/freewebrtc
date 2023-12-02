@@ -8,6 +8,7 @@
 #include <memory>
 #include <iostream>
 
+#include "util/util_fmap.hpp"
 #include "stun/stun_client_udp.hpp"
 #include "stun/details/stun_client_udp_rto.hpp"
 #include "clock/clock_std.hpp"
@@ -16,6 +17,7 @@
 #include "node_stun_client_udp_settings.hpp"
 #include "node_stun_client_udp_effects.hpp"
 #include "node_stun_client_udp_handle.hpp"
+#include "node_stun_client_udp_auth.hpp"
 
 namespace freewebrtc::node_stun {
 
@@ -42,12 +44,30 @@ ReturnValue<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj)
         .fmap(napi::Value::to_string)
         .fmap(net::ip::Address::from_string);
 
+    using Auth = stun::ClientUDP::Auth;
+    using MaybeAuth = stun::ClientUDP::MaybeAuth;
+
+    ReturnValue<MaybeAuth> maybe_auth_rv
+        = obj.maybe_named_property("auth")
+        .fmap([](auto&& maybe_val) { return util::fmap(maybe_val, napi::Value::to_object); })
+        .fmap([](auto&& maybe_obj) {
+            if (!maybe_obj.has_value()) {
+                return ReturnValue<MaybeAuth>{std::nullopt};
+            }
+            return maybe_obj.value()
+                .fmap(parse_auth)
+                .fmap([](Auth&& auth) {
+                    return MaybeAuth{std::move(auth)};
+                });
+        });
+
     return combine(
-        [](net::ip::Address&& src, net::ip::Address&& dst) {
-            return stun::ClientUDP::Request{{std::move(src), std::move(dst)}};
+        [](net::ip::Address&& src, net::ip::Address&& dst, MaybeAuth&& maybe_auth) {
+            return stun::ClientUDP::Request{{std::move(src), std::move(dst)}, .maybe_auth = maybe_auth };
         }
         , std::move(source_rv)
-        , std::move(target_rv));
+        , std::move(target_rv)
+        , std::move(maybe_auth_rv));
 }
 
 ReturnValue<napi::Value> create(napi::Env& env, const napi::CallbackInfo& info) {
