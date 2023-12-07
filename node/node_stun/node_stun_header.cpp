@@ -8,7 +8,8 @@
 
 #include "stun/stun_header.hpp"
 #include "node/napi_wrapper/napi_error.hpp"
-#include "node_stun_header.hpp"
+#include "node/node_stun/node_stun_header.hpp"
+#include "node/node_stun/node_stun_error.hpp"
 
 namespace freewebrtc::node_stun {
 
@@ -19,14 +20,14 @@ ReturnValue<napi::Value> stun_class(const napi::Env& env, const stun::Class& cls
     case stun::Class::SUCCESS_RESPONSE: return env.create_string("success_response");
     case stun::Class::ERROR_RESPONSE:   return env.create_string("error_response");
     }
-    return make_error_code(napi::WrapperError::UNKNOWN_STUN_CLASS);
+    return make_error_code(Error::unknown_stun_class);
 }
 
 ReturnValue<napi::Value> stun_method(const napi::Env& env, const stun::Method& method) {
     if (method == stun::Method::binding()) {
         return env.create_string("binding");
     }
-    return make_error_code(napi::WrapperError::UNKNOWN_STUN_METHOD);
+    return make_error_code(Error::unknown_stun_method);
 }
 
 ReturnValue<napi::Value> stun_transcation_id(const napi::Env& env, const stun::TransactionId& id) {

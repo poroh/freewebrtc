@@ -7,6 +7,7 @@
 set(SOURCES
   node_stun_header.cpp
   node_stun_message.cpp
+  node_stun_error.cpp
   node_stun_server_stateless.cpp
   node_stun_client_udp.cpp
   node_stun_client_udp_settings.cpp

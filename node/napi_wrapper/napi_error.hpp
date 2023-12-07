@@ -24,10 +24,6 @@ std::error_code make_error_code(napi_status status);
 enum class WrapperError {
     OK = 0,
     INVALID_TYPE,
-    UNKNOWN_STUN_METHOD,
-    UNKNOWN_STUN_CLASS,
-    INVALID_IP_ADDRESS,
-    INVALID_PORT_NUMBER,
     NO_REQUIRED_ARGUMENT
 };
 
