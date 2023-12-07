@@ -13,6 +13,7 @@ set(SUBLIBS
     clock
     precis
     stat
+    ice
 )
 
 add_library(freewebrtc)

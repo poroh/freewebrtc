@@ -52,7 +52,7 @@ inline util::ConstBinaryView Address<SIZE>::view() const noexcept {
 template<size_t SIZE>
 inline ReturnValue<Address<SIZE>> Address<SIZE>::from_view(const util::ConstBinaryView& vv) {
     if (vv.size() != std::tuple_size<Value>::value) {
-        return make_error_code(Error::INVALID_ADDRESS_SIZE);
+        return make_error_code(Error::invalid_address_size);
     }
     Value v;
     std::copy(vv.begin(), vv.end(), v.begin());

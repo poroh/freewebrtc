@@ -63,7 +63,13 @@ ReturnValue<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj)
 
     return combine(
         [](net::ip::Address&& src, net::ip::Address&& dst, MaybeAuth&& maybe_auth) {
-            return stun::ClientUDP::Request{{std::move(src), std::move(dst)}, .maybe_auth = maybe_auth };
+            return stun::ClientUDP::Request{
+                .path = {
+                    .source = std::move(src),
+                    .target  =std::move(dst)
+                },
+                .maybe_auth = maybe_auth
+            };
         }
         , std::move(source_rv)
         , std::move(target_rv)

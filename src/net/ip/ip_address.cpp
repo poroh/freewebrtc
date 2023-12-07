@@ -25,7 +25,7 @@ ReturnValue<AddressType> inet_pton_adapter(const std::string_view& v) {
         return AddressType::from_view(util::ConstBinaryView(&ip_addr, sizeof(ip_addr)));
     }
     if (rc == 0) {
-        return make_error_code(Error::IP_ADDRESS_PARSE_ERROR);
+        return make_error_code(Error::ip_address_parse_error);
     }
     return std::error_code(errno, std::generic_category());
 }

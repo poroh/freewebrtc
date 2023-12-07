@@ -17,9 +17,11 @@ public:
     }
     std::string message(int code) const override {
         switch ((Error)code) {
-        case Error::OK:  return "success";
-        case Error::INVALID_ADDRESS_SIZE: return "invalid data size to initialize address";
-        case Error::IP_ADDRESS_PARSE_ERROR: return "cannot parse IP address";
+        case Error::ok:  return "success";
+        case Error::invalid_address_size: return "invalid data size to initialize address";
+        case Error::ip_address_parse_error: return "cannot parse IP address";
+        case Error::fqdn_invalid_label_expect_letter: return "invalid FQDN label: expect letter";
+        case Error::fqdn_not_fully_parsed: return "FQDN is not fully parsed";
         }
         return "unknown stun error";
     }

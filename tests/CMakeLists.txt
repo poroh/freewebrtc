@@ -11,6 +11,7 @@ set(TEST_SOURCES
     stun_client_udp_tests.cpp
     util_return_value_tests.cpp
     util_intrusive_list_tests.cpp
+    net_fqdn_tests.cpp
     clock_timepoint_tests.cpp
 )
 
