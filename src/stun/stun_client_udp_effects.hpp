@@ -65,7 +65,7 @@ struct TransactionFailed {
     };
     // Error occurred during transaction processing
     struct Error {
-        std::error_code code;
+        ::freewebrtc::Error code;
     };
 
     struct Timeout{};

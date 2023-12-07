@@ -27,7 +27,7 @@ public:
         MaybeIntegrity maybe_integrity;
     };
     struct Error {
-        std::error_code error;
+        ::freewebrtc::Error error;
     };
     struct Ignore {
         // Message is set if message is parsed as STUN message bu

@@ -34,11 +34,13 @@ ReturnValue<net::Endpoint> extract_rinfo(const Value& v) {
     auto addr_rv = v_as_obj
         .fmap([](auto obj) { return obj.named_property("address"); })
         .fmap([](auto v)   { return v.as_string(); })
-        .fmap([](auto v)   { return net::ip::Address::from_string(v); });
+        .fmap([](auto v)   { return net::ip::Address::from_string(v); })
+        .add_context("rinfo.address");
 
     auto port_rv = v_as_obj
         .fmap([](auto obj) { return obj.named_property("port"); })
-        .fmap([](const auto& v) { return v.as_int32(); });
+        .fmap([](const auto& v) { return v.as_int32(); })
+        .add_context("rinfo.port");
 
     return combine(
         [](auto&& addr, auto&& port) {
@@ -50,9 +52,12 @@ ReturnValue<net::Endpoint> extract_rinfo(const Value& v) {
 
 ReturnValue<Value> process_message(Env& env, const CallbackInfo& info) {
     // (message, rinfo)
-    auto buffer_rv = info[0].fmap([](const auto& arg) { return arg.as_buffer(); });
-    auto rinfo_rv = info[1].fmap([](const auto& arg) { return extract_rinfo(arg); });
-    auto obj_rvv = info.this_arg.unwrap<stun::server::Stateless>();
+    auto buffer_rv = info[0].fmap([](const auto& arg) { return arg.as_buffer(); })
+        .add_context("buffer (1st parameter)");
+    auto rinfo_rv = info[1].fmap([](const auto& arg) { return extract_rinfo(arg); })
+        .add_context("remote info (2nd parameter)");
+    auto obj_rvv = info.this_arg.unwrap<stun::server::Stateless>()
+        .add_context("object unwrap");
 
     return combine(
         [&](auto&& message, auto&& endpoint, auto&& server) {
@@ -98,14 +103,19 @@ ReturnValue<Value> add_user(Env& env, const CallbackInfo& info) {
         .fmap([](const auto& arg) { return arg.as_string(); })
         .fmap([](const auto& str) {
             return precis::OpaqueString{str};
-        });
+        })
+        .add_context("username (1st parameter)");
+
 
     auto password_rv = info[1]
         .fmap([](const auto& arg) { return arg.as_string(); })
         .fmap([](const auto& str) {
             return stun::Password::short_term(precis::OpaqueString{str}, crypto::node_openssl::sha1);
-        });
-    auto obj_rvv = info.this_arg.unwrap<stun::server::Stateless>();
+        })
+        .add_context("password (2nd parameter)");
+
+    auto obj_rvv = info.this_arg.unwrap<stun::server::Stateless>()
+        .add_context("object unwrap");
 
     return combine(
         [&](auto&& username, auto&& password, auto&& server) {
@@ -127,7 +137,8 @@ ReturnValue<Value> server_stateless_class(Env& env, std::string_view name) {
             {
                 {"process", process_message},
                 {"addUser", add_user}
-            });
+            })
+        .add_context("stateless stun server class", name);
 }
 
 }

@@ -174,12 +174,14 @@ ReturnValue<Object> Env::create_object(const ObjectSpec& spec) const noexcept {
         if (!mrvv.has_value()) {
             continue;
         }
-        const auto& rvv = mrvv.value();
+        auto& rvv = mrvv.value();
         if (rvv.is_error()) {
+            rvv.add_context(k + " attribute");
             return rvv.assert_error();
         }
         const auto& vv = rvv.assert_value();
         if (auto maybe_error = object.set_named_property(k, vv); maybe_error.is_error()) {
+            maybe_error.add_context(k + " attribute");
             return maybe_error.assert_error();
         }
     }
@@ -374,6 +376,7 @@ ReturnValue<Value> Env::create_class(std::string_view name, Function ctor, const
                     }
                 },
                 p.second);
+        rvv.add_context("attribute create", p.first);
         if (rvv.is_error()) {
             return rvv.assert_error();
         }

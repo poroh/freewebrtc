@@ -72,7 +72,8 @@ ReturnValue<Object> message(const Env& env, const stun::Message& msg) {
                 { "header", header(env, msg.header) },
                 { "is_rfc3489", env.create_boolean(msg.is_rfc3489) },
                 { "attributes", stun_attributes(env, msg.header.transaction_id, msg.attribute_set) }
-            });
+            })
+        .add_context("stun message");
 }
 
 ReturnValue<Value> message_parse(Env& env, const CallbackInfo& ci) {

@@ -26,7 +26,8 @@ ReturnValue<stun::client_udp::Settings> client_udp_settings_from_napi(napi::Obje
             }
             return maybe_v.value().as_boolean()
                 .fmap([](bool v) { return ReturnValue<MaybeBool>{v}; });
-        });
+        })
+        .add_context("use_fingerprint attibute");
 
     return combine(
         [](auto&& maybe_use_fingerprint) {
@@ -36,7 +37,8 @@ ReturnValue<stun::client_udp::Settings> client_udp_settings_from_napi(napi::Obje
             }
             return result;
         }
-        , std::move(maybe_use_fingerprint_rv));
+        , std::move(maybe_use_fingerprint_rv))
+        .add_context("stun udp client settings");
 }
 
 }

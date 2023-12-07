@@ -13,6 +13,7 @@
 #include <string_view>
 #include <optional>
 #include <utility>
+#include <sstream>
 #include "util/util_fmap.hpp"
 
 namespace freewebrtc::util::string_view {
@@ -27,6 +28,9 @@ std::optional<std::pair<SV, SV>> split(SV, char sep);
 
 template<template <typename...> class Result = std::vector>
 Result<std::string_view> split_all(SV, char sep);
+
+template<typename Container>
+std::string join(const Container&, const std::string& sep);
 
 //
 // implementation
@@ -65,6 +69,15 @@ Result<std::string_view> split(std::string_view sv, char sep) {
             sv = SV{};
         }
     }
+}
+
+template<typename Container>
+std::string join(const Container& c, const std::string& sep) {
+    std::ostringstream sstr;
+    for (auto it = c.begin(); it != c.end(); ++it) {
+        sstr << (it == c.begin() ? "" : sep) << *it;
+    }
+    return sstr.str();
 }
 
 

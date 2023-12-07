@@ -39,7 +39,8 @@ ReturnValue<napi::Object> header(const napi::Env& env, const stun::Header& hdr) 
                 { "class", stun_class(env, hdr.cls) },
                 { "method", stun_method(env, hdr.method) },
                 { "transaction", stun_transcation_id(env, hdr.transaction_id) }
-            });
+            })
+        .add_context("stun header");
 }
 
 }

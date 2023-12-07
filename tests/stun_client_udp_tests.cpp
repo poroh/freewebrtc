@@ -78,7 +78,7 @@ void StunClientTest::initial_request_check(
         rnd,
         now,
         ClientUDP::Request{
-            {local_ipv4, stun_server_ipv4},
+            .path = {local_ipv4, stun_server_ipv4},
             .maybe_auth = maybe_auth
         });
     ASSERT_TRUE(hnd_rv.is_value());
@@ -231,7 +231,13 @@ TEST_F(StunClientTest, request_response_happy_path_with_auth) {
     ClientUDP client(settings);
     // Create request
     auto now = Timepoint::epoch();
-    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, .maybe_auth = default_auth}).assert_value();
+    auto hnd = client.create(
+        rnd,
+        now,
+        ClientUDP::Request{
+            .path = {local_ipv4, stun_server_ipv4},
+            .maybe_auth = default_auth
+        }).assert_value();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     auto sent_data = std::get<ClientUDP::SendData>(next);

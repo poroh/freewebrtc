@@ -15,6 +15,8 @@
 #include <optional>
 #include <utility>
 
+#include "util/util_error.hpp"
+
 namespace freewebrtc {
 
 template<typename T> class ReturnValue;
@@ -28,7 +30,7 @@ template<typename V>
 class ReturnValue {
 public:
     using Value = V;
-    using Error = std::error_code;
+    using Error = ::freewebrtc::Error;
 
     using MaybeValue = std::optional<std::reference_wrapper<Value>>;
     using MaybeConstValue = std::optional<std::reference_wrapper<const Value>>;
@@ -36,7 +38,9 @@ public:
     ReturnValue(Value&&);
     ReturnValue(const Value&);
     ReturnValue(std::error_code&&);
+    ReturnValue(Error&&);
     ReturnValue(const std::error_code&);
+    ReturnValue(const Error&);
     ReturnValue(const ReturnValue&) = default;
     ReturnValue(ReturnValue&&) = default;
     ReturnValue& operator=(const ReturnValue&) = default;
@@ -63,6 +67,10 @@ public:
     template<typename Fmap>
     auto fmap(Fmap&& f) && -> ReturnValue<decltype(strip_rv(f(std::declval<V&&>())))>;
 
+    // Context to error (if ReturnValue contains error);
+    template<typename... Ts>
+    ReturnValue<V>& add_context(Ts&&...);
+
 private:
     std::variant<Value, Error> m_result;
 };
@@ -79,7 +87,7 @@ MaybeError success() noexcept;
 //   ReturnValue<double> v3 = std::make_error_code(std::errc::invalid_argument);
 //   assert(any_is_error(v1, v2, v3));
 template<typename T, typename... Ts>
-std::optional<std::error_code> any_is_error(const ReturnValue<T>& first, const ReturnValue<Ts>&... rest);
+std::optional<Error> any_is_error(const ReturnValue<T>& first, const ReturnValue<Ts>&... rest);
 
 // Combine ReturnValue s with function
 // Example:
@@ -120,6 +128,15 @@ inline ReturnValue<V>::ReturnValue(const std::error_code& c)
     : m_result(c)
 {}
 
+template<typename V>
+inline ReturnValue<V>::ReturnValue(Error&& e)
+    : m_result(std::move(e))
+{}
+
+template<typename V>
+inline ReturnValue<V>::ReturnValue(const Error& e)
+    : m_result(e)
+{}
 
 template<typename V>
 inline bool ReturnValue<V>::is_error() const noexcept {
@@ -220,8 +237,18 @@ auto ReturnValue<V>::fmap(Fmap&& f) && -> ReturnValue<decltype(strip_rv(f(std::d
     }
 }
 
+template<typename V>
+template<typename... Ts>
+ReturnValue<V>& ReturnValue<V>::add_context(Ts&&... v) {
+    if (!is_error()) {
+        return *this;
+    }
+    std::get<Error>(m_result).add_context(std::forward<Ts>(v)...);
+    return *this;
+}
+
 template<typename T, typename... Ts>
-std::optional<std::error_code> any_is_error(const ReturnValue<T>& first, const ReturnValue<Ts>&... rest) {
+std::optional<Error> any_is_error(const ReturnValue<T>& first, const ReturnValue<Ts>&... rest) {
     if (first.is_error()) {
         return first.assert_error();
     }

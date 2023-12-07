@@ -9,6 +9,8 @@
 #pragma once
 
 #include <variant>
+#include <functional>
+
 #include "net/ip/ip_address.hpp"
 #include "net/net_port.hpp"
 #include "util/util_variant_overloaded.hpp"
