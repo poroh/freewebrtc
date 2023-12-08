@@ -25,7 +25,7 @@ ReturnValue<stun::client_udp::Settings> client_udp_settings_from_napi(napi::Obje
                if (!maybe_v.has_value()) {
                    return ReturnValue<MaybeBool>{std::nullopt};
                }
-               return maybe_v.value().as_boolean() >= [](bool v) { return MaybeBool{v}; };
+               return maybe_v.value().as_boolean() > [](const bool& v) { return MaybeBool{v}; };
            }).add_context("use_fingerprint attibute");
 
     return combine(

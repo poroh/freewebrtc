@@ -15,7 +15,7 @@ ReturnValue<stun::ClientUDP::Auth> parse_auth(napi::Object obj) {
     const auto sha1 = freewebrtc::crypto::node_openssl::sha1;
     auto username_rv = (obj.named_property("username")
         > [](auto&& val) { return val.as_string(); }
-        >= [](std::string&& str) { return precis::OpaqueString{std::move(str)}; }
+        > [](std::string&& str) { return precis::OpaqueString{std::move(str)}; }
         ).add_context("username attribute");
 
     auto password_rv = (obj.named_property("password")

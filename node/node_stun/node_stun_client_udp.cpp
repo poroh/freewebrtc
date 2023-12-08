@@ -49,12 +49,12 @@ ReturnValue<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj)
 
     ReturnValue<MaybeAuth> maybe_auth_rv
         = (obj.maybe_named_property("auth")
-           >= [](auto&& maybe_val) { return util::fmap(maybe_val, napi::Value::to_object); }
-           >  [](auto&& maybe_obj) {
+           > [](auto&& maybe_val) { return util::fmap(maybe_val, napi::Value::to_object); }
+           > [](auto&& maybe_obj) {
                if (!maybe_obj.has_value()) {
                    return ReturnValue<MaybeAuth>{std::nullopt};
                }
-               return maybe_obj.value() > parse_auth >= [](Auth&& auth) { return MaybeAuth{std::move(auth)}; };
+               return maybe_obj.value() > parse_auth > [](Auth&& auth) { return MaybeAuth{std::move(auth)}; };
            }).add_context("auth field");
 
     return combine(
@@ -92,7 +92,7 @@ ReturnValue<napi::Value> next(napi::Env& env, const napi::CallbackInfo& info) {
             auto effect = client.get().next(clock::steady_clock_now());
             return client_udp_effect_to_napi(env, effect);
         }
-        >= napi::Object::fmap_to_value;
+        > napi::Object::fmap_to_value;
 }
 
 ReturnValue<napi::Value> response(napi::Env& env, const napi::CallbackInfo& info) {

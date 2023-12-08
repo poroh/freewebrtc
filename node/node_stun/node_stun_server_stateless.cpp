@@ -97,7 +97,7 @@ ReturnValue<Value> add_user(Env& env, const CallbackInfo& info) {
     // (username, password)
     auto username_rv = (info[0]
         > [](const auto& arg) { return arg.as_string(); }
-        >= [](const auto& str) {
+        > [](const auto& str) {
             return precis::OpaqueString{str};
         }).add_context("username (1st parameter)");
 

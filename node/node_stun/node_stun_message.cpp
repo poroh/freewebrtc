@@ -85,7 +85,7 @@ ReturnValue<Value> message_parse(Env& env, const CallbackInfo& ci) {
             return freewebrtc::stun::Message::parse(view, parsestat);
         }
         > [&](const auto& msg) { return message(env, msg); }
-        >= Object::fmap_to_value;
+        > Object::fmap_to_value;
 }
 
 }
