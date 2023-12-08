@@ -36,6 +36,8 @@ std::string IceCandidateError::message(int code) const {
     case Error::invalid_candidate_parts_number: return "Invalid candidate string number of tokens";
     case Error::candidate_type_absent:  return "Candidate type is absent in candidate string";
     case Error::unknown_candidate_type:  return "Candidate type is unknown";
+    case Error::invalid_foundation_length: return "Invalid length of foundation string";
+    case Error::invalid_foundation_char: return "Invalid char in foundation string";
     }
     return "Unknown ice candidate error: " + std::to_string(code);
 }

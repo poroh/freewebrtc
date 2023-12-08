@@ -17,7 +17,9 @@ enum class Error {
     invalid_attr_prefix,
     invalid_candidate_parts_number,
     candidate_type_absent,
-    unknown_candidate_type
+    unknown_candidate_type,
+    invalid_foundation_length,
+    invalid_foundation_char
 };
 
 std::error_code make_error_code(Error) noexcept;

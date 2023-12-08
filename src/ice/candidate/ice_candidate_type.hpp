@@ -28,6 +28,7 @@ public:
     static Type peer_reflexive();
     static Type relayed();
 
+    // From SDP string (RFC8839).
     static ReturnValue<Type> from_string(const std::string_view&) noexcept;
 
     bool operator==(const Type&) const noexcept = default;

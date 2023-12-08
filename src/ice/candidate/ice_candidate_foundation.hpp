@@ -16,10 +16,18 @@ namespace freewebrtc::ice::candidate {
 
 class Foundation {
 public:
-    static ReturnValue<Foundation> from_string(std::string_view);
+    static ReturnValue<Foundation> from_string(const std::string_view&);
 
 private:
+    Foundation(const std::string_view&);
     std::string m_value;
 };
+
+//
+// implementation
+//
+inline Foundation::Foundation(const std::string_view& v)
+    : m_value(v)
+{}
 
 }

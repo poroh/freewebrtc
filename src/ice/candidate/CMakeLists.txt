@@ -8,6 +8,7 @@ set(SOURCES
   ice_candidate_error.cpp
   ice_candidate_sdp.cpp
   ice_candidate_type.cpp
+  ice_candidate_foundation.cpp
 )
 file(GLOB HEADERS "*.hpp")
 

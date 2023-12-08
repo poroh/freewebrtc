@@ -15,6 +15,7 @@ set(TEST_SOURCES
     net_fqdn_tests.cpp
     clock_timepoint_tests.cpp
     ice_candidate_type_tests.cpp
+    ice_candidate_foundation_tests.cpp
 )
 
 include(FetchContent)

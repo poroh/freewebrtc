@@ -14,6 +14,10 @@
 namespace freewebrtc::ice::candidate {
 
 ReturnValue<Type> Type::from_string(const std::string_view& v) noexcept {
+    // RFC8839:
+    // This specification defines the values "host", "srflx",
+    // "prflx", and "relay" for host, server-reflexive,
+    // peer-reflexive, and relayed candidates, respectively.
     if (v == "host") {
         return host();
     } else if (v == "srflx") {

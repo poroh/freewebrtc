@@ -18,6 +18,7 @@ namespace freewebrtc::ice::candidate {
 class Address {
 public:
     static ReturnValue<Address> from_string(std::string_view v);
+
 private:
     std::variant<net::ip::Address, net::Fqdn> m_value;
 };
