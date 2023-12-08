@@ -19,13 +19,6 @@
 
 namespace freewebrtc {
 
-template<typename T> class ReturnValue;
-
-template<typename T> T strip_rv(const ReturnValue<T>& v);
-template<typename T> T strip_rv(ReturnValue<T>&& v);
-template<typename T> T strip_rv(const T& v);
-template<typename T> T strip_rv(T&& v);
-
 template<typename V>
 class ReturnValue {
 public:
@@ -55,21 +48,49 @@ public:
     Value& assert_value() noexcept;
     const Value& assert_value() const noexcept;
 
+    // Functor's fmap
     // Apply function to Value if it ReturnValue is value
     // and return result as ReturnValue of result of the function.
-    // If function Fmap returns ReturnValue<SomeTime> then
-    // fmap return also returns ReturnValue<SomeTime> instead of
-    // ReturnValue<ReturnValue<SomeTime>>
-    template<typename Fmap>
-    auto fmap(Fmap&& f) & -> ReturnValue<decltype(strip_rv(f(std::declval<V&>())))>;
-    template<typename Fmap>
-    auto fmap(Fmap&& f) const& -> ReturnValue<decltype(strip_rv(f(std::declval<const V&>())))>;
-    template<typename Fmap>
-    auto fmap(Fmap&& f) && -> ReturnValue<decltype(strip_rv(f(std::declval<V&&>())))>;
+    template<typename F>
+    auto fmap(F&& f) & -> ReturnValue<std::invoke_result_t<F, V&>>;
+    template<typename F>
+    auto fmap(F&& f) const& -> ReturnValue<std::invoke_result_t<F, const V&>>;
+    template<typename F>
+    auto fmap(F&& f) && -> ReturnValue<std::invoke_result_t<F, V&&>>;
+
+    // Syntax sugar for Function fmap:
+    template<typename F>
+    ReturnValue<std::invoke_result_t<F, V&>> operator>=(F&& f) & { return fmap(std::forward<F>(f)); }
+    template<typename F>
+    ReturnValue<std::invoke_result_t<F, const V&>> operator>=(F&& f) const& { return fmap(std::forward<F>(f)); }
+    template<typename F>
+    ReturnValue<std::invoke_result_t<F, V&&>> operator>=(F&& f) && { return std::move(*this).fmap(std::forward<F>(f)); }
+
+    // Monadic binding:
+    // F must return ReturnValue<SomeType>
+    // f is called only if this ReturnValue is not error
+    template<typename F>
+    auto bind(F&& f) & -> ReturnValue<typename std::invoke_result_t<F, V&>::Value>;
+    template<typename F>
+    auto bind(F&& f) const& -> ReturnValue<typename std::invoke_result_t<F, const V&>::Value>;
+    template<typename F>
+    auto bind(F&& f) && -> ReturnValue<typename std::invoke_result_t<F, V&&>::Value>;
+
+    // Syntax sugar for Mondic bind:
+    template<typename F>
+    ReturnValue<typename std::invoke_result_t<F, V&>::Value> operator>(F&& f) & { return bind(std::forward<F>(f)); }
+    template<typename F>
+    ReturnValue<typename std::invoke_result_t<F, const V&>::Value> operator>(F&& f) const& { return bind(std::forward<F>(f)); }
+    template<typename F>
+    ReturnValue<typename std::invoke_result_t<F, V&&>::Value> operator>(F&& f) && { return std::move(*this).bind(std::forward<F>(f)); }
 
     // Context to error (if ReturnValue contains error);
     template<typename... Ts>
     ReturnValue<V>& add_context(Ts&&...);
+
+    // Syntax sugar for adding context:
+    template<typename T>
+    ReturnValue<V>& operator==(T&& t) { return add_context(std::forward<T>(t)); }
 
 private:
     std::variant<Value, Error> m_result;
@@ -78,7 +99,6 @@ private:
 struct ReturnValueUnitType{};
 using MaybeError = ReturnValue<ReturnValueUnitType>;
 MaybeError success() noexcept;
-
 
 // Check that any of the ReturnValue is error.
 // Example:
@@ -99,11 +119,11 @@ std::optional<Error> any_is_error(const ReturnValue<T>& first, const ReturnValue
 //   },
 //   v1, v2, v3)
 template<typename F, typename... Ts>
-auto combine(F&& f, const ReturnValue<Ts>&... rvs) -> ReturnValue<decltype(strip_rv(f(std::declval<const Ts&>()...)))>;
+auto combine(F&& f, const ReturnValue<Ts>&... rvs) -> ReturnValue<typename std::invoke_result_t<F, const Ts&...>::Value>;
 template<typename F, typename... Ts>
-auto combine(F&& f, ReturnValue<Ts>&... rvs) -> ReturnValue<decltype(strip_rv(f(std::declval<Ts&>()...)))>;
+auto combine(F&& f, ReturnValue<Ts>&... rvs) -> ReturnValue<typename std::invoke_result_t<F, Ts&...>::Value>;
 template<typename F, typename... Ts>
-auto combine(F&& f, ReturnValue<Ts>&&... rvs) -> ReturnValue<decltype(strip_rv(f(std::declval<Ts&&>()...)))>;
+auto combine(F&& f, ReturnValue<Ts>&&... rvs) -> ReturnValue<typename std::invoke_result_t<F, Ts&&...>::Value>;
 
 //
 // inlines
@@ -181,60 +201,57 @@ ReturnValue<V>::assert_value() noexcept {
 }
 
 template<typename V>
-template<typename Fmap>
-auto ReturnValue<V>::fmap(Fmap&& f) & -> ReturnValue<decltype(strip_rv(f(std::declval<V&>())))> {
-    using FRetT = decltype(f(std::declval<V&>()));
-    using FmapRet = decltype(strip_rv(f(std::declval<V&>())));
+template<typename F>
+auto ReturnValue<V>::fmap(F&& f) & -> ReturnValue<std::invoke_result_t<F, V&>> {
     if (is_error()) {
         return assert_error();
     }
-    if constexpr (std::is_same_v<FRetT, FmapRet>) {
-        return f(assert_value());
-    } else {
-        auto result = f(assert_value());
-        if (result.is_error()) {
-            return result.assert_error();
-        }
-        return result.assert_value();
-    }
+    return f(assert_value());
 }
 
 template<typename V>
-template<typename Fmap>
-auto ReturnValue<V>::fmap(Fmap&& f) const& -> ReturnValue<decltype(strip_rv(f(std::declval<const V&>())))> {
-    using FRetT = decltype(f(std::declval<const V&>()));
-    using FmapRet = decltype(strip_rv(f(std::declval<const V&>())));
+template<typename F>
+auto ReturnValue<V>::fmap(F&& f) const& -> ReturnValue<std::invoke_result_t<F, const V&>> {
     if (is_error()) {
         return assert_error();
     }
-    if constexpr (std::is_same_v<FRetT, FmapRet>) {
-        return f(assert_value());
-    } else {
-        auto result = f(assert_value());
-        if (result.is_error()) {
-            return result.assert_error();
-        }
-        return result.assert_value();
-    }
+    return f(assert_value());
 }
 
 template<typename V>
-template<typename Fmap>
-auto ReturnValue<V>::fmap(Fmap&& f) && -> ReturnValue<decltype(strip_rv(f(std::declval<V&&>())))> {
-    using FRetT = decltype(f(std::declval<V>()));
-    using FmapRet = decltype(strip_rv(f(std::declval<V>())));
+template<typename F>
+auto ReturnValue<V>::fmap(F&& f) && -> ReturnValue<std::invoke_result_t<F, V&&>> {
     if (is_error()) {
         return assert_error();
     }
-    if constexpr (std::is_same_v<FRetT, FmapRet>) {
-        return f(std::move(assert_value()));
-    } else {
-        auto result = f(std::move(assert_value()));
-        if (result.is_error()) {
-            return result.assert_error();
-        }
-        return result.assert_value();
+    return f(std::get<Value>(std::move(m_result)));
+}
+
+template<typename V>
+template<typename F>
+auto ReturnValue<V>::bind(F&& f) & -> ReturnValue<typename std::invoke_result_t<F, V&>::Value> {
+    if (is_error()) {
+        return assert_error();
     }
+    return f(assert_value());
+}
+
+template<typename V>
+template<typename F>
+auto ReturnValue<V>::bind(F&& f) const& -> ReturnValue<typename std::invoke_result_t<F, const V&>::Value> {
+    if (is_error()) {
+        return assert_error();
+    }
+    return f(assert_value());
+}
+
+template<typename V>
+template<typename F>
+auto ReturnValue<V>::bind(F&& f) && -> ReturnValue<typename std::invoke_result_t<F, V&&>::Value> {
+    if (is_error()) {
+        return assert_error();
+    }
+    return f(std::get<Value>(std::move(m_result)));
 }
 
 template<typename V>
@@ -282,22 +299,15 @@ auto combine_with_values_cref(Func func, const ReturnValue<Ts>&... rvs) {
 }
 
 template<typename F, typename... Ts>
-auto combine(F&& f, const ReturnValue<Ts>&... rvs) -> ReturnValue<decltype(strip_rv(f(std::declval<const Ts&>()...)))> {
+auto combine(F&& f, const ReturnValue<Ts>&... rvs) -> ReturnValue<typename std::invoke_result_t<F, const Ts&...>::Value> {
     if (auto maybe_error = any_is_error(rvs...); maybe_error.has_value()) {
         return maybe_error.value();
     }
-    using FRetT = decltype(f(std::declval<const Ts&>()...));
-    using FmapRet = decltype(strip_rv(f(std::declval<const Ts&>()...)));
-
-    if constexpr (std::is_same_v<FRetT, FmapRet>) {
-        return combine_with_values_cref(f, std::forward<const ReturnValue<Ts>&>(rvs)...);
-    } else {
-        auto result = combine_with_values_cref(f, std::forward<const ReturnValue<Ts>&>(rvs)...);
-        if (result.is_error()) {
-            return result.assert_error();
-        }
-        return result.assert_value();
+    auto result = combine_with_values_cref(f, std::forward<const ReturnValue<Ts>&>(rvs)...);
+    if (result.is_error()) {
+        return result.assert_error();
     }
+    return result.assert_value();
 }
 
 template<typename Func, typename... Vs>
@@ -323,22 +333,15 @@ auto combine_with_values_ref(Func func, ReturnValue<Ts>&... rvs) {
 }
 
 template<typename F, typename... Ts>
-auto combine(F&& f, ReturnValue<Ts>&... rvs) -> ReturnValue<decltype(strip_rv(f(std::declval<Ts&>()...)))> {
+auto combine(F&& f, ReturnValue<Ts>&... rvs) -> ReturnValue<typename std::invoke_result_t<F, Ts&...>::Value> {
     if (auto maybe_error = any_is_error(rvs...); maybe_error.has_value()) {
         return maybe_error.value();
     }
-    using FRetT = decltype(f(std::declval<Ts&>()...));
-    using FmapRet = decltype(strip_rv(f(std::declval<Ts&>()...)));
-
-    if constexpr (std::is_same_v<FRetT, FmapRet>) {
-        return combine_with_values_ref(f, std::forward<ReturnValue<Ts>&>(rvs)...);
-    } else {
-        auto result = combine_with_values_ref(f, std::forward<ReturnValue<Ts>&>(rvs)...);
-        if (result.is_error()) {
-            return result.assert_error();
-        }
-        return result.assert_value();
+    auto result = combine_with_values_ref(f, std::forward<ReturnValue<Ts>&>(rvs)...);
+    if (result.is_error()) {
+        return result.assert_error();
     }
+    return std::move(result.assert_value());
 }
 
 template<typename F, typename... Values>
@@ -364,22 +367,15 @@ auto combine_rv_with_values(F&& func, ReturnValue<Ts>&&... rvs) {
 }
 
 template<typename F, typename... Ts>
-auto combine(F&& f, ReturnValue<Ts>&&... rvs) -> ReturnValue<decltype(strip_rv(f(std::declval<Ts&&>()...)))> {
+auto combine(F&& f, ReturnValue<Ts>&&... rvs) -> ReturnValue<typename std::invoke_result_t<F, Ts&&...>::Value>  {
     if (auto maybe_error = any_is_error(rvs...); maybe_error.has_value()) {
         return maybe_error.value();
     }
-    using FRetT = decltype(f(std::declval<Ts&&>()...));
-    using FmapRet = decltype(strip_rv(f(std::declval<Ts&&>()...)));
-
-    if constexpr (std::is_same_v<FRetT, FmapRet>) {
-        return combine_rv_with_values(std::move(f), std::forward<ReturnValue<Ts>>(rvs)...);
-    } else {
-        auto result = combine_rv_with_values(std::move(f), std::forward<ReturnValue<Ts>>(rvs)...);
-        if (result.is_error()) {
-            return result.assert_error();
-        }
-        return result.assert_value();
+    auto result = combine_rv_with_values(std::move(f), std::forward<ReturnValue<Ts>>(rvs)...);
+    if (result.is_error()) {
+        return result.assert_error();
     }
+    return std::move(result.assert_value());
 }
 
 inline MaybeError success() noexcept {

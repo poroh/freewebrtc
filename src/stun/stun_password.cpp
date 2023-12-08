@@ -14,7 +14,7 @@ ReturnValue<Password> Password::short_term(const OpaqueString& password, crypto:
     std::vector<uint8_t> data(password.value.begin(), password.value.end());
     auto ipad = crypto::hmac::IPadKey::from_key(util::ConstBinaryView(data), h);
     auto opad = crypto::hmac::OPadKey::from_key(util::ConstBinaryView(data), h);
-    return combine([](crypto::hmac::IPadKey&& ipad, crypto::hmac::OPadKey&& opad) {
+    return combine([](crypto::hmac::IPadKey&& ipad, crypto::hmac::OPadKey&& opad) -> ReturnValue<Password> {
         return Password(std::move(ipad), std::move(opad));
     }, std::move(ipad), std::move(opad));
 }

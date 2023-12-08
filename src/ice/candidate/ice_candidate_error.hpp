@@ -15,7 +15,8 @@ namespace freewebrtc::ice::candidate {
 enum class Error {
     ok = 0,
     invalid_attr_prefix,
-    invalid_candidate_parts_number
+    invalid_candidate_parts_number,
+    candidate_type_absent
 };
 
 std::error_code make_error_code(Error) noexcept;

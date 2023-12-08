@@ -30,19 +30,19 @@ Attribute::Attribute(AttributeType t, Value&& v)
 ReturnValue<Attribute::ParseResult> Attribute::parse(const util::ConstBinaryView& vv, AttributeType type, ParseStat& stat) {
     auto create_attr_fun = [=](Value&& attr) -> ReturnValue<ParseResult> { return ParseResult{Attribute(type, std::move(attr))}; };
     switch (type.value()) {
-    case attr_registry::MAPPED_ADDRESS:     return MappedAddressAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
-    case attr_registry::XOR_MAPPED_ADDRESS: return XorMappedAddressAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
-    case attr_registry::USERNAME:           return UsernameAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
-    case attr_registry::SOFTWARE:           return SoftwareAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
-    case attr_registry::MESSAGE_INTEGRITY:  return MessageIntegityAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
-    case attr_registry::FINGERPRINT:        return FingerprintAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
-    case attr_registry::PRIORITY:           return PriorityAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
-    case attr_registry::ICE_CONTROLLING:    return IceControllingAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
-    case attr_registry::ICE_CONTROLLED:     return IceControlledAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
-    case attr_registry::USE_CANDIDATE:      return UseCandidateAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
-    case attr_registry::ERROR_CODE:         return ErrorCodeAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
-    case attr_registry::ALTERNATE_SERVER:   return AlternateServerAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
-    case attr_registry::UNKNOWN_ATTRIBUTES: return UnknownAttributesAttribute::parse(vv, stat).fmap(std::move(create_attr_fun));
+    case attr_registry::MAPPED_ADDRESS:     return MappedAddressAttribute::parse(vv, stat).bind(std::move(create_attr_fun));
+    case attr_registry::XOR_MAPPED_ADDRESS: return XorMappedAddressAttribute::parse(vv, stat).bind(std::move(create_attr_fun));
+    case attr_registry::USERNAME:           return UsernameAttribute::parse(vv, stat).bind(std::move(create_attr_fun));
+    case attr_registry::SOFTWARE:           return SoftwareAttribute::parse(vv, stat).bind(std::move(create_attr_fun));
+    case attr_registry::MESSAGE_INTEGRITY:  return MessageIntegityAttribute::parse(vv, stat).bind(std::move(create_attr_fun));
+    case attr_registry::FINGERPRINT:        return FingerprintAttribute::parse(vv, stat).bind(std::move(create_attr_fun));
+    case attr_registry::PRIORITY:           return PriorityAttribute::parse(vv, stat).bind(std::move(create_attr_fun));
+    case attr_registry::ICE_CONTROLLING:    return IceControllingAttribute::parse(vv, stat).bind(std::move(create_attr_fun));
+    case attr_registry::ICE_CONTROLLED:     return IceControlledAttribute::parse(vv, stat).bind(std::move(create_attr_fun));
+    case attr_registry::USE_CANDIDATE:      return UseCandidateAttribute::parse(vv, stat).bind(std::move(create_attr_fun));
+    case attr_registry::ERROR_CODE:         return ErrorCodeAttribute::parse(vv, stat).bind(std::move(create_attr_fun));
+    case attr_registry::ALTERNATE_SERVER:   return AlternateServerAttribute::parse(vv, stat).bind(std::move(create_attr_fun));
+    case attr_registry::UNKNOWN_ATTRIBUTES: return UnknownAttributesAttribute::parse(vv, stat).bind(std::move(create_attr_fun));
     default:
         return ParseResult{UnknownAttribute(type, vv)};
     }

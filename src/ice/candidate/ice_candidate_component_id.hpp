@@ -11,12 +11,14 @@
 
 #include <cstdint>
 #include <optional>
+#include <string>
 
 namespace freewebrtc::ice::candidate {
 
 class ComponentId {
 public:
     static ComponentId from_unsigned(unsigned);
+    static ReturnValue<ComponentId> from_string(const std::string_view&) noexcept;
 private:
     unsigned m_value;
 };

@@ -26,7 +26,7 @@ struct Supported {
     using ExtensionVec = std::vector<Extension>;
     ExtensionVec extension;
 };
-using SDPAttrParseResult = std::variant<Candidate, Unsupported>;
+using SDPAttrParseResult = std::variant<Supported, Unsupported>;
 
 ReturnValue<SDPAttrParseResult> parse_sdp_attr(std::string_view);
 

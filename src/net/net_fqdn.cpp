@@ -120,7 +120,7 @@ ParseResult<Fqdn> Fqdn::parse(std::string_view v) {
 
 ReturnValue<Fqdn> Fqdn::from_string(std::string_view v) {
     return parse(v)
-        .fmap([](auto& parse_success) {
+        .bind([](auto& parse_success) {
             using RetVal = ReturnValue<Fqdn>;
             if (parse_success.rest.empty()) {
                 return RetVal{parse_success.value};

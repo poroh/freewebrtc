@@ -34,13 +34,13 @@ ReturnValue<Object> stun_attributes(const Env& env, const stun::TransactionId& t
                         return
                             v.get().addr.to_address(tid)
                             .to_string()
-                            .fmap([&](const auto& addr) {
+                            > [&](const auto& addr) {
                                 return
                                     env.create_object({
                                             { "addr", env.create_string(addr) },
                                             { "port", env.create_int32(v.get().port.value()) }
                                         });
-                            });
+                            };
                     })},
             { "priority",
                     util::fmap(attrs.priority(), [&](const auto& v) {
@@ -78,15 +78,13 @@ ReturnValue<Object> message(const Env& env, const stun::Message& msg) {
 
 ReturnValue<Value> message_parse(Env& env, const CallbackInfo& ci) {
     return ci[0]
-        .fmap([](const auto& arg) { return arg.as_buffer(); })
-        .fmap([&](const auto& view) {
+        > [](const auto& arg) { return arg.as_buffer(); }
+        > [](const auto& view) {
             freewebrtc::stun::ParseStat parsestat;
             return freewebrtc::stun::Message::parse(view, parsestat);
-        })
-        .fmap([&](const auto& msg) {
-            return message(env, msg);
-        })
-        .fmap(Object::fmap_to_value);
+        }
+        > [&](const auto& msg) { return message(env, msg); }
+        >= Object::fmap_to_value;
 }
 
 }

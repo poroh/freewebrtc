@@ -5,6 +5,7 @@
 #
 
 set(SOURCES
+  ice_candidate_error.cpp
   ice_candidate_sdp.cpp
 )
 file(GLOB HEADERS "*.hpp")

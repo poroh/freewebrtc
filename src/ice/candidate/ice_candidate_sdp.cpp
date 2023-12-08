@@ -11,6 +11,7 @@
 #include "ice/candidate/ice_candidate_sdp.hpp"
 #include "ice/candidate/ice_candidate_error.hpp"
 #include "util/util_string_view.hpp"
+#include "util/util_token_stream.hpp"
 
 namespace freewebrtc::ice::candidate {
 
@@ -58,11 +59,36 @@ ReturnValue<SDPAttrParseResult> parse_sdp_attr(std::string_view inv) {
         return make_error_code(Error::invalid_attr_prefix);
     }
     auto& v = maybev.value();
-    auto tokens = util::string_view::split_all(v, ' ');
-    if (tokens.size() < 6) {
-        return make_error_code(Error::invalid_candidate_parts_number);
+    auto tstr = util::TokenStream{util::string_view::split_all(v, ' ')};
+
+    auto foundation_rv      = tstr.required_bind(Foundation::from_string).add_context("foundation");
+    auto component_id_rv    = tstr.required_bind(ComponentId::from_string).add_context("component");
+    auto transport_rv       = tstr.required_bind(TransportType::from_string).add_context("transport");
+    auto priority_rv        = tstr.required_bind(Priority::from_string).add_context("priority");
+    auto connection_addr_rv = tstr.required_bind(Address::from_string).add_context("address");
+    auto port_rv            = tstr.required_bind(net::Port::from_string).add_context("port");
+    auto type_rv = tstr.required("typ")
+        .bind([&](auto&&) { return tstr.required_bind(Type::from_string); });
+    return combine([](auto&& f, auto&& cid, auto& t, auto&& p, auto&& addr, auto&& port, auto&& type) -> ReturnValue<SDPAttrParseResult> {
+        return SDPAttrParseResult{ Supported {
+            .candidate = {
+                .address = std::move(addr),
+                .port = std::move(port),
+                .transport_type = std::move(t),
+                .foundation = std::move(f),
+                .maybe_component = std::move(cid),
+                .priority = std::move(p),
+                .type = std::move(type)
+            }
+        } };
     }
-    return make_error_code(Error::invalid_attr_prefix);
+    , std::move(foundation_rv)
+    , std::move(component_id_rv)
+    , std::move(transport_rv)
+    , std::move(priority_rv)
+    , std::move(connection_addr_rv)
+    , std::move(port_rv)
+    , std::move(type_rv));
 }
 
 

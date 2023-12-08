@@ -10,6 +10,9 @@
 
 #pragma once
 
+#include <string_view>
+#include "util/util_return_value.hpp"
+
 namespace freewebrtc::ice::candidate {
 
 class Type {
@@ -24,6 +27,8 @@ public:
     static Type server_reflexive();
     static Type peer_reflexive();
     static Type relayed();
+
+    static ReturnValue<Type> from_string(const std::string_view&) noexcept;
 
 private:
     Value m_value;

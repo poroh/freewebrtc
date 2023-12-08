@@ -14,6 +14,8 @@
 namespace freewebrtc::test {
 
 class UtilReturnValueTest : public ::testing::Test {
+public:
+    using RVI = ReturnValue<int>;
 };
 
 // ================================================================================
@@ -136,24 +138,27 @@ TEST_F(UtilReturnValueTest, fmap_error_propagation) {
     auto chained_rv = rv
         .fmap([](int value) { return value + 1; })
         .fmap([](int value) { return value * 2; });
-    EXPECT_TRUE(chained_rv.is_error());
+    ASSERT_TRUE(chained_rv.is_error());
     EXPECT_EQ(chained_rv.assert_error(), ec);
 }
 
-TEST_F(UtilReturnValueTest, fmap_nested_return_value_unwrapping) {
+// ================================================================================
+// bind
+
+TEST_F(UtilReturnValueTest, bind_return_value_unwrapping) {
     ReturnValue<int> nested_rv(1);
     auto unwrapped_rv = nested_rv
-        .fmap([](auto& i) { return ReturnValue<int>(i * 2); });
+        .bind([](auto& i) { return ReturnValue<int>(i * 2); });
     ASSERT_TRUE(unwrapped_rv.is_value());
     EXPECT_EQ(unwrapped_rv.assert_value(), 2);
 }
 
-TEST_F(UtilReturnValueTest, fmap_nested_return_value_unwrapping_error) {
+TEST_F(UtilReturnValueTest, bind_return_value_unwrapping_error) {
     auto ec = std::make_error_code(std::errc::invalid_argument);
     ReturnValue<int> nested_rv(1);
     auto unwrapped_rv = nested_rv
-        .fmap([&](auto&) { return ReturnValue<int>(ec); });
-    EXPECT_TRUE(unwrapped_rv.is_error());
+        .bind([&](auto&) { return ReturnValue<int>(ec); });
+    ASSERT_TRUE(unwrapped_rv.is_error());
     EXPECT_EQ(unwrapped_rv.assert_error(), ec);
 }
 
@@ -161,9 +166,10 @@ TEST_F(UtilReturnValueTest, fmap_nested_return_value_unwrapping_error) {
 // combine
 
 TEST_F(UtilReturnValueTest, combine_two_values_success) {
+    using RVI = ReturnValue<int>;
     ReturnValue<int> rv1(10);
     ReturnValue<int> rv2(20);
-    auto combined_rv = combine([](int a, int b) { return a + b; }, std::move(rv1), std::move(rv2));
+    auto combined_rv = combine([](int a, int b) -> RVI { return a + b; }, std::move(rv1), std::move(rv2));
     ASSERT_TRUE(combined_rv.is_value());
     EXPECT_EQ(combined_rv.assert_value(), 30);
 }
@@ -172,7 +178,7 @@ TEST_F(UtilReturnValueTest, combine_value_with_error) {
     ReturnValue<int> rv1(10);
     auto ec = std::make_error_code(std::errc::invalid_argument);
     ReturnValue<int> rv2(ec);
-    auto combined_rv = combine([](int a, int b) { return a + b; }, std::move(rv1), std::move(rv2));
+    auto combined_rv = combine([](int a, int b) -> RVI { return a + b; }, std::move(rv1), std::move(rv2));
     ASSERT_TRUE(combined_rv.is_error());
     EXPECT_EQ(combined_rv.assert_error(), ec);
 }
@@ -181,7 +187,7 @@ TEST_F(UtilReturnValueTest, combine_multiple_values_success) {
     ReturnValue<int> rv1(10);
     ReturnValue<int> rv2(20);
     ReturnValue<int> rv3(30);
-    auto combined_rv = combine([](int a, int b, int c) { return a + b + c; }, std::move(rv1), std::move(rv2), std::move(rv3));
+    auto combined_rv = combine([](int a, int b, int c) -> RVI { return a + b + c; }, std::move(rv1), std::move(rv2), std::move(rv3));
     ASSERT_TRUE(combined_rv.is_value());
     EXPECT_EQ(combined_rv.assert_value(), 60);
 }
@@ -191,7 +197,7 @@ TEST_F(UtilReturnValueTest, combine_multiple_values_one_error) {
     ReturnValue<int> rv2(20);
     auto ec = std::make_error_code(std::errc::invalid_argument);
     ReturnValue<int> rv3(ec);
-    auto combined_rv = combine([](int a, int b, int c) { return a + b + c; }, std::move(rv1), std::move(rv2), std::move(rv3));
+    auto combined_rv = combine([](int a, int b, int c) -> RVI { return a + b + c; }, std::move(rv1), std::move(rv2), std::move(rv3));
     ASSERT_TRUE(combined_rv.is_error());
     EXPECT_EQ(combined_rv.assert_error(), ec);
 }
@@ -200,7 +206,7 @@ TEST_F(UtilReturnValueTest, combine_moved_rvalues) {
     using T = std::unique_ptr<int>;
     ReturnValue<T> rv1(std::make_unique<int>(10));
     ReturnValue<T> rv2(std::make_unique<int>(20));
-    auto combined_rv = combine([](T&& p1, T&& p2) {
+    auto combined_rv = combine([](T&& p1, T&& p2) -> ReturnValue<std::vector<T>> {
         std::vector<T> vec;
         vec.emplace_back(std::move(p1));
         vec.emplace_back(std::move(p2));
@@ -224,7 +230,7 @@ TEST_F(UtilReturnValueTest, combine_references) {
     using T = std::unique_ptr<int>;
     ReturnValue<T> rv1(std::make_unique<int>(10));
     ReturnValue<T> rv2(std::make_unique<int>(20));
-    auto combined_rv = combine([](T& p1, T& p2) {
+    auto combined_rv = combine([](T& p1, T& p2) -> ReturnValue<std::vector<T>> {
         std::vector<T> vec;
         vec.emplace_back(std::move(p1));
         vec.emplace_back(std::move(p2));
@@ -248,7 +254,7 @@ TEST_F(UtilReturnValueTest, combine_const_references) {
     using T = std::unique_ptr<int>;
     const ReturnValue<T> rv1(std::make_unique<int>(10));
     const ReturnValue<T> rv2(std::make_unique<int>(20));
-    auto combined_rv = combine([](const T& p1, const T& p2) {
+    auto combined_rv = combine([](const T& p1, const T& p2) -> RVI {
         return *p1.get() + *p2.get();
     }, rv1, rv2);
 

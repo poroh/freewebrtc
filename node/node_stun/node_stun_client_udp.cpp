@@ -24,10 +24,7 @@ namespace freewebrtc::node_stun {
 namespace {
 
 ReturnValue<napi::Value> constructor(napi::Env&, const napi::CallbackInfo& info) {
-    auto settings_rv = info[0]
-        .fmap(napi::Value::to_object)
-        .fmap(client_udp_settings_from_napi);
-
+    auto settings_rv = info[0] > napi::Value::to_object > client_udp_settings_from_napi;
     return
         combine([](auto&& obj, auto&& settings) {
                 return obj.wrap(std::make_unique<stun::ClientUDP>(settings));
@@ -37,32 +34,30 @@ ReturnValue<napi::Value> constructor(napi::Env&, const napi::CallbackInfo& info)
 }
 
 ReturnValue<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj) {
-    auto source_rv = obj.named_property("source")
-        .fmap(napi::Value::to_string)
-        .fmap(net::ip::Address::from_string);
-    auto target_rv = obj.named_property("target")
-        .fmap(napi::Value::to_string)
-        .fmap(net::ip::Address::from_string);
+    auto source_rv = (obj.named_property("source")
+        > napi::Value::to_string
+        > net::ip::Address::from_string
+        ) == "source field";
+    auto target_rv = (obj.named_property("target")
+        > napi::Value::to_string
+        > net::ip::Address::from_string
+        ) == "target field";
 
     using Auth = stun::ClientUDP::Auth;
     using MaybeAuth = stun::ClientUDP::MaybeAuth;
 
     ReturnValue<MaybeAuth> maybe_auth_rv
-        = obj.maybe_named_property("auth")
-        .fmap([](auto&& maybe_val) { return util::fmap(maybe_val, napi::Value::to_object); })
-        .fmap([](auto&& maybe_obj) {
-            if (!maybe_obj.has_value()) {
-                return ReturnValue<MaybeAuth>{std::nullopt};
-            }
-            return maybe_obj.value()
-                .fmap(parse_auth)
-                .fmap([](Auth&& auth) {
-                    return MaybeAuth{std::move(auth)};
-                });
-        });
+        = (obj.maybe_named_property("auth")
+           >= [](auto&& maybe_val) { return util::fmap(maybe_val, napi::Value::to_object); }
+           >  [](auto&& maybe_obj) {
+               if (!maybe_obj.has_value()) {
+                   return ReturnValue<MaybeAuth>{std::nullopt};
+               }
+               return maybe_obj.value() > parse_auth >= [](Auth&& auth) { return MaybeAuth{std::move(auth)}; };
+           }) == "auth field";
 
     return combine(
-        [](net::ip::Address&& src, net::ip::Address&& dst, MaybeAuth&& maybe_auth) {
+        [](net::ip::Address&& src, net::ip::Address&& dst, MaybeAuth&& maybe_auth) -> ReturnValue<stun::ClientUDP::Request> {
             return stun::ClientUDP::Request{
                 .path = {
                     .source = std::move(src),
@@ -73,13 +68,12 @@ ReturnValue<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj)
         }
         , std::move(source_rv)
         , std::move(target_rv)
-        , std::move(maybe_auth_rv));
+        , std::move(maybe_auth_rv))
+        .add_context("request");
 }
 
 ReturnValue<napi::Value> create(napi::Env& env, const napi::CallbackInfo& info) {
-    auto request_rv = info[0]
-        .fmap(napi::Value::to_object)
-        .fmap(request_from_napi);
+    auto request_rv = info[0] > napi::Value::to_object > request_from_napi;
     auto client_rv = info.this_arg.unwrap<stun::ClientUDP>();
     return combine(
         [](auto&& client, stun::ClientUDP::Request&& req) {
@@ -87,23 +81,22 @@ ReturnValue<napi::Value> create(napi::Env& env, const napi::CallbackInfo& info) 
         }
         , std::move(client_rv)
         , std::move(request_rv))
-        .fmap([&](auto&& hnd) {
-            return client_udp_handle_to_napi(env, hnd);
-        });
+        .bind([&](auto&& hnd) { return client_udp_handle_to_napi(env, hnd); })
+        .add_context("create request");
 }
 
 ReturnValue<napi::Value> next(napi::Env& env, const napi::CallbackInfo& info) {
     return info.this_arg.unwrap<stun::ClientUDP>()
-        .fmap([&](auto&& client) {
+        > [&](auto&& client) {
             auto effect = client.get().next(clock::steady_clock_now());
             return client_udp_effect_to_napi(env, effect);
-        })
-        .fmap(napi::Object::fmap_to_value);
+        }
+        >= napi::Object::fmap_to_value;
 }
 
 ReturnValue<napi::Value> response(napi::Env& env, const napi::CallbackInfo& info) {
     auto this_rv = info.this_arg.unwrap<stun::ClientUDP>();
-    auto resp_rv = info[0].fmap(napi::Value::to_buffer);
+    auto resp_rv = info[0] > napi::Value::to_buffer;
     return combine(
         [&](auto& client, auto& resp) {
             client.get().response(clock::steady_clock_now(), resp);

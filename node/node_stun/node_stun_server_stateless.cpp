@@ -24,26 +24,24 @@ namespace {
 
 ReturnValue<Value> constructor(Env&, const CallbackInfo& info) {
     return info.this_arg.as_object()
-        .fmap([](const auto& obj) {
-            return obj.wrap(std::make_unique<stun::server::Stateless>(crypto::node_openssl::sha1));
-        });
+        > [](const auto& obj) { return obj.wrap(std::make_unique<stun::server::Stateless>(crypto::node_openssl::sha1)); };
 }
 
 ReturnValue<net::Endpoint> extract_rinfo(const Value& v) {
     auto v_as_obj = v.as_object();
-    auto addr_rv = v_as_obj
-        .fmap([](auto obj) { return obj.named_property("address"); })
-        .fmap([](auto v)   { return v.as_string(); })
-        .fmap([](auto v)   { return net::ip::Address::from_string(v); })
-        .add_context("rinfo.address");
+    auto addr_rv = (v_as_obj
+        > [](auto obj) { return obj.named_property("address"); }
+        > [](auto v)   { return v.as_string(); }
+        > [](auto v)   { return net::ip::Address::from_string(v); }
+        ) == "rinfo.address";
 
-    auto port_rv = v_as_obj
-        .fmap([](auto obj) { return obj.named_property("port"); })
-        .fmap([](const auto& v) { return v.as_int32(); })
-        .add_context("rinfo.port");
+    auto port_rv = (v_as_obj
+        > [](auto obj) { return obj.named_property("port"); }
+        > [](const auto& v) { return v.as_int32(); }
+        ) == "rinfo.port";
 
     return combine(
-        [](auto&& addr, auto&& port) {
+        [](auto&& addr, auto&& port) -> ReturnValue<net::Endpoint> {
             return net::Endpoint(net::UdpEndpoint{addr, net::Port(port)});
         },
         std::move(addr_rv),
@@ -52,12 +50,9 @@ ReturnValue<net::Endpoint> extract_rinfo(const Value& v) {
 
 ReturnValue<Value> process_message(Env& env, const CallbackInfo& info) {
     // (message, rinfo)
-    auto buffer_rv = info[0].fmap([](const auto& arg) { return arg.as_buffer(); })
-        .add_context("buffer (1st parameter)");
-    auto rinfo_rv = info[1].fmap([](const auto& arg) { return extract_rinfo(arg); })
-        .add_context("remote info (2nd parameter)");
-    auto obj_rvv = info.this_arg.unwrap<stun::server::Stateless>()
-        .add_context("object unwrap");
+    auto buffer_rv = (info[0] > [](const auto& arg) { return arg.as_buffer(); }) == "buffer (1st parameter)";
+    auto rinfo_rv = (info[1] > [](const auto& arg) { return extract_rinfo(arg); }) == "remote info (2nd parameter)";
+    auto obj_rvv = info.this_arg.unwrap<stun::server::Stateless>() == "object unwrap";
 
     return combine(
         [&](auto&& message, auto&& endpoint, auto&& server) {
@@ -83,7 +78,7 @@ ReturnValue<Value> process_message(Env& env, const CallbackInfo& info) {
                             env.create_object({
                                 {"result", env.create_string("respond")},
                                 {"data",   rsp.response.build(rsp.maybe_integrity)
-                                        .fmap([&](const auto& bytevec) {
+                                        .bind([&](const auto& bytevec) {
                                             return env.create_buffer(util::ConstBinaryView(bytevec));
                                         })}
                             });
@@ -99,24 +94,20 @@ ReturnValue<Value> process_message(Env& env, const CallbackInfo& info) {
 
 ReturnValue<Value> add_user(Env& env, const CallbackInfo& info) {
     // (username, password)
-    auto username_rv = info[0]
-        .fmap([](const auto& arg) { return arg.as_string(); })
-        .fmap([](const auto& str) {
+    auto username_rv = (info[0]
+        > [](const auto& arg) { return arg.as_string(); }
+        >= [](const auto& str) {
             return precis::OpaqueString{str};
-        })
-        .add_context("username (1st parameter)");
+        }) == "username (1st parameter)";
 
 
-    auto password_rv = info[1]
-        .fmap([](const auto& arg) { return arg.as_string(); })
-        .fmap([](const auto& str) {
+    auto password_rv = (info[1]
+        > [](const auto& arg) { return arg.as_string(); }
+        > [](const auto& str) {
             return stun::Password::short_term(precis::OpaqueString{str}, crypto::node_openssl::sha1);
-        })
-        .add_context("password (2nd parameter)");
+        }) == "password (2nd parameter)";
 
-    auto obj_rvv = info.this_arg.unwrap<stun::server::Stateless>()
-        .add_context("object unwrap");
-
+    auto obj_rvv = info.this_arg.unwrap<stun::server::Stateless>() == "object unwrap";
     return combine(
         [&](auto&& username, auto&& password, auto&& server) {
             server.get().add_user(username, password);

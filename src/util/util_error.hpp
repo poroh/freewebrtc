@@ -28,10 +28,10 @@ public:
     Error& operator=(const Error&) = default;
     Error& operator=(Error&&) = default;
 
-    void add_context(const std::string&);
-    void add_context(std::string&&);
+    Error& add_context(const std::string&);
+    Error& add_context(std::string&&);
     template<typename... Ts>
-    void add_context(Ts&&...);
+    Error& add_context(Ts&&...);
 
     bool operator==(const std::error_code&) const noexcept;
 
@@ -40,10 +40,11 @@ public:
     int value() const noexcept;
 
 private:
+    using ContextVec = std::vector<std::string>;
     template<typename T, typename... Ts>
-    void add_context_impl(T&& t, Ts&&... rest);
+    void add_context_impl(ContextVec& v, T&& t, Ts&&... rest);
     std::error_code m_code;
-    std::vector<std::string> m_context;
+    ContextVec m_context;
 };
 
 //
@@ -57,17 +58,26 @@ inline Error::Error(const std::error_code& c)
     : m_code(c)
 {}
 
-inline void Error::add_context(const std::string& s) {
+inline Error& Error::add_context(const std::string& s) {
     m_context.emplace_back(s);
+    return *this;
 }
 
-inline void Error::add_context(std::string&& s) {
+inline Error& Error::add_context(std::string&& s) {
     m_context.emplace_back(std::move(s));
+    return *this;
 }
 
 template<typename... Ts>
-void Error::add_context(Ts&&... ts) {
-    add_context_impl(std::forward<Ts>(ts)...);
+Error& Error::add_context(Ts&&... ts) {
+    ContextVec v;
+    add_context_impl(v, std::forward<Ts>(ts)...);
+    m_context.reserve(m_context.size() + v.size());
+    for (auto rit = v.rbegin(); rit != v.rend(); ++rit) {
+        // add in reverse order
+        m_context.emplace_back(std::move(*rit));
+    }
+    return *this;
 }
 
 
@@ -84,15 +94,13 @@ inline int Error::value() const noexcept {
 }
 
 template<typename T, typename... Ts>
-inline void Error::add_context_impl(T&& t, Ts&&... rest) {
+inline void Error::add_context_impl(ContextVec& v, T&& t, Ts&&... rest) {
     if constexpr (sizeof...(rest) == 0) {
-        return add_context(std::forward<T>(t));
+        v.emplace_back(std::forward<T>(t));
     } else {
-        add_context(std::forward<T>(t));
-        add_context(std::forward<Ts>(rest)...);
+        v.emplace_back(std::forward<T>(t));
+        add_context_impl(v, std::forward<Ts>(rest)...);
     }
 }
-
-
 
 }

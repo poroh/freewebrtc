@@ -9,12 +9,15 @@
 #pragma once
 
 #include <cstdint>
+#include "util/util_return_value.hpp"
 
 namespace freewebrtc::net {
 
 class Port {
 public:
     explicit Port(uint16_t);
+    static ReturnValue<Port> from_string(const std::string_view&) noexcept;
+
     bool operator==(const Port&) const noexcept = default;
     uint16_t value() const noexcept;
 private:

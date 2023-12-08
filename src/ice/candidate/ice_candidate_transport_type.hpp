@@ -10,6 +10,9 @@
 
 #pragma once
 
+#include <string_view>
+#include "util/util_return_value.hpp"
+
 namespace freewebrtc::ice::candidate {
 
 class TransportType {
@@ -18,6 +21,8 @@ public:
         UDP,
     };
     static TransportType udp();
+
+    static ReturnValue<TransportType> from_string(const std::string_view&) noexcept;
 
 private:
     Value m_value;

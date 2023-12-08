@@ -19,18 +19,16 @@ using Settings = stun::client_udp::Settings;
 
 ReturnValue<stun::client_udp::Settings> client_udp_settings_from_napi(napi::Object obj) {
     ReturnValue<MaybeBool> maybe_use_fingerprint_rv
-        = obj.maybe_named_property("use_fingerprint")
-        .fmap([](auto&& maybe_v) {
-            if (!maybe_v.has_value()) {
-                return ReturnValue<MaybeBool>{std::nullopt};
-            }
-            return maybe_v.value().as_boolean()
-                .fmap([](bool v) { return ReturnValue<MaybeBool>{v}; });
-        })
-        .add_context("use_fingerprint attibute");
+        = (obj.maybe_named_property("use_fingerprint")
+           > [](auto&& maybe_v) {
+               if (!maybe_v.has_value()) {
+                   return ReturnValue<MaybeBool>{std::nullopt};
+               }
+               return maybe_v.value().as_boolean() >= [](bool v) { return MaybeBool{v}; };
+           }) == "use_fingerprint attibute";
 
     return combine(
-        [](auto&& maybe_use_fingerprint) {
+        [](auto&& maybe_use_fingerprint) -> ReturnValue<stun::client_udp::Settings> {
             stun::client_udp::Settings result;
             if (maybe_use_fingerprint.has_value()) {
                 result.use_fingerprint = Settings::UseFingerprint{maybe_use_fingerprint.value()};

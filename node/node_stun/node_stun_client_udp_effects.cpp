@@ -29,8 +29,7 @@ ReturnValue<napi::Object> transaction_ok_to_napi(napi::Env& env, const stun::Cli
     return env.create_object({
         {"type", env.create_string("transaction_ok")},
         {"result", env.create_object({
-                { "addr", t.result.address.to_string()
-                .fmap([&](std::string&& s) { return env.create_string(std::move(s)); })},
+                { "addr", t.result.address.to_string() > [&](auto&& s) { return env.create_string(std::move(s)); }},
                 { "port", env.create_int32(t.result.port.value()) }
                 })},
         {"response", message(env, t.response)},
