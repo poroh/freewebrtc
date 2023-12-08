@@ -58,14 +58,6 @@ public:
     template<typename F>
     auto fmap(F&& f) && -> ReturnValue<std::invoke_result_t<F, V&&>>;
 
-    // Syntax sugar for Function fmap:
-    template<typename F>
-    ReturnValue<std::invoke_result_t<F, V&>> operator>=(F&& f) & { return fmap(std::forward<F>(f)); }
-    template<typename F>
-    ReturnValue<std::invoke_result_t<F, const V&>> operator>=(F&& f) const& { return fmap(std::forward<F>(f)); }
-    template<typename F>
-    ReturnValue<std::invoke_result_t<F, V&&>> operator>=(F&& f) && { return std::move(*this).fmap(std::forward<F>(f)); }
-
     // Monadic binding:
     // F must return ReturnValue<SomeType>
     // f is called only if this ReturnValue is not error
@@ -76,21 +68,9 @@ public:
     template<typename F>
     auto bind(F&& f) && -> ReturnValue<typename std::invoke_result_t<F, V&&>::Value>;
 
-    // Syntax sugar for Mondic bind:
-    template<typename F>
-    ReturnValue<typename std::invoke_result_t<F, V&>::Value> operator>(F&& f) & { return bind(std::forward<F>(f)); }
-    template<typename F>
-    ReturnValue<typename std::invoke_result_t<F, const V&>::Value> operator>(F&& f) const& { return bind(std::forward<F>(f)); }
-    template<typename F>
-    ReturnValue<typename std::invoke_result_t<F, V&&>::Value> operator>(F&& f) && { return std::move(*this).bind(std::forward<F>(f)); }
-
     // Context to error (if ReturnValue contains error);
     template<typename... Ts>
     ReturnValue<V>& add_context(Ts&&...);
-
-    // Syntax sugar for adding context:
-    template<typename T>
-    ReturnValue<V>& operator==(T&& t) { return add_context(std::forward<T>(t)); }
 
 private:
     std::variant<Value, Error> m_result;

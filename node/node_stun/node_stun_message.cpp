@@ -9,6 +9,7 @@
 #include "node_stun_message.hpp"
 #include "node_stun_header.hpp"
 #include "util/util_fmap.hpp"
+#include "util/util_return_value_sugar.hpp"
 
 namespace freewebrtc::node_stun {
 

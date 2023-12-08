@@ -7,6 +7,7 @@
 
 #include "node/node_stun/node_stun_client_udp_auth.hpp"
 #include "node/openssl/node_openssl_hash.hpp"
+#include "util/util_return_value_sugar.hpp"
 
 namespace freewebrtc::node_stun {
 
@@ -15,14 +16,14 @@ ReturnValue<stun::ClientUDP::Auth> parse_auth(napi::Object obj) {
     auto username_rv = (obj.named_property("username")
         > [](auto&& val) { return val.as_string(); }
         >= [](std::string&& str) { return precis::OpaqueString{std::move(str)}; }
-        ) == "username attribute";
+        ).add_context("username attribute");
 
     auto password_rv = (obj.named_property("password")
         > [](auto&& val) { return val.as_string(); }
         > [&](std::string&& str) {
             return stun::Password::short_term(precis::OpaqueString{std::move(str)}, sha1);
         }
-        ) == "password attribute";
+        ).add_context("password attribute");
 
 
     return combine(

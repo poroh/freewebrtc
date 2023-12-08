@@ -9,6 +9,7 @@
 #include <iostream>
 
 #include "util/util_fmap.hpp"
+#include "util/util_return_value_sugar.hpp"
 #include "stun/stun_client_udp.hpp"
 #include "stun/details/stun_client_udp_rto.hpp"
 #include "clock/clock_std.hpp"
@@ -37,11 +38,11 @@ ReturnValue<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj)
     auto source_rv = (obj.named_property("source")
         > napi::Value::to_string
         > net::ip::Address::from_string
-        ) == "source field";
+        ).add_context("source field");
     auto target_rv = (obj.named_property("target")
         > napi::Value::to_string
         > net::ip::Address::from_string
-        ) == "target field";
+        ).add_context("target field");
 
     using Auth = stun::ClientUDP::Auth;
     using MaybeAuth = stun::ClientUDP::MaybeAuth;
@@ -54,7 +55,7 @@ ReturnValue<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj)
                    return ReturnValue<MaybeAuth>{std::nullopt};
                }
                return maybe_obj.value() > parse_auth >= [](Auth&& auth) { return MaybeAuth{std::move(auth)}; };
-           }) == "auth field";
+           }).add_context("auth field");
 
     return combine(
         [](net::ip::Address&& src, net::ip::Address&& dst, MaybeAuth&& maybe_auth) -> ReturnValue<stun::ClientUDP::Request> {
