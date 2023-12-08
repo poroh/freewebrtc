@@ -16,7 +16,8 @@ enum class Error {
     ok = 0,
     invalid_attr_prefix,
     invalid_candidate_parts_number,
-    candidate_type_absent
+    candidate_type_absent,
+    unknown_candidate_type
 };
 
 std::error_code make_error_code(Error) noexcept;

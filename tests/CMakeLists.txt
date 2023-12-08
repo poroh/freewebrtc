@@ -14,6 +14,7 @@ set(TEST_SOURCES
     util_token_stream_tests.cpp
     net_fqdn_tests.cpp
     clock_timepoint_tests.cpp
+    ice_candidate_type_tests.cpp
 )
 
 include(FetchContent)

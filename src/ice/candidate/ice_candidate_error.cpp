@@ -35,6 +35,7 @@ std::string IceCandidateError::message(int code) const {
     case Error::invalid_attr_prefix: return "Invalid attribute prefix";
     case Error::invalid_candidate_parts_number: return "Invalid candidate string number of tokens";
     case Error::candidate_type_absent:  return "Candidate type is absent in candidate string";
+    case Error::unknown_candidate_type:  return "Candidate type is unknown";
     }
     return "Unknown ice candidate error: " + std::to_string(code);
 }

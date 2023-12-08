@@ -30,8 +30,34 @@ public:
 
     static ReturnValue<Type> from_string(const std::string_view&) noexcept;
 
+    bool operator==(const Type&) const noexcept = default;
+
 private:
+    Type(Value);
     Value m_value;
 };
+
+//
+// implementation
+//
+inline Type::Type(Value v)
+    : m_value(v)
+{}
+
+inline Type Type::host() {
+    return Type{HOST};
+}
+
+inline Type Type::server_reflexive() {
+    return Type{SERVER_REFLEXIVE};
+}
+
+inline Type Type::peer_reflexive() {
+    return Type{PEER_REFLEXIVE};
+}
+
+inline Type Type::relayed() {
+    return Type{RELAYED};
+}
 
 }
