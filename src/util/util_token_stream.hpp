@@ -34,13 +34,15 @@ public:
     template<typename F>
     auto required_bind(F&& f) noexcept -> ReturnValue<typename std::invoke_result_t<F, const TokenType&>::Value>;
 
+    ReturnValue<TokenType> required() noexcept;
+
     MaybeError required(const std::string_view&) noexcept;
 
 private:
     ::freewebrtc::Error make_error_code(Error);
 
-    Container m_data;
-    Container::iterator m_pos;
+    const Container m_data;
+    Container::const_iterator m_pos;
 };
 
 
@@ -49,11 +51,7 @@ private:
 //
 template<typename F>
 auto TokenStream::required_bind(F&& f) noexcept -> ReturnValue<typename std::invoke_result_t<F, const TokenType&>::Value> {
-    if (m_pos == m_data.end()) {
-        return make_error_code(Error::no_required_token);
-    }
-    return ReturnValue<TokenType>{*m_pos}
-        .bind(f);
+    return required().bind(f);
 }
 
 inline MaybeError TokenStream::required(const std::string_view& expected) noexcept {
@@ -64,6 +62,13 @@ inline MaybeError TokenStream::required(const std::string_view& expected) noexce
         return MaybeError{ make_error_code(Error::expected_token_missed) }
             .add_context("expected", expected, "received", v);
     });
+}
+
+inline ReturnValue<TokenStream::TokenType> TokenStream::required() noexcept {
+    if (m_pos == m_data.end()) {
+        return make_error_code(Error::no_required_token);
+    }
+    return ReturnValue<TokenType>{*(m_pos++)};
 }
 
 
