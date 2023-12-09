@@ -22,7 +22,8 @@ enum class Error {
     invalid_foundation_char,
     invalid_component_id_length,
     invalid_component_id_char,
-    invalid_component_id_value
+    invalid_component_id_value,
+    unknown_transport_type
 };
 
 std::error_code make_error_code(Error) noexcept;

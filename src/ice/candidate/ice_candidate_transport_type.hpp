@@ -20,12 +20,26 @@ public:
     enum Value {
         UDP,
     };
-    static TransportType udp();
+    static TransportType udp() noexcept;
+
+    bool operator==(const TransportType&) const noexcept = default;
 
     static ReturnValue<TransportType> from_string(const std::string_view&) noexcept;
 
 private:
+    explicit TransportType(Value);
     Value m_value;
 };
+
+//
+// implementation
+//
+inline TransportType::TransportType(Value v)
+    : m_value(v)
+{}
+
+inline TransportType TransportType::udp() noexcept {
+    return TransportType(UDP);
+}
 
 }

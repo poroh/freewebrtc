@@ -41,6 +41,7 @@ std::string IceCandidateError::message(int code) const {
     case Error::invalid_component_id_length: return "Invalid length of component id";
     case Error::invalid_component_id_char: return "Invalid char in component id";
     case Error::invalid_component_id_value: return "Invalid value of component id";
+    case Error::unknown_transport_type: return "Transport type is unknown";
     }
     return "Unknown ice candidate error: " + std::to_string(code);
 }
