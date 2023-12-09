@@ -38,6 +38,9 @@ std::string IceCandidateError::message(int code) const {
     case Error::unknown_candidate_type:  return "Candidate type is unknown";
     case Error::invalid_foundation_length: return "Invalid length of foundation string";
     case Error::invalid_foundation_char: return "Invalid char in foundation string";
+    case Error::invalid_component_id_length: return "Invalid length of component id";
+    case Error::invalid_component_id_char: return "Invalid char in component id";
+    case Error::invalid_component_id_value: return "Invalid value of component id";
     }
     return "Unknown ice candidate error: " + std::to_string(code);
 }

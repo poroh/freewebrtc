@@ -4,7 +4,7 @@
 // Distributed under the terms of the MIT License. See the LICENSE file.
 //
 // Interactive Connectivity Establishment (ICE)
-// ICE Candidate Priority
+// ICE Candidate Component Identifier
 //
 
 #pragma once
@@ -19,13 +19,23 @@ namespace freewebrtc::ice::candidate {
 
 class ComponentId {
 public:
-    static ComponentId from_unsigned(unsigned);
+    static ReturnValue<ComponentId> from_unsigned(unsigned) noexcept;
     static ReturnValue<ComponentId> from_string(const std::string_view&) noexcept;
 
+    bool operator==(const ComponentId&) const noexcept = default;
+
 private:
+    explicit ComponentId(unsigned);
     unsigned m_value;
 };
 
 using MaybeComponentId = std::optional<ComponentId>;
+
+//
+// implementation
+//
+inline ComponentId::ComponentId(unsigned v)
+    : m_value(v)
+{}
 
 }

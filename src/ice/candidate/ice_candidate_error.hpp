@@ -19,7 +19,10 @@ enum class Error {
     candidate_type_absent,
     unknown_candidate_type,
     invalid_foundation_length,
-    invalid_foundation_char
+    invalid_foundation_char,
+    invalid_component_id_length,
+    invalid_component_id_char,
+    invalid_component_id_value
 };
 
 std::error_code make_error_code(Error) noexcept;

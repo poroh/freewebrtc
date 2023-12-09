@@ -16,6 +16,7 @@ set(TEST_SOURCES
     clock_timepoint_tests.cpp
     ice_candidate_type_tests.cpp
     ice_candidate_foundation_tests.cpp
+    ice_candidate_component_id_tests.cpp
 )
 
 include(FetchContent)
