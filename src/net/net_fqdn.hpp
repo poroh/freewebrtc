@@ -23,6 +23,8 @@ public:
     static ParseResult<Fqdn> parse(std::string_view);
     static ReturnValue<Fqdn> from_string(std::string_view);
 
+    bool operator==(const Fqdn&) const noexcept = default;
+
     const std::string& to_string() const noexcept;
 
 private:

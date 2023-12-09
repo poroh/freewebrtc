@@ -12,6 +12,7 @@ set(SOURCES
   ice_candidate_component_id.cpp
   ice_candidate_transport_type.cpp
   ice_candidate_priority.cpp
+  ice_candidate_address.cpp
 )
 file(GLOB HEADERS "*.hpp")
 
