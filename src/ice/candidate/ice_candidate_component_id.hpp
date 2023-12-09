@@ -19,6 +19,11 @@ namespace freewebrtc::ice::candidate {
 
 class ComponentId {
 public:
+    ComponentId(const ComponentId&) = default;
+    ComponentId(ComponentId&&) = default;
+    ComponentId& operator=(const ComponentId&) = default;
+    ComponentId& operator=(ComponentId&&) = default;
+
     static ReturnValue<ComponentId> from_unsigned(unsigned) noexcept;
     static ReturnValue<ComponentId> from_string(const std::string_view&) noexcept;
 

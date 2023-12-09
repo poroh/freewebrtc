@@ -16,6 +16,11 @@ namespace freewebrtc::ice::candidate {
 
 class Foundation {
 public:
+    Foundation(const Foundation&) = default;
+    Foundation(Foundation&&) = default;
+    Foundation& operator=(const Foundation&) = default;
+    Foundation& operator=(Foundation&&) = default;
+
     static ReturnValue<Foundation> from_string(const std::string_view&);
 
 private:

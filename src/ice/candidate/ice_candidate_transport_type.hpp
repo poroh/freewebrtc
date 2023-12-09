@@ -17,6 +17,11 @@ namespace freewebrtc::ice::candidate {
 
 class TransportType {
 public:
+    TransportType(const TransportType&) = default;
+    TransportType(TransportType&&) = default;
+    TransportType& operator=(const TransportType&) = default;
+    TransportType& operator=(TransportType&&) = default;
+
     enum Value {
         UDP,
     };

@@ -17,6 +17,11 @@ namespace freewebrtc::ice::candidate {
 
 class Type {
 public:
+    Type(const Type&) = default;
+    Type(Type&&) = default;
+    Type& operator=(const Type&) = default;
+    Type& operator=(Type&&) = default;
+
     enum Value {
         HOST,
         SERVER_REFLEXIVE,
