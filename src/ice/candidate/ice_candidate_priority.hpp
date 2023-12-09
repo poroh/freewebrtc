@@ -17,11 +17,26 @@ namespace freewebrtc::ice::candidate {
 
 class Priority {
 public:
-    static Priority from_uint32(uint32_t);
+    Priority(const Priority&) = default;
+    Priority(Priority&&) = default;
+    Priority& operator=(const Priority&) = default;
+    Priority& operator=(Priority&&) = default;
+
+    static ReturnValue<Priority> from_uint32(uint32_t) noexcept;
     static ReturnValue<Priority> from_string(const std::string_view&) noexcept;
 
+    bool operator==(const Priority&) const noexcept = default;
+
 private:
+    explicit Priority(uint32_t);
     uint32_t m_value;
 };
+
+//
+// inlines
+//
+inline Priority::Priority(uint32_t v)
+    : m_value(v)
+{}
 
 }
