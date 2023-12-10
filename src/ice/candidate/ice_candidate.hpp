@@ -28,7 +28,8 @@ struct Candidate {
     MaybeComponentId maybe_component;
     Priority priority;
     Type type;
-    std::optional<net::Endpoint> maybe_related_address;
+    std::optional<Address> maybe_related_address;
+    std::optional<net::Port> maybe_related_port;
 };
 
 }

@@ -69,26 +69,29 @@ ReturnValue<SDPAttrParseResult> parse_sdp_attr(std::string_view inv) {
     auto port_rv            = tstr.required_bind(net::Port::from_string).add_context("port");
     auto type_rv = tstr.required("typ")
         .bind([&](auto&&) { return tstr.required_bind(Type::from_string); });
+
     return combine([](auto&& f, auto&& cid, auto& t, auto&& p, auto&& addr, auto&& port, auto&& type) -> ReturnValue<SDPAttrParseResult> {
-        return SDPAttrParseResult{ Supported {
-            .candidate = {
-                .address = std::move(addr),
-                .port = std::move(port),
-                .transport_type = std::move(t),
-                .foundation = std::move(f),
-                .maybe_component = std::move(cid),
-                .priority = std::move(p),
-                .type = std::move(type)
-            }
-        } };
-    }
-    , std::move(foundation_rv)
-    , std::move(component_id_rv)
-    , std::move(transport_rv)
-    , std::move(priority_rv)
-    , std::move(connection_addr_rv)
-    , std::move(port_rv)
-    , std::move(type_rv));
+            return SDPAttrParseResult{
+                Supported {
+                    .candidate = {
+                        .address = std::move(addr),
+                        .port = std::move(port),
+                        .transport_type = std::move(t),
+                        .foundation = std::move(f),
+                        .maybe_component = std::move(cid),
+                        .priority = std::move(p),
+                        .type = std::move(type)
+                    }
+                }
+            };
+        }
+        , std::move(foundation_rv)
+        , std::move(component_id_rv)
+        , std::move(transport_rv)
+        , std::move(priority_rv)
+        , std::move(connection_addr_rv)
+        , std::move(port_rv)
+        , std::move(type_rv));
 }
 
 }

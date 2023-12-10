@@ -17,7 +17,8 @@ enum class Error {
     invalid_address_size,
     ip_address_parse_error,
     fqdn_invalid_label_expect_letter,
-    fqdn_not_fully_parsed
+    fqdn_not_fully_parsed,
+    invalid_port_value
 };
 
 std::error_code make_error_code(Error) noexcept;

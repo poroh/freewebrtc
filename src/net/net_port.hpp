@@ -16,6 +16,7 @@ namespace freewebrtc::net {
 class Port {
 public:
     explicit Port(uint16_t);
+    static Port from_uint16(uint16_t) noexcept;
     static ReturnValue<Port> from_string(const std::string_view&) noexcept;
 
     bool operator==(const Port&) const noexcept = default;
@@ -27,9 +28,13 @@ private:
 //
 // implementation
 //
-inline Port::Port(uint16_t p)
-    : m_value(p)
+inline Port::Port(uint16_t v)
+    : m_value(v)
 {}
+
+inline Port Port::from_uint16(uint16_t v) noexcept {
+    return Port(v);
+}
 
 inline uint16_t Port::value() const noexcept {
     return m_value;

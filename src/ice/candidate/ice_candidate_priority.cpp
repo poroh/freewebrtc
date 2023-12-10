@@ -7,6 +7,7 @@
 // ICE Candidate Priority
 //
 
+#include "abnf/abnf.hpp"
 #include "ice/candidate/ice_candidate_priority.hpp"
 #include "ice/candidate/ice_candidate_error.hpp"
 
@@ -26,6 +27,9 @@ ReturnValue<Priority> Priority::from_string(const std::string_view& v) noexcept 
     }
     uint64_t result = 0;
     for (auto c: v) {
+        if (!abnf::is_DIGIT(c)) {
+            return make_error_code(Error::invalid_priority_value);
+        }
         result = 10 * result + c - '0';
     }
     // is a positive integer between 1 and (2**31 - 1) inclusive. The

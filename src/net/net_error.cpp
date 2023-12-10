@@ -22,6 +22,7 @@ public:
         case Error::ip_address_parse_error: return "cannot parse IP address";
         case Error::fqdn_invalid_label_expect_letter: return "invalid FQDN label: expect letter";
         case Error::fqdn_not_fully_parsed: return "FQDN is not fully parsed";
+        case Error::invalid_port_value: return "invalid port value";
         }
         return "unknown stun error";
     }

@@ -15,6 +15,7 @@ endforeach()
 set(SOURCES
     net_error.cpp
     net_fqdn.cpp
+    net_port.cpp
 )
 file(GLOB HEADERS "*.hpp")
 
