@@ -14,6 +14,7 @@
 #include <optional>
 #include <utility>
 #include <sstream>
+#include <vector>
 #include "util/util_fmap.hpp"
 
 namespace freewebrtc::util::string_view {
@@ -27,7 +28,7 @@ MaybeSV remote_prefix(SV, size_t sz);
 std::optional<std::pair<SV, SV>> split(SV, char sep);
 
 template<template <typename...> class Result = std::vector>
-Result<std::string_view> split_all(SV, char sep);
+Result<SV> split_all(SV, char sep);
 
 template<typename Container>
 std::string join(const Container&, const std::string& sep);
@@ -36,7 +37,7 @@ std::string join(const Container&, const std::string& sep);
 // implementation
 //
 inline MaybeSV remove_prefix(SV sv, size_t sz) {
-    if (sv.size() > sz) {
+    if (sz > sv.size()) {
         return std::nullopt;
     }
     sv.remove_prefix(sz);
@@ -54,10 +55,9 @@ inline std::optional<std::pair<SV, SV>> split(SV sv, char sep) {
     return std::nullopt;
 }
 
-
 template<template <typename...> class Result>
-Result<std::string_view> split(std::string_view sv, char sep) {
-    Result result;
+Result<SV> split_all(SV sv, char sep) {
+    Result<SV> result;
     while (!sv.empty()) {
         auto maybe_pair = split(sv, sep);
         if (maybe_pair.has_value()) {
@@ -69,6 +69,7 @@ Result<std::string_view> split(std::string_view sv, char sep) {
             sv = SV{};
         }
     }
+    return result;
 }
 
 template<typename Container>

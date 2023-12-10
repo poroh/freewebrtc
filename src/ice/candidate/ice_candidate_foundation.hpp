@@ -23,6 +23,8 @@ public:
 
     static ReturnValue<Foundation> from_string(const std::string_view&);
 
+    bool operator==(const Foundation&) const noexcept = default;
+
 private:
     Foundation(const std::string_view&);
     std::string m_value;

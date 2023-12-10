@@ -6,12 +6,13 @@
 // Error in freewebrtc library
 //
 
-#include "util/util_error.h"
+#include "util/util_error.hpp"
+#include "util/util_string_view.hpp"
 
 namespace freewebrtc {
 
 std::string Error::message() const {
-    std::vector<string_view> out;
+    std::vector<std::string_view> out;
     for (auto rit = m_context.rbegin(); rit != m_context.rend(); ++rit) {
         out.emplace_back(*rit);
     }

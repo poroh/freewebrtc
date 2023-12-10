@@ -48,6 +48,12 @@ TokenStream::TokenStream(Container&& d)
     , m_pos(m_data.cbegin())
 {}
 
+TokenStream::MaybToken TokenStream::optional() noexcept {
+    if (m_pos == m_data.cend()) {
+        return std::nullopt;
+    }
+    return *(m_pos++);
+}
 
 ::freewebrtc::Error TokenStream::make_error_code(Error code) {
     return std::error_code(static_cast<int>(code), token_stream_error_category());

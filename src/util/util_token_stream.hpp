@@ -26,6 +26,7 @@ public:
     };
     using TokenType = std::string_view;
     using Container = std::vector<TokenType>;
+    using MaybToken = std::optional<TokenType>;
 
     TokenStream(const Container&);
     TokenStream(Container&&);
@@ -35,8 +36,9 @@ public:
     auto required_bind(F&& f) noexcept -> ReturnValue<typename std::invoke_result_t<F, const TokenType&>::Value>;
 
     ReturnValue<TokenType> required() noexcept;
-
     MaybeError required(const std::string_view&) noexcept;
+
+    MaybToken optional() noexcept;
 
 private:
     ::freewebrtc::Error make_error_code(Error);

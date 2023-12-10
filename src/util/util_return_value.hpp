@@ -80,6 +80,11 @@ struct ReturnValueUnitType{};
 using MaybeError = ReturnValue<ReturnValueUnitType>;
 MaybeError success() noexcept;
 
+// Create ReturnValue from the type. In FP it is full anaglogue of return
+// for Monad or pure for applicative functor.
+template<typename T>
+ReturnValue<T> return_value(T&& t) noexcept;
+
 // Check that any of the ReturnValue is error.
 // Example:
 //   ReturnValue<int> v1 = 1;
@@ -360,6 +365,11 @@ auto combine(F&& f, ReturnValue<Ts>&&... rvs) -> ReturnValue<typename std::invok
 
 inline MaybeError success() noexcept {
     return MaybeError{ReturnValueUnitType{}};
+}
+
+template<typename T>
+ReturnValue<T> return_value(T&& t) noexcept {
+    return ReturnValue<T>(std::forward<T>(t));
 }
 
 

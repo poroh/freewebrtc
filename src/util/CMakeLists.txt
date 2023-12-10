@@ -8,6 +8,7 @@ set(SOURCES
     util_hash_murmur.cpp
     util_binary_view.cpp
     util_token_stream.cpp
+    util_error.cpp
 )
 file(GLOB HEADERS "*.hpp")
 

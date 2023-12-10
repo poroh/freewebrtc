@@ -70,7 +70,63 @@ ReturnValue<SDPAttrParseResult> parse_sdp_attr(std::string_view inv) {
     auto type_rv = tstr.required("typ")
         .bind([&](auto&&) { return tstr.required_bind(Type::from_string); });
 
-    return combine([](auto&& f, auto&& cid, auto& t, auto&& p, auto&& addr, auto&& port, auto&& type) -> ReturnValue<SDPAttrParseResult> {
+    std::optional<ReturnValue<Address>> maybe_raddr;
+    std::optional<ReturnValue<net::Port>> maybe_rport;
+    Supported::ExtensionVec extensions;
+    while (true) {
+        auto maybe_att_name = tstr.optional();
+        if (!maybe_att_name.has_value()) {
+            break;
+        }
+        auto att_name = maybe_att_name.value();
+        if (att_name == "raddr") {
+            maybe_raddr = tstr.required_bind(Address::from_string).add_context("raddr");
+        } else if (att_name == "rport") {
+            maybe_rport = tstr.required_bind(net::Port::from_string).add_context("rport");
+        } else {
+            auto att_value_rv = tstr.required();
+            if (att_value_rv.is_value()) {
+                extensions.emplace_back(Supported::Extension{
+                        .att_name = std::string{att_name},
+                        .att_value = std::string{att_value_rv.assert_value()}
+                    });
+            }
+        }
+    }
+
+    // RFC8839:
+    // An agent processing remote candidates MUST ignore "candidate"
+    // lines that include candidates with FQDNs or IP address versions
+    // that are not supported or recognized.
+    const auto unsupported = any_is_error(connection_addr_rv, type_rv, transport_rv);
+    if (unsupported.has_value()) {
+        auto error = unsupported.value();
+        if (connection_addr_rv.is_error()
+            || error == make_error_code(Error::unknown_candidate_type)
+            || error == make_error_code(Error::unknown_transport_type)) {
+            return SDPAttrParseResult{ Unsupported{ error.message() } };
+        }
+    }
+
+    using MaybeAddr = std::optional<Address>;
+    using MaybeAddrRV = ReturnValue<MaybeAddr>;
+    MaybeAddrRV maybe_raddr_rv =  maybe_raddr.has_value()
+        ? std::move(maybe_raddr.value()).fmap([](auto&& addr) { return MaybeAddr{std::move(addr)}; })
+        : MaybeAddrRV{std::nullopt};
+
+    using MaybePort = std::optional<net::Port>;
+    using MaybePortRV = ReturnValue<MaybePort>;
+    MaybePortRV maybe_rport_rv =  maybe_rport.has_value()
+        ? maybe_rport.value().fmap([](auto&& port) { return MaybePort{port}; })
+        : MaybePortRV{std::nullopt};
+
+    return combine([](
+            auto&& f, auto&& cid, auto& t, auto&& p,
+            auto&& addr, auto&& port, auto&& type,
+            auto&& raddr, auto&& rport,
+            auto&& extensions
+            ) -> ReturnValue<SDPAttrParseResult>
+        {
             return SDPAttrParseResult{
                 Supported {
                     .candidate = {
@@ -80,8 +136,11 @@ ReturnValue<SDPAttrParseResult> parse_sdp_attr(std::string_view inv) {
                         .foundation = std::move(f),
                         .maybe_component = std::move(cid),
                         .priority = std::move(p),
-                        .type = std::move(type)
-                    }
+                        .type = std::move(type),
+                        .maybe_related_address = std::move(raddr),
+                        .maybe_related_port = std::move(rport)
+                    },
+                    .extensions = std::move(extensions)
                 }
             };
         }
@@ -91,7 +150,10 @@ ReturnValue<SDPAttrParseResult> parse_sdp_attr(std::string_view inv) {
         , std::move(priority_rv)
         , std::move(connection_addr_rv)
         , std::move(port_rv)
-        , std::move(type_rv));
+        , std::move(type_rv)
+        , std::move(maybe_raddr_rv)
+        , std::move(maybe_rport_rv)
+        , return_value(std::move(extensions)));
 }
 
 }

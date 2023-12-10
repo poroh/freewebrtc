@@ -21,6 +21,7 @@ set(TEST_SOURCES
     ice_candidate_transport_type_tests.cpp
     ice_candidate_priority_tests.cpp
     ice_candidate_address_tests.cpp
+    ice_candidate_sdp_tests.cpp
 )
 
 include(FetchContent)

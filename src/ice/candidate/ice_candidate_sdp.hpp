@@ -24,7 +24,7 @@ struct Supported {
         std::string att_value;
     };
     using ExtensionVec = std::vector<Extension>;
-    ExtensionVec extension;
+    ExtensionVec extensions;
 };
 using SDPAttrParseResult = std::variant<Supported, Unsupported>;
 
