@@ -35,6 +35,8 @@ public:
     MaybeFqdnCRef as_fqdn() const noexcept;
     MaybeIpAddressCRef as_ip_address() const noexcept;
 
+    ReturnValue<std::string> to_string() const;
+
 private:
     using Value = std::variant<net::ip::Address, net::Fqdn>;
     Address(net::ip::Address&&);
@@ -66,5 +68,16 @@ inline Address::MaybeIpAddressCRef Address::as_ip_address() const noexcept{
     }
     return std::nullopt;
 }
+
+inline ReturnValue<std::string> Address::to_string() const {
+    return std::visit([](auto&& v) {
+        if constexpr (std::is_same_v<const net::ip::Address&, decltype(v)>) {
+            return v.to_string();
+        } else if constexpr (std::is_same_v<const net::Fqdn&, decltype(v)>) {
+            return ReturnValue<std::string>{std::move(v.to_string())};
+        }
+    }, m_value);
+}
+
 
 }

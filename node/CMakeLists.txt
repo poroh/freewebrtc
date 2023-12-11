@@ -44,6 +44,7 @@ if(NODE_JS_FOUND)
   set(SUBLIBS
     napi_wrapper
     node_stun
+    node_ice
     openssl
   )
 

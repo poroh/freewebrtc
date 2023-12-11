@@ -12,9 +12,11 @@ import { HTTPServer, HTTPServerPrefix, ProcessJsonResult } from './http';
 import { parseSDP, serializeSDP, SDP, MediaDescriptor } from './sdp';
 import * as os from 'os';
 import { webrtcProcessSDP } from './webrtc_sdp';
+const echob = require('../build/Release/echo_backend');
 
 const prefixes: HTTPServerPrefix[] = [
     {method: 'POST', prefix: '/echo-api/offer', action: {type: 'process-json', handler: sdpOffer}},
+    {method: 'POST', prefix: '/echo-api/ice-candidate', action: {type: 'process-json', handler: iceCandidate}},
     {method: 'GET', prefix: '/', action: {type: 'proxy', target: 'http://localhost:9000'}},
 ];
 
@@ -44,7 +46,7 @@ async function sdpOffer(req: object): Promise<ProcessJsonResult> {
     const addr = await t.start();
     if (addr.address === '0.0.0.0') {
         const candidates = collectNonLoopbackAddresses(addr.family)
-            .map((ifaddr) => `candidate:1 1 udp 1 ${ifaddr} ${addr.port} typ host`);
+            .map((ifaddr) => `candidate:1 1 UDP 1 ${ifaddr} ${addr.port} typ host`);
         return {
             result: 'ok',
             answer: {
@@ -57,6 +59,13 @@ async function sdpOffer(req: object): Promise<ProcessJsonResult> {
         result: 'error',
         code: 501,
         description: 'Not supported yet'
+    };
+}
+
+async function iceCandidate(req: object): Promise<ProcessJsonResult> {
+    return {
+        result: 'ok',
+        answer: echob.ice.candidate_parse((req as any).candidate)
     };
 }
 

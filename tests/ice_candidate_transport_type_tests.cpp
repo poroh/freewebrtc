@@ -19,10 +19,12 @@ public:
 
 TEST_F(IceCandidateTransportTypeTest, from_string_tests) {
     // RFC8839:
-    // This specification defines the values "host", "srflx",
-    // "prflx", and "relay" for host, server-reflexive,
-    // peer-reflexive, and relayed candidates, respectively.
-    const std::vector<std::string_view> all { "UDP" };
+    // This specification only defines UDP. However, extensibility is
+    // provided to allow for future transport protocols to be used
+    // with ICE by extending the subregistry "ICE Transport Protocols"
+    // under the "Interactive Connectivity Establishment (ICE)"
+    // registry.
+    const std::vector<std::string_view> all { "UDP", "Udp", "uDp", "udp" };
     for (auto t: all) {
         ASSERT_TRUE(TransportType::from_string(t).is_value());
     }

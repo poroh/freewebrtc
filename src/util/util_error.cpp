@@ -16,7 +16,8 @@ std::string Error::message() const {
     for (auto rit = m_context.rbegin(); rit != m_context.rend(); ++rit) {
         out.emplace_back(*rit);
     }
-    out.emplace_back(m_code.message());
+    std::string message = m_code.message();
+    out.emplace_back(message);
     return util::string_view::join(out, ": ");
 }
 

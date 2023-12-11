@@ -28,6 +28,7 @@ public:
     static ReturnValue<ComponentId> from_string(const std::string_view&) noexcept;
 
     bool operator==(const ComponentId&) const noexcept = default;
+    unsigned value() const noexcept;
 
 private:
     explicit ComponentId(unsigned);
@@ -42,5 +43,9 @@ using MaybeComponentId = std::optional<ComponentId>;
 inline ComponentId::ComponentId(unsigned v)
     : m_value(v)
 {}
+
+inline unsigned ComponentId::value() const noexcept {
+    return m_value;
+}
 
 }

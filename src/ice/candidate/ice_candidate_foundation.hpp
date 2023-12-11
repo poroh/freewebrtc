@@ -23,6 +23,7 @@ public:
 
     static ReturnValue<Foundation> from_string(const std::string_view&);
 
+    const std::string& to_string() const noexcept;
     bool operator==(const Foundation&) const noexcept = default;
 
 private:
@@ -36,5 +37,9 @@ private:
 inline Foundation::Foundation(const std::string_view& v)
     : m_value(v)
 {}
+
+inline const std::string& Foundation::to_string() const noexcept {
+    return m_value;
+}
 
 }

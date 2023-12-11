@@ -30,6 +30,7 @@ public:
     bool operator==(const TransportType&) const noexcept = default;
 
     static ReturnValue<TransportType> from_string(const std::string_view&) noexcept;
+    const std::string& to_string() const;
 
 private:
     explicit TransportType(Value);

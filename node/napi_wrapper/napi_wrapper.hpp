@@ -34,7 +34,20 @@ public:
     template<typename T>
     ReturnValue<Value> wrap(std::unique_ptr<T> native_obj) const noexcept;
 
-    static Value fmap_to_value(const Object& obj) noexcept;
+    static Value fmap_to_value(const Object&) noexcept;
+private:
+    napi_env m_env;
+    napi_value m_value;
+};
+
+class Array {
+public:
+    Array(napi_env, napi_value);
+
+    Value to_value() const noexcept;
+    MaybeError set_element(size_t i, const Value&) noexcept;
+
+    static Value fmap_to_value(const Array&) noexcept;
 private:
     napi_env m_env;
     napi_value m_value;
@@ -85,6 +98,7 @@ public:
 
     using RVV = ReturnValue<Value>;
     using RVO = ReturnValue<Object>;
+    using RVA = ReturnValue<Array>;
 
     using ValueInit = std::variant<Value, RVV, std::optional<RVV>, Object, RVO, std::optional<RVO>>;
     using ObjectSpec = std::vector<std::pair<std::string, ValueInit>>;
@@ -93,7 +107,13 @@ public:
     RVO create_object() const noexcept;
     RVO create_object(const ObjectSpec&) const noexcept;
 
+    RVA create_array() const noexcept;
+
+    template<typename Container, typename F>
+    RVV create_array(const Container&, F&&);
+
     RVV create_undefined() const noexcept;
+    RVV create_null() const noexcept;
     RVV create_string(const std::string_view&) const noexcept;
     RVV create_buffer(const util::ConstBinaryView& view) const noexcept;
     RVV create_boolean(bool value) const noexcept;
@@ -162,6 +182,14 @@ inline Value Object::fmap_to_value(const Object& obj) noexcept {
     return obj.to_value();
 }
 
+inline Value Array::to_value() const noexcept {
+    return Value(m_env, m_value);
+}
+
+inline Value Array::fmap_to_value(const Array& arr) noexcept {
+    return arr.to_value();
+}
+
 inline ReturnValue<util::ConstBinaryView> Value::to_buffer(const Value& val) noexcept {
     return val.as_buffer();
 }
@@ -177,5 +205,26 @@ inline ReturnValue<std::string> Value::to_string(const Value& val) noexcept {
 inline ReturnValue<int32_t> Value::to_int32(const Value& val) noexcept {
     return val.as_int32();
 }
+
+template<typename Container, typename F>
+Env::RVV Env::create_array(const Container& c, F&& f) {
+    return create_array()
+        > [&](auto&& array) -> RVA {
+            size_t i = 0;
+            for (const auto& v: c) {
+                auto napiv_rv = f(v);
+                if (napiv_rv.is_error()) {
+                    return napiv_rv.assert_error();
+                }
+                auto maybe_err = array.set_element(i++, napiv_rv.assert_value());
+                if (maybe_err.is_error()) {
+                    return maybe_err.assert_error();
+                }
+            }
+            return array;
+        }
+        > Array::fmap_to_value;
+}
+
 
 }

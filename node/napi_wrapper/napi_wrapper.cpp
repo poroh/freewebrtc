@@ -113,6 +113,17 @@ ReturnValue<std::optional<Value>> Object::maybe_named_property(const std::string
         });
 }
 
+Array::Array(napi_env env, napi_value v)
+    : m_env(env)
+    , m_value(v)
+{}
+
+MaybeError Array::set_element(size_t i, const Value& v) noexcept {
+    if (auto status = napi_set_element(m_env, m_value, i, v.to_napi())) {
+        return make_error_code(status);
+    }
+    return success();
+}
 
 Env::Env(napi_env env)
     : m_env(env)
@@ -188,9 +199,25 @@ ReturnValue<Object> Env::create_object(const ObjectSpec& spec) const noexcept {
     return object_result;
 }
 
+ReturnValue<Array> Env::create_array() const noexcept {
+    napi_value arr;
+    if (auto status = napi_create_array(m_env, &arr); status != napi_ok) {
+        return make_error_code(status);
+    }
+    return Array(m_env, arr);
+}
+
 ReturnValue<Value> Env::create_undefined() const noexcept {
     napi_value result;
     if (auto status = napi_get_undefined(m_env, &result); status != napi_ok) {
+        return make_error_code(status);
+    }
+    return Value(m_env, result);
+}
+
+ReturnValue<Value> Env::create_null() const noexcept {
+    napi_value result;
+    if (auto status = napi_get_null(m_env, &result); status != napi_ok) {
         return make_error_code(status);
     }
     return Value(m_env, result);

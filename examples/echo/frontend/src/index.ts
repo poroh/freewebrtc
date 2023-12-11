@@ -8,6 +8,23 @@ async function startRTC() {
         offerToReceiveVideo: true
     };
     const offer = await pc.createOffer(offerOptions);
+    pc.onicecandidate = async (ev: RTCPeerConnectionIceEvent) => {
+        if (ev.candidate?.candidate) {
+            const candidate = ev.candidate?.candidate;
+            await fetch('/echo-api/ice-candidate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({candidate})
+            });
+            const app = document.getElementById('root');
+            if (app) {
+                app.innerHTML += "<br>" + ev.candidate?.candidate;
+            }
+            console.log(ev.candidate?.candidate);
+        }
+    };
     pc.setLocalDescription(offer);
     const offerResp = await fetch('/echo-api/offer', {
         method: 'POST',

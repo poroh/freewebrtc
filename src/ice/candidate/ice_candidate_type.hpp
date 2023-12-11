@@ -36,6 +36,8 @@ public:
     // From SDP string (RFC8839).
     static ReturnValue<Type> from_string(const std::string_view&) noexcept;
 
+    const std::string& to_string() const noexcept;
+
     bool operator==(const Type&) const noexcept = default;
 
 private:
