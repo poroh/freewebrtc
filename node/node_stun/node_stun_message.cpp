@@ -9,7 +9,7 @@
 #include "node_stun_message.hpp"
 #include "node_stun_header.hpp"
 #include "util/util_fmap.hpp"
-#include "util/util_return_value_sugar.hpp"
+#include "util/util_result_sugar.hpp"
 
 namespace freewebrtc::node_stun {
 
@@ -18,8 +18,8 @@ using Object = napi::Object;
 using Env = napi::Env;
 using CallbackInfo = napi::CallbackInfo;
 
-ReturnValue<Object> stun_attributes(const Env& env, const stun::TransactionId& tid, const stun::AttributeSet& attrs) {
-    using MaybeRVV = std::optional<ReturnValue<Value>>;
+Result<Object> stun_attributes(const Env& env, const stun::TransactionId& tid, const stun::AttributeSet& attrs) {
+    using MaybeRVV = std::optional<Result<Value>>;
     return
         env.create_object({
             { "username",
@@ -67,7 +67,7 @@ ReturnValue<Object> stun_attributes(const Env& env, const stun::TransactionId& t
         });
 }
 
-ReturnValue<Object> message(const Env& env, const stun::Message& msg) {
+Result<Object> message(const Env& env, const stun::Message& msg) {
     return
         env.create_object({
                 { "header", header(env, msg.header) },
@@ -77,7 +77,7 @@ ReturnValue<Object> message(const Env& env, const stun::Message& msg) {
         .add_context("stun message");
 }
 
-ReturnValue<Value> message_parse(Env& env, const CallbackInfo& ci) {
+Result<Value> message_parse(Env& env, const CallbackInfo& ci) {
     return ci[0]
         > [](const auto& arg) { return arg.as_buffer(); }
         > [](const auto& view) {

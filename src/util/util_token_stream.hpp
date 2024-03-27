@@ -13,7 +13,7 @@
 #include <optional>
 #include <type_traits>
 
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 
 namespace freewebrtc::util {
 
@@ -33,9 +33,9 @@ public:
 
     // Read next required token and transform it with function F
     template<typename F>
-    auto required_bind(F&& f) noexcept -> ReturnValue<typename std::invoke_result_t<F, const TokenType&>::Value>;
+    auto required_bind(F&& f) noexcept -> Result<typename std::invoke_result_t<F, const TokenType&>::Value>;
 
-    ReturnValue<TokenType> required() noexcept;
+    Result<TokenType> required() noexcept;
     MaybeError required(const std::string_view&) noexcept;
 
     MaybToken optional() noexcept;
@@ -52,7 +52,7 @@ private:
 // implementation
 //
 template<typename F>
-auto TokenStream::required_bind(F&& f) noexcept -> ReturnValue<typename std::invoke_result_t<F, const TokenType&>::Value> {
+auto TokenStream::required_bind(F&& f) noexcept -> Result<typename std::invoke_result_t<F, const TokenType&>::Value> {
     return required().bind(f);
 }
 
@@ -66,11 +66,11 @@ inline MaybeError TokenStream::required(const std::string_view& expected) noexce
     });
 }
 
-inline ReturnValue<TokenStream::TokenType> TokenStream::required() noexcept {
+inline Result<TokenStream::TokenType> TokenStream::required() noexcept {
     if (m_pos == m_data.end()) {
         return make_error_code(Error::no_required_token);
     }
-    return ReturnValue<TokenType>{*(m_pos++)};
+    return Result<TokenType>{*(m_pos++)};
 }
 
 

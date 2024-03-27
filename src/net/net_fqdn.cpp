@@ -81,14 +81,14 @@ ParseResult<std::string_view> parse_subdomain(std::string_view v) {
 
     while (true) {
         auto rv = parse_label(rest);
-        if (rv.is_error()) {
+        if (rv.is_err()) {
             if (sz == 0) {
-                return rv.assert_error();
+                return rv.unwrap_err();
             } else {
                 return return_success();
             }
         }
-        const auto& parse_success = rv.assert_value();
+        const auto& parse_success = rv.unwrap();
         sz += parse_success.value.size();
         rest = parse_success.rest;
         if (rest.empty()) {
@@ -118,10 +118,10 @@ ParseResult<Fqdn> Fqdn::parse(std::string_view v) {
         });
 }
 
-ReturnValue<Fqdn> Fqdn::from_string(std::string_view v) {
+Result<Fqdn> Fqdn::from_string(std::string_view v) {
     return parse(v)
         .bind([](auto& parse_success) {
-            using RetVal = ReturnValue<Fqdn>;
+            using RetVal = Result<Fqdn>;
             if (parse_success.rest.empty()) {
                 return RetVal{parse_success.value};
             }

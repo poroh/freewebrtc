@@ -120,7 +120,7 @@ AttributeSet AttributeSet::create(std::vector<Attribute::Value>&& ka, std::vecto
     return newset;
 }
 
-ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const MaybeIntegrity& maybe_integrity) const {
+Result<util::ByteVec> AttributeSet::build(const Header& header, const MaybeIntegrity& maybe_integrity) const {
     std::vector<util::ConstBinaryView> result;
     const size_t num_attrs = m_map.size() + m_unknown.size() + (maybe_integrity.has_value() ? 1 : 0);
     result.reserve(num_attrs * 3 + 1); // We can have up to three views per attribute
@@ -214,7 +214,7 @@ ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const Maybe
     }
 
     // Add message integrity with dummy content (if exist in m_map);
-    std::optional<ReturnValue<MessageIntegityAttribute::Digest>> maybe_integrity_digest_rv;
+    std::optional<Result<MessageIntegityAttribute::Digest>> maybe_integrity_digest_rv;
     if (maybe_integrity.has_value()) {
         const auto& h = maybe_integrity->hash;
         const auto& p = maybe_integrity->password;
@@ -222,10 +222,10 @@ ReturnValue<util::ByteVec> AttributeSet::build(const Header& header, const Maybe
         result[0] = util::ConstBinaryView(fake_header);
         maybe_integrity_digest_rv = crypto::hmac::digest(result, p.opad(), p.ipad(), h);
         const auto& integrity_digest_rv = maybe_integrity_digest_rv.value();
-        if (integrity_digest_rv.is_error()) {
-            return integrity_digest_rv.assert_error();
+        if (integrity_digest_rv.is_err()) {
+            return integrity_digest_rv.unwrap_err();
         }
-        add_attr(attr_registry::MESSAGE_INTEGRITY, util::ConstBinaryView(integrity_digest_rv.assert_value().value.value()));
+        add_attr(attr_registry::MESSAGE_INTEGRITY, util::ConstBinaryView(integrity_digest_rv.unwrap().value.value()));
     }
 
     util::ByteVec real_header;

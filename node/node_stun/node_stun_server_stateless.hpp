@@ -13,6 +13,6 @@
 
 namespace freewebrtc::node_stun {
 
-ReturnValue<napi::Value> server_stateless_class(napi::Env& env, std::string_view name);
+Result<napi::Value> server_stateless_class(napi::Env& env, std::string_view name);
 
 }

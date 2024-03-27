@@ -44,7 +44,7 @@ uint8_t Family::to_uint8() const noexcept {
     return attr_registry::FAMILY_IPV4;
 }
 
-ReturnValue<XoredAddress> XoredAddress::from_view(Family f, const util::ConstBinaryView& vv) {
+Result<XoredAddress> XoredAddress::from_view(Family f, const util::ConstBinaryView& vv) {
     switch (f.type()) {
         case Family::IPv4: {
             if (vv.size() != std::tuple_size<V4Holder>::value) {

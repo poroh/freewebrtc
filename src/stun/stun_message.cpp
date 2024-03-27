@@ -17,7 +17,7 @@
 namespace freewebrtc::stun {
 
 
-ReturnValue<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
+Result<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
     using namespace details;
     if (vv.size() < STUN_HEADER_SIZE) {
         stat.error.inc();
@@ -110,9 +110,9 @@ ReturnValue<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& 
             continue;
         }
         auto attr_rv = Attribute::parse(attr_view, attr_type, stat);
-        if (attr_rv.is_error()) {
+        if (attr_rv.is_err()) {
             // statisitics is increased by Attribute::parse.
-            return attr_rv.assert_error();
+            return attr_rv.unwrap_err();
         }
         const auto maybe_error =
             std::visit(
@@ -158,9 +158,9 @@ ReturnValue<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& 
                         return success();
                     }
                 },
-                std::move(attr_rv.assert_value()));
-        if (maybe_error.is_error()) {
-            return maybe_error.assert_error();
+                std::move(attr_rv.unwrap()));
+        if (maybe_error.is_err()) {
+            return maybe_error.unwrap_err();
         }
         attr_offset = next_attr_offset;
     }
@@ -178,7 +178,7 @@ ReturnValue<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& 
     };
 }
 
-ReturnValue<std::optional<bool>> Message::is_valid(const util::ConstBinaryView& data, const IntegrityData& idata) const noexcept {
+Result<std::optional<bool>> Message::is_valid(const util::ConstBinaryView& data, const IntegrityData& idata) const noexcept {
     using namespace details;
     const auto& h = idata.hash;
     const auto& password = idata.password;
@@ -210,13 +210,13 @@ ReturnValue<std::optional<bool>> Message::is_valid(const util::ConstBinaryView& 
             uint8_t(integrity_message_len & 0xFF)
         };
     const auto digest_rv = crypto::hmac::digest({util::ConstBinaryView(header), *without_4byte_header}, password.opad(), password.ipad(), h);
-    if (digest_rv.is_error()) {
-        return digest_rv.assert_error();
+    if (digest_rv.is_err()) {
+        return digest_rv.unwrap_err();
     }
-    return MaybeBool{digest_rv.assert_value().value == integrity.get().value};
+    return MaybeBool{digest_rv.unwrap().value == integrity.get().value};
 }
 
-ReturnValue<util::ByteVec> Message::build(const MaybeIntegrity& maybeintegrity) const noexcept {
+Result<util::ByteVec> Message::build(const MaybeIntegrity& maybeintegrity) const noexcept {
     return attribute_set.build(header, maybeintegrity);
 }
 

@@ -13,7 +13,7 @@
 
 namespace freewebrtc::node_stun {
 
-ReturnValue<napi::Object> message(const napi::Env& env, const stun::Message& msg);
-ReturnValue<napi::Value> message_parse(napi::Env& env, const napi::CallbackInfo& ci);
+Result<napi::Object> message(const napi::Env& env, const stun::Message& msg);
+Result<napi::Value> message_parse(napi::Env& env, const napi::CallbackInfo& ci);
 
 }

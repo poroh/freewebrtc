@@ -28,6 +28,6 @@ struct Supported {
 };
 using SDPAttrParseResult = std::variant<Supported, Unsupported>;
 
-ReturnValue<SDPAttrParseResult> parse_sdp_attr(std::string_view);
+Result<SDPAttrParseResult> parse_sdp_attr(std::string_view);
 
 }

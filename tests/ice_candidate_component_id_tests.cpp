@@ -17,14 +17,14 @@ public:
 };
 
 TEST_F(IceCandidateComponentIdTest, from_string_tests) {
-    EXPECT_TRUE(ComponentId::from_string("0").is_value());
-    EXPECT_FALSE(ComponentId::from_string("").is_value());
-    EXPECT_TRUE(ComponentId::from_string("123").is_value());
-    EXPECT_FALSE(ComponentId::from_string("1234").is_value());
+    EXPECT_TRUE(ComponentId::from_string("0").is_ok());
+    EXPECT_FALSE(ComponentId::from_string("").is_ok());
+    EXPECT_TRUE(ComponentId::from_string("123").is_ok());
+    EXPECT_FALSE(ComponentId::from_string("1234").is_ok());
 
-    EXPECT_TRUE(ComponentId::from_string("90").is_value());
-    EXPECT_EQ(ComponentId::from_string("0").assert_value(), ComponentId::from_unsigned(0).assert_value());
-    EXPECT_EQ(ComponentId::from_string("123").assert_value(), ComponentId::from_unsigned(123).assert_value());
+    EXPECT_TRUE(ComponentId::from_string("90").is_ok());
+    EXPECT_EQ(ComponentId::from_string("0").unwrap(), ComponentId::from_unsigned(0).unwrap());
+    EXPECT_EQ(ComponentId::from_string("123").unwrap(), ComponentId::from_unsigned(123).unwrap());
 }
 
 }

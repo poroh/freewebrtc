@@ -20,11 +20,11 @@ napi_value init(napi_env inenv, napi_value) {
                 })
             }
         });
-    if (exports.is_error()) {
-        env.throw_error("Failed to initialize: " + exports.assert_error().message());
+    if (exports.is_err()) {
+        env.throw_error("Failed to initialize: " + exports.unwrap_err().message());
         return nullptr;
     }
-    return exports.assert_value().to_value().to_napi();
+    return exports.unwrap().to_value().to_napi();
 }
 
 NAPI_MODULE(NODE_GYP_MODULE_NAME, init);

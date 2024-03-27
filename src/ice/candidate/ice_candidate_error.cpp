@@ -44,6 +44,7 @@ std::string IceCandidateError::message(int code) const {
     case Error::unknown_transport_type: return "Transport type is unknown";
     case Error::invalid_priority_length: return "Invalid candidate priority length";
     case Error::invalid_priority_value: return "Invalid candidate priority value";
+    case Error::invalid_type_preference_value: return "Invalid candidate type preference value";
     }
     return "Unknown ice candidate error: " + std::to_string(code);
 }

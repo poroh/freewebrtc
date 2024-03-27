@@ -9,7 +9,7 @@
 #pragma once
 
 #include "util/util_parse_result.hpp"
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 
 namespace freewebrtc::net {
 
@@ -21,7 +21,7 @@ public:
     Fqdn& operator=(Fqdn&&) = default;
 
     static ParseResult<Fqdn> parse(std::string_view);
-    static ReturnValue<Fqdn> from_string(std::string_view);
+    static Result<Fqdn> from_string(std::string_view);
 
     bool operator==(const Fqdn&) const noexcept = default;
 

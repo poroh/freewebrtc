@@ -13,7 +13,7 @@
 
 #include "util/util_binary_view.hpp"
 #include "util/util_typed_bool.hpp"
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 
 #include "stun/stun_header.hpp"
 #include "stun/stun_attribute_set.hpp"
@@ -37,15 +37,15 @@ struct Message {
     // Data interval that is covered by MESSAGE-INTEGRITY attribute (if any).
     std::optional<util::ConstBinaryView::Interval> integrity_interval;
     // Parse message from binary view
-    static ReturnValue<Message> parse(const util::ConstBinaryView&, ParseStat&);
+    static Result<Message> parse(const util::ConstBinaryView&, ParseStat&);
     // Check that MESSAGE-INTEGRITY is valid (if present).
     // If MESSAGE-INTEGRITY is not present then function returns std::nullopt
     // Error may occue if hash function returns error. Otherwise return_value.value()
     // is always not nullptr
-    ReturnValue<std::optional<bool>> is_valid(const util::ConstBinaryView&, const IntegrityData&) const noexcept;
+    Result<std::optional<bool>> is_valid(const util::ConstBinaryView&, const IntegrityData&) const noexcept;
 
     // Build message as bytes
-    ReturnValue<util::ByteVec> build(const MaybeIntegrity& maybe_integrity = std::nullopt) const noexcept;
+    Result<util::ByteVec> build(const MaybeIntegrity& maybe_integrity = std::nullopt) const noexcept;
 
     // Check if message is alternate server response
     bool is_alternate_server() const noexcept;

@@ -13,7 +13,7 @@
 #include <variant>
 
 #include "util/util_binary_view.hpp"
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 #include "net/ip/ip_address.hpp"
 #include "net/net_port.hpp"
 #include "stun/stun_attribute_type.hpp"
@@ -40,7 +40,7 @@ struct UnknownAttribute {
 struct MappedAddressAttribute {
     net::ip::Address addr;
     net::Port port;
-    static ReturnValue<MappedAddressAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static Result<MappedAddressAttribute> parse(const util::ConstBinaryView&, ParseStat&);
     util::ByteVec build() const;
 };
 
@@ -48,53 +48,53 @@ struct XorMappedAddressAttribute {
     XoredAddress addr;
     net::Port port;
     bool operator==(const XorMappedAddressAttribute&) const noexcept = default;
-    static ReturnValue<XorMappedAddressAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static Result<XorMappedAddressAttribute> parse(const util::ConstBinaryView&, ParseStat&);
     util::ByteVec build() const;
 };
 
 struct UsernameAttribute {
     precis::OpaqueString name;
-    static ReturnValue<UsernameAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static Result<UsernameAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct SoftwareAttribute {
     std::string name;
-    static ReturnValue<SoftwareAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static Result<SoftwareAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct MessageIntegityAttribute {
     using Digest = crypto::hmac::Digest<crypto::SHA1Hash>;
     Digest digest;
-    static ReturnValue<MessageIntegityAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static Result<MessageIntegityAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct FingerprintAttribute {
     uint32_t crc32;
-    static ReturnValue<FingerprintAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static Result<FingerprintAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct PriorityAttribute {
     uint32_t priority;
-    static ReturnValue<PriorityAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static Result<PriorityAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct UseCandidateAttribute {
-    static ReturnValue<UseCandidateAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static Result<UseCandidateAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct IceControllingAttribute {
     uint64_t tiebreaker;
-    static ReturnValue<IceControllingAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static Result<IceControllingAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct IceControlledAttribute {
     uint64_t tiebreaker;
-    static ReturnValue<IceControlledAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static Result<IceControlledAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
 struct UnknownAttributesAttribute {
     std::vector<AttributeType> types;
-    static ReturnValue<UnknownAttributesAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static Result<UnknownAttributesAttribute> parse(const util::ConstBinaryView&, ParseStat&);
     util::ByteVec build() const;
 };
 
@@ -112,14 +112,14 @@ struct ErrorCodeAttribute {
     std::optional<std::string> reason_phrase;
 
     bool operator==(const ErrorCodeAttribute&) const noexcept = default;
-    static ReturnValue<ErrorCodeAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static Result<ErrorCodeAttribute> parse(const util::ConstBinaryView&, ParseStat&);
     util::ByteVec build() const;
 };
 
 struct AlternateServerAttribute {
     net::ip::Address addr;
     net::Port port;
-    static ReturnValue<AlternateServerAttribute> parse(const util::ConstBinaryView&, ParseStat&);
+    static Result<AlternateServerAttribute> parse(const util::ConstBinaryView&, ParseStat&);
     util::ByteVec build() const;
 };
 
@@ -149,7 +149,7 @@ public:
     const AttrType *as() const noexcept;
 
     using ParseResult = std::variant<Attribute, UnknownAttribute>;
-    static ReturnValue<ParseResult> parse(const util::ConstBinaryView&, AttributeType type, ParseStat&);
+    static Result<ParseResult> parse(const util::ConstBinaryView&, AttributeType type, ParseStat&);
     static Attribute create(Value&&);
 
 private:

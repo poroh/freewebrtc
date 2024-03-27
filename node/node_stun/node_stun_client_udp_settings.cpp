@@ -7,7 +7,7 @@
 //
 
 #include "node_stun_client_udp_settings.hpp"
-#include "util/util_return_value_sugar.hpp"
+#include "util/util_result_sugar.hpp"
 
 namespace freewebrtc::node_stun {
 
@@ -18,18 +18,18 @@ using Settings = stun::client_udp::Settings;
 
 }
 
-ReturnValue<stun::client_udp::Settings> client_udp_settings_from_napi(napi::Object obj) {
-    ReturnValue<MaybeBool> maybe_use_fingerprint_rv
+Result<stun::client_udp::Settings> client_udp_settings_from_napi(napi::Object obj) {
+    Result<MaybeBool> maybe_use_fingerprint_rv
         = (obj.maybe_named_property("use_fingerprint")
            > [](auto&& maybe_v) {
                if (!maybe_v.has_value()) {
-                   return ReturnValue<MaybeBool>{std::nullopt};
+                   return Result<MaybeBool>{std::nullopt};
                }
                return maybe_v.value().as_boolean() > [](const bool& v) { return MaybeBool{v}; };
            }).add_context("use_fingerprint attibute");
 
     return combine(
-        [](auto&& maybe_use_fingerprint) -> ReturnValue<stun::client_udp::Settings> {
+        [](auto&& maybe_use_fingerprint) -> Result<stun::client_udp::Settings> {
             stun::client_udp::Settings result;
             if (maybe_use_fingerprint.has_value()) {
                 result.use_fingerprint = Settings::UseFingerprint{maybe_use_fingerprint.value()};

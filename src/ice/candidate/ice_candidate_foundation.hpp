@@ -10,7 +10,7 @@
 #pragma once
 
 #include <string>
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 
 namespace freewebrtc::ice::candidate {
 
@@ -21,7 +21,7 @@ public:
     Foundation& operator=(const Foundation&) = default;
     Foundation& operator=(Foundation&&) = default;
 
-    static ReturnValue<Foundation> from_string(const std::string_view&);
+    static Result<Foundation> from_string(const std::string_view&);
 
     const std::string& to_string() const noexcept;
     bool operator==(const Foundation&) const noexcept = default;

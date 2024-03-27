@@ -7,20 +7,20 @@
 //
 
 #include "node_ice_candidate.hpp"
-#include "util/util_return_value_sugar.hpp"
+#include "util/util_result_sugar.hpp"
 #include "util/util_fmap.hpp"
 #include "ice/candidate/ice_candidate_sdp.hpp"
 
 namespace freewebrtc::node_ice {
 
-ReturnValue<napi::Object> ice_candidate_to_object(napi::Env& env, const ice::candidate::Supported& v) {
+Result<napi::Object> ice_candidate_to_object(napi::Env& env, const ice::candidate::Supported& v) {
     const auto& c = v.candidate;
     auto ice_addr_to_string = [&](auto&& addr) { return addr.to_string() > [&](auto&& str) { return env.create_string(str); }; };
     auto ext_to_obj = [&](auto&& ext) {
         return env.create_object({
             {"name", env.create_string(ext.att_name)},
-            {"value", env.create_string(ext.att_value)}
-        }) > napi::Object::fmap_to_value;
+            {"value", env.create_string(ext.att_value)}})
+            > napi::Object::fmap_to_value;
     };
     return env.create_object({
         { "result", env.create_object({
@@ -32,13 +32,12 @@ ReturnValue<napi::Object> ice_candidate_to_object(napi::Env& env, const ice::can
                 { "component", util::fmap(c.maybe_component, [&](auto&& id) { return env.create_int32(id.value()); }) },
                 { "raddr", util::fmap(c.maybe_related_address, ice_addr_to_string) },
                 { "rport", util::fmap(c.maybe_related_port, [&](auto&& rport) { return env.create_int32(rport.value()); }) },
-                { "extensions", env.create_array(v.extensions, ext_to_obj) }
-            })},
+                { "extensions", env.create_array(v.extensions, ext_to_obj) }}) },
         { "error", env.create_null() }
     });
 }
 
-ReturnValue<napi::Value> ice_candidate_parse(napi::Env& env, const napi::CallbackInfo& ci) {
+Result<napi::Value> ice_candidate_parse(napi::Env& env, const napi::CallbackInfo& ci) {
     return ci[0]
         > napi::Value::to_string
         > ice::candidate::parse_sdp_attr

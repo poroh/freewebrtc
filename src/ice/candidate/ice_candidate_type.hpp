@@ -11,7 +11,7 @@
 #pragma once
 
 #include <string_view>
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 
 namespace freewebrtc::ice::candidate {
 
@@ -34,8 +34,9 @@ public:
     static Type relayed();
 
     // From SDP string (RFC8839).
-    static ReturnValue<Type> from_string(const std::string_view&) noexcept;
+    static Result<Type> from_string(const std::string_view&) noexcept;
 
+    Value value() const noexcept;
     const std::string& to_string() const noexcept;
 
     bool operator==(const Type&) const noexcept = default;
@@ -66,6 +67,10 @@ inline Type Type::peer_reflexive() {
 
 inline Type Type::relayed() {
     return Type{RELAYED};
+}
+
+inline Type::Value Type::value() const noexcept {
+    return m_value;
 }
 
 }

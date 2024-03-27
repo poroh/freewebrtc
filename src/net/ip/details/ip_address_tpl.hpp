@@ -11,7 +11,7 @@
 #include <array>
 #include "net/net_error.hpp"
 #include "util/util_binary_view.hpp"
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 
 namespace freewebrtc::net::ip::details {
 
@@ -21,7 +21,7 @@ public:
     using Value = std::array<uint8_t, SIZE>;
 
     static constexpr size_t size();
-    static ReturnValue<Address> from_view(const util::ConstBinaryView&);
+    static Result<Address> from_view(const util::ConstBinaryView&);
 
     Address(Value&&);
     util::ConstBinaryView view() const noexcept;
@@ -50,7 +50,7 @@ inline util::ConstBinaryView Address<SIZE>::view() const noexcept {
 }
 
 template<size_t SIZE>
-inline ReturnValue<Address<SIZE>> Address<SIZE>::from_view(const util::ConstBinaryView& vv) {
+inline Result<Address<SIZE>> Address<SIZE>::from_view(const util::ConstBinaryView& vv) {
     if (vv.size() != std::tuple_size<Value>::value) {
         return make_error_code(Error::invalid_address_size);
     }

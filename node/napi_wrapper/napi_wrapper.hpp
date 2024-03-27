@@ -13,7 +13,7 @@
 #include <optional>
 #include <functional>
 #include <memory>
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 #include "util/util_binary_view.hpp"
 #include "napi_error.hpp"
 
@@ -28,11 +28,11 @@ public:
 
     MaybeError set_named_property(const std::string&, const Value&) noexcept;
     Value to_value() const noexcept;
-    ReturnValue<Value> named_property(const std::string& name) const noexcept;
-    ReturnValue<std::optional<Value>> maybe_named_property(const std::string& name) const noexcept;
+    Result<Value> named_property(const std::string& name) const noexcept;
+    Result<std::optional<Value>> maybe_named_property(const std::string& name) const noexcept;
 
     template<typename T>
-    ReturnValue<Value> wrap(std::unique_ptr<T> native_obj) const noexcept;
+    Result<Value> wrap(std::unique_ptr<T> native_obj) const noexcept;
 
     static Value fmap_to_value(const Object&) noexcept;
 private:
@@ -57,21 +57,21 @@ class Value {
 public:
     Value(napi_env, napi_value);
 
-    ReturnValue<util::ConstBinaryView> as_buffer() const noexcept;
-    ReturnValue<Object> as_object() const noexcept;
-    ReturnValue<std::string> as_string() const noexcept;
-    ReturnValue<int32_t> as_int32() const noexcept;
-    ReturnValue<bool> as_boolean() const noexcept;
+    Result<util::ConstBinaryView> as_buffer() const noexcept;
+    Result<Object> as_object() const noexcept;
+    Result<std::string> as_string() const noexcept;
+    Result<int32_t> as_int32() const noexcept;
+    Result<bool> as_boolean() const noexcept;
 
     napi_value to_napi() const noexcept;
 
     template<typename T>
-    ReturnValue<std::reference_wrapper<T>> unwrap() const noexcept;
+    Result<std::reference_wrapper<T>> unwrap() const noexcept;
 
-    static ReturnValue<util::ConstBinaryView> to_buffer(const Value& obj) noexcept;
-    static ReturnValue<Object> to_object(const Value& obj) noexcept;
-    static ReturnValue<std::string> to_string(const Value& obj) noexcept;
-    static ReturnValue<int32_t> to_int32(const Value& obj) noexcept;
+    static Result<util::ConstBinaryView> to_buffer(const Value& obj) noexcept;
+    static Result<Object> to_object(const Value& obj) noexcept;
+    static Result<std::string> to_string(const Value& obj) noexcept;
+    static Result<int32_t> to_int32(const Value& obj) noexcept;
 
 private:
     napi_env m_env;
@@ -84,7 +84,7 @@ public:
 
     Value this_arg;
 
-    ReturnValue<Value> operator[](size_t index) const noexcept;
+    Result<Value> operator[](size_t index) const noexcept;
 
 private:
     std::vector<Value> m_args;
@@ -94,11 +94,11 @@ class Env {
 public:
     explicit Env(napi_env);
 
-    ReturnValue<CallbackInfo> create_callback_info(napi_callback_info, void ** = nullptr) const noexcept;
+    Result<CallbackInfo> create_callback_info(napi_callback_info, void ** = nullptr) const noexcept;
 
-    using RVV = ReturnValue<Value>;
-    using RVO = ReturnValue<Object>;
-    using RVA = ReturnValue<Array>;
+    using RVV = Result<Value>;
+    using RVO = Result<Object>;
+    using RVA = Result<Array>;
 
     using ValueInit = std::variant<Value, RVV, std::optional<RVV>, Object, RVO, std::optional<RVO>>;
     using ObjectSpec = std::vector<std::pair<std::string, ValueInit>>;
@@ -132,7 +132,7 @@ public:
     RVV create_class(std::string_view name, Function ctor, const ClassPropertySpec&) const noexcept;
 
     template<typename T>
-    bool maybe_throw_error(const ReturnValue<T>& v) const noexcept;
+    bool maybe_throw_error(const Result<T>& v) const noexcept;
 private:
     napi_env m_env;
 };
@@ -141,7 +141,7 @@ private:
 // implementation
 //
 template<typename T>
-ReturnValue<Value> Object::wrap(std::unique_ptr<T> native_obj) const noexcept {
+Result<Value> Object::wrap(std::unique_ptr<T> native_obj) const noexcept {
     auto dtor = [](napi_env, void *data, void *) {
         delete static_cast<T *>(data);
     };
@@ -157,7 +157,7 @@ inline napi_value Value::to_napi() const noexcept {
 }
 
 template<typename T>
-ReturnValue<std::reference_wrapper<T>> Value::unwrap() const noexcept {
+Result<std::reference_wrapper<T>> Value::unwrap() const noexcept {
     T *t;
     if (auto status = napi_unwrap(m_env, m_value, reinterpret_cast<void **>(&t)); status != napi_ok) {
         return make_error_code(status);
@@ -166,9 +166,9 @@ ReturnValue<std::reference_wrapper<T>> Value::unwrap() const noexcept {
 }
 
 template<typename T>
-bool Env::maybe_throw_error(const ReturnValue<T>& v) const noexcept {
-    if (v.is_error()) {
-        throw_error(v.assert_error().message());
+bool Env::maybe_throw_error(const Result<T>& v) const noexcept {
+    if (v.is_err()) {
+        throw_error(v.unwrap_err().message());
         return true;
     }
     return false;
@@ -190,19 +190,19 @@ inline Value Array::fmap_to_value(const Array& arr) noexcept {
     return arr.to_value();
 }
 
-inline ReturnValue<util::ConstBinaryView> Value::to_buffer(const Value& val) noexcept {
+inline Result<util::ConstBinaryView> Value::to_buffer(const Value& val) noexcept {
     return val.as_buffer();
 }
 
-inline ReturnValue<Object> Value::to_object(const Value& val) noexcept {
+inline Result<Object> Value::to_object(const Value& val) noexcept {
     return val.as_object();
 }
 
-inline ReturnValue<std::string> Value::to_string(const Value& val) noexcept {
+inline Result<std::string> Value::to_string(const Value& val) noexcept {
     return val.as_string();
 }
 
-inline ReturnValue<int32_t> Value::to_int32(const Value& val) noexcept {
+inline Result<int32_t> Value::to_int32(const Value& val) noexcept {
     return val.as_int32();
 }
 
@@ -213,12 +213,12 @@ Env::RVV Env::create_array(const Container& c, F&& f) {
             size_t i = 0;
             for (const auto& v: c) {
                 auto napiv_rv = f(v);
-                if (napiv_rv.is_error()) {
-                    return napiv_rv.assert_error();
+                if (napiv_rv.is_err()) {
+                    return napiv_rv.unwrap_err();
                 }
-                auto maybe_err = array.set_element(i++, napiv_rv.assert_value());
-                if (maybe_err.is_error()) {
-                    return maybe_err.assert_error();
+                auto maybe_err = array.set_element(i++, napiv_rv.unwrap());
+                if (maybe_err.is_err()) {
+                    return maybe_err.unwrap_err();
                 }
             }
             return array;

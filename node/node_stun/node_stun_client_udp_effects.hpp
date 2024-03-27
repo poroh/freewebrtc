@@ -13,6 +13,6 @@
 
 namespace freewebrtc::node_stun {
 
-ReturnValue<napi::Object> client_udp_effect_to_napi(napi::Env&, const stun::ClientUDP::Effect& effect);
+Result<napi::Object> client_udp_effect_to_napi(napi::Env&, const stun::ClientUDP::Effect& effect);
 
 }

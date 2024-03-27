@@ -30,7 +30,7 @@ const std::string unknown_str = "unknown";
 
 }
 
-ReturnValue<Type> Type::from_string(const std::string_view& v) noexcept {
+Result<Type> Type::from_string(const std::string_view& v) noexcept {
     if (abnf::eq_string(v, host_str)) {
         return host();
     } else if (abnf::eq_string(v, server_reflexive_str)) {

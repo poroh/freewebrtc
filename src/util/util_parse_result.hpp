@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 
 namespace freewebrtc {
 
@@ -19,7 +19,7 @@ struct ParseSuccess {
 };
 
 template<typename V>
-using ParseResult = ReturnValue<ParseSuccess<V>>;
+using ParseResult = Result<ParseSuccess<V>>;
 
 }
 

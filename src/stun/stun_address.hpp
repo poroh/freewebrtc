@@ -36,7 +36,7 @@ private:
 
 class XoredAddress {
 public:
-    static ReturnValue<XoredAddress> from_view(Family, const util::ConstBinaryView&);
+    static Result<XoredAddress> from_view(Family, const util::ConstBinaryView&);
     static XoredAddress from_address(const net::ip::Address&, const TransactionId&);
     // Get Address from XOR format.
     // Normative RFC8489 (14.2.  XOR-MAPPED-ADDRESS)

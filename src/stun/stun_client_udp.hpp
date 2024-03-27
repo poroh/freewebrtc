@@ -16,7 +16,7 @@
 
 #include "clock/clock_timepoint.hpp"
 #include "precis/precis_opaque_string.hpp"
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 #include "util/util_hash_dynamic.hpp"
 #include "stun/stun_message.hpp"
 #include "stun/stun_attribute_set.hpp"
@@ -89,7 +89,7 @@ public:
     // Create transaction with unique identifier. Random device
     // may be override with cryptographic random if needed.
     template<typename RandomDevice = std::random_device>
-    ReturnValue<Handle> create(RandomDevice&, Timepoint now, Request&&);
+    Result<Handle> create(RandomDevice&, Timepoint now, Request&&);
 
     // Process response. If stun message was already parsed before
     // then caller may provide parsed message. It optimizes performance by
@@ -126,7 +126,7 @@ private:
     using RtoCalculator = details::ClientUDPRtoCalculator;
     using RtoCalculatorPtr = std::unique_ptr<RtoCalculator>;
 
-    ReturnValue<Handle> do_create(Timepoint, TransactionId&&, Request&&);
+    Result<Handle> do_create(Timepoint, TransactionId&&, Request&&);
     MaybeError handle_success_response(Timepoint now, Handle hnd, Message& msg);
     MaybeError handle_error_response(Timepoint now, Handle hnd, const Message& msg);
     Handle allocate_handle() noexcept;
@@ -152,7 +152,7 @@ private:
 // implementation
 //
 template<typename RandomDevice>
-inline ReturnValue<ClientUDP::Handle>
+inline Result<ClientUDP::Handle>
 ClientUDP::create(RandomDevice& rand, Timepoint now, Request&& req) {
     while (true) {
         TransactionId id = TransactionId::generate(rand);

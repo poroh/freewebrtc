@@ -26,14 +26,14 @@ TEST_F(IceCandidateTransportTypeTest, from_string_tests) {
     // registry.
     const std::vector<std::string_view> all { "UDP", "Udp", "uDp", "udp" };
     for (auto t: all) {
-        ASSERT_TRUE(TransportType::from_string(t).is_value());
+        ASSERT_TRUE(TransportType::from_string(t).is_ok());
     }
-    EXPECT_EQ(TransportType::from_string("UDP").assert_value(), TransportType::udp());
+    EXPECT_EQ(TransportType::from_string("UDP").unwrap(), TransportType::udp());
 }
 
 TEST_F(IceCandidateTransportTypeTest, from_unknown_string_tests) {
-    ASSERT_TRUE(TransportType::from_string("unknown_string").is_error());
-    ASSERT_EQ(TransportType::from_string("unknown_string").assert_error().value(), (int)ice::candidate::Error::unknown_transport_type);
+    ASSERT_TRUE(TransportType::from_string("unknown_string").is_err());
+    ASSERT_EQ(TransportType::from_string("unknown_string").unwrap_err().value(), (int)ice::candidate::Error::unknown_transport_type);
 }
 
 }

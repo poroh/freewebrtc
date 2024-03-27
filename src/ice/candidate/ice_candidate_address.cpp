@@ -12,16 +12,16 @@
 
 namespace freewebrtc::ice::candidate {
 
-ReturnValue<Address> Address::from_string(std::string_view v) noexcept {
+Result<Address> Address::from_string(std::string_view v) noexcept {
     auto ipaddr_rv = net::ip::Address::from_string(v);
-    if (ipaddr_rv.is_value()) {
-        return Address{std::move(ipaddr_rv.assert_value())};
+    if (ipaddr_rv.is_ok()) {
+        return Address{std::move(ipaddr_rv.unwrap())};
     }
     auto fqdn_rv = net::Fqdn::from_string(v);
-    if (fqdn_rv.is_value()) {
-        return Address(std::move(fqdn_rv.assert_value()));
+    if (fqdn_rv.is_ok()) {
+        return Address(std::move(fqdn_rv.unwrap()));
     }
-    return ipaddr_rv.assert_error();
+    return ipaddr_rv.unwrap_err();
 }
 
 }

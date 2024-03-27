@@ -9,7 +9,7 @@
 #include <iostream>
 
 #include "util/util_fmap.hpp"
-#include "util/util_return_value_sugar.hpp"
+#include "util/util_result_sugar.hpp"
 #include "stun/stun_client_udp.hpp"
 #include "stun/details/stun_client_udp_rto.hpp"
 #include "clock/clock_std.hpp"
@@ -24,7 +24,7 @@ namespace freewebrtc::node_stun {
 
 namespace {
 
-ReturnValue<napi::Value> constructor(napi::Env&, const napi::CallbackInfo& info) {
+Result<napi::Value> constructor(napi::Env&, const napi::CallbackInfo& info) {
     auto settings_rv = info[0] > napi::Value::to_object > client_udp_settings_from_napi;
     return
         combine([](auto&& obj, auto&& settings) {
@@ -34,7 +34,7 @@ ReturnValue<napi::Value> constructor(napi::Env&, const napi::CallbackInfo& info)
             settings_rv);
 }
 
-ReturnValue<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj) {
+Result<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj) {
     auto source_rv = (obj.named_property("source")
         > napi::Value::to_string
         > net::ip::Address::from_string
@@ -47,18 +47,18 @@ ReturnValue<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj)
     using Auth = stun::ClientUDP::Auth;
     using MaybeAuth = stun::ClientUDP::MaybeAuth;
 
-    ReturnValue<MaybeAuth> maybe_auth_rv
+    Result<MaybeAuth> maybe_auth_rv
         = (obj.maybe_named_property("auth")
            > [](auto&& maybe_val) { return util::fmap(maybe_val, napi::Value::to_object); }
            > [](auto&& maybe_obj) {
                if (!maybe_obj.has_value()) {
-                   return ReturnValue<MaybeAuth>{std::nullopt};
+                   return Result<MaybeAuth>{std::nullopt};
                }
                return maybe_obj.value() > parse_auth > [](Auth&& auth) { return MaybeAuth{std::move(auth)}; };
            }).add_context("auth field");
 
     return combine(
-        [](net::ip::Address&& src, net::ip::Address&& dst, MaybeAuth&& maybe_auth) -> ReturnValue<stun::ClientUDP::Request> {
+        [](net::ip::Address&& src, net::ip::Address&& dst, MaybeAuth&& maybe_auth) -> Result<stun::ClientUDP::Request> {
             return stun::ClientUDP::Request{
                 .path = {
                     .source = std::move(src),
@@ -73,7 +73,7 @@ ReturnValue<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj)
         .add_context("request");
 }
 
-ReturnValue<napi::Value> create(napi::Env& env, const napi::CallbackInfo& info) {
+Result<napi::Value> create(napi::Env& env, const napi::CallbackInfo& info) {
     auto request_rv = info[0] > napi::Value::to_object > request_from_napi;
     auto client_rv = info.this_arg.unwrap<stun::ClientUDP>();
     return combine(
@@ -86,7 +86,7 @@ ReturnValue<napi::Value> create(napi::Env& env, const napi::CallbackInfo& info) 
         .add_context("create request");
 }
 
-ReturnValue<napi::Value> next(napi::Env& env, const napi::CallbackInfo& info) {
+Result<napi::Value> next(napi::Env& env, const napi::CallbackInfo& info) {
     return info.this_arg.unwrap<stun::ClientUDP>()
         > [&](auto&& client) {
             auto effect = client.get().next(clock::steady_clock_now());
@@ -95,7 +95,7 @@ ReturnValue<napi::Value> next(napi::Env& env, const napi::CallbackInfo& info) {
         > napi::Object::fmap_to_value;
 }
 
-ReturnValue<napi::Value> response(napi::Env& env, const napi::CallbackInfo& info) {
+Result<napi::Value> response(napi::Env& env, const napi::CallbackInfo& info) {
     auto this_rv = info.this_arg.unwrap<stun::ClientUDP>();
     auto resp_rv = info[0] > napi::Value::to_buffer;
     return combine(
@@ -109,7 +109,7 @@ ReturnValue<napi::Value> response(napi::Env& env, const napi::CallbackInfo& info
 
 }
 
-ReturnValue<napi::Value> client_udp_class(napi::Env& env, std::string_view name) {
+Result<napi::Value> client_udp_class(napi::Env& env, std::string_view name) {
     return
         env.create_class(
             name,

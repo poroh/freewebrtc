@@ -7,13 +7,13 @@
 
 #pragma once
 
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 #include "stun/stun_client_udp.hpp"
 #include "node/napi_wrapper/napi_wrapper.hpp"
 
 namespace freewebrtc::node_stun {
 
-ReturnValue<stun::ClientUDP::Auth> parse_auth(napi::Object obj);
+Result<stun::ClientUDP::Auth> parse_auth(napi::Object obj);
 
 }
 

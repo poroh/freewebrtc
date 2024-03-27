@@ -50,10 +50,10 @@ Stateless::Stateless(crypto::SHA1Hash::Func sha1, const std::optional<Settings>&
 
 Stateless::ProcessResult Stateless::process(const net::Endpoint& ep, const util::ConstBinaryView& view) {
     auto maybe_msg = stun::Message::parse(view, m_stat);
-    if (!maybe_msg.is_value()) {
+    if (!maybe_msg.is_ok()) {
         return Ignore{};
     }
-    auto& msg = maybe_msg.assert_value();
+    auto& msg = maybe_msg.unwrap();
     if (msg.header.cls == stun::Class::request()) {
         return process_request(ep, std::move(msg), view);
     }
@@ -114,10 +114,10 @@ Stateless::ProcessResult Stateless::process_request(const net::Endpoint& ep, Mes
         //    of 401 (Unauthorized).
         maybe_integrity_data = IntegrityData{user_password_pair_it->second, m_sha1};
         const auto maybe_is_valid_rv = msg.is_valid(view, maybe_integrity_data.value());
-        if (maybe_is_valid_rv.is_error()) {
-            return Error{maybe_is_valid_rv.assert_error()};
+        if (maybe_is_valid_rv.is_err()) {
+            return Error{maybe_is_valid_rv.unwrap_err()};
         }
-        const auto maybe_is_valid = maybe_is_valid_rv.assert_value();
+        const auto maybe_is_valid = maybe_is_valid_rv.unwrap();
         if (maybe_is_valid.has_value() && !maybe_is_valid.value()) {
             return Respond{create_error(msg, ErrorCodeAttribute::Code::Unauthorized), std::move(msg)};
         }

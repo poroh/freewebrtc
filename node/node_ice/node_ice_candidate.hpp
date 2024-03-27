@@ -13,7 +13,7 @@
 
 namespace freewebrtc::node_ice {
 
-ReturnValue<napi::Value> ice_candidate_parse(napi::Env& env, const napi::CallbackInfo& ci);
+Result<napi::Value> ice_candidate_parse(napi::Env& env, const napi::CallbackInfo& ci);
 
 }
 

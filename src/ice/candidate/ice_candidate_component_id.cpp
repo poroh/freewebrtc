@@ -13,14 +13,14 @@
 
 namespace freewebrtc::ice::candidate {
 
-ReturnValue<ComponentId> ComponentId::from_unsigned(unsigned v) noexcept {
+Result<ComponentId> ComponentId::from_unsigned(unsigned v) noexcept {
     if (v >= 1000) {
         return make_error_code(Error::invalid_component_id_value);
     }
     return ComponentId(v);
 }
 
-ReturnValue<ComponentId> ComponentId::from_string(const std::string_view& v) noexcept {
+Result<ComponentId> ComponentId::from_string(const std::string_view& v) noexcept {
     // component-id = 1*3DIGIT
     if (v.empty() || v.size() > 3) {
         return make_error_code(Error::invalid_component_id_length);

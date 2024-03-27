@@ -13,7 +13,7 @@
 
 namespace freewebrtc::ice::candidate {
 
-ReturnValue<Foundation> Foundation::from_string(const std::string_view& v) {
+Result<Foundation> Foundation::from_string(const std::string_view& v) {
     if (v.empty() || v.size() > 32) {
         return make_error_code(Error::invalid_foundation_length);
     }

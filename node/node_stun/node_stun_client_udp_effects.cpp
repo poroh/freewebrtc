@@ -9,7 +9,7 @@
 #include <iostream>
 
 #include "util/util_fmap.hpp"
-#include "util/util_return_value_sugar.hpp"
+#include "util/util_result_sugar.hpp"
 #include "stun/stun_client_udp.hpp"
 #include "node_stun_client_udp_effects.hpp"
 #include "node_stun_client_udp_handle.hpp"
@@ -19,14 +19,14 @@ namespace freewebrtc::node_stun {
 
 namespace {
 
-ReturnValue<napi::Object> send_data_to_napi(napi::Env& env, const stun::ClientUDP::SendData& d) {
+Result<napi::Object> send_data_to_napi(napi::Env& env, const stun::ClientUDP::SendData& d) {
     return env.create_object({
         {"type", env.create_string("send_data")},
         {"message", env.create_buffer(d.message_view)}
     });
 }
 
-ReturnValue<napi::Object> transaction_ok_to_napi(napi::Env& env, const stun::ClientUDP::TransactionOk& t) {
+Result<napi::Object> transaction_ok_to_napi(napi::Env& env, const stun::ClientUDP::TransactionOk& t) {
     return env.create_object({
         {"type", env.create_string("transaction_ok")},
         {"result", env.create_object({
@@ -41,7 +41,7 @@ ReturnValue<napi::Object> transaction_ok_to_napi(napi::Env& env, const stun::Cli
 }
 
 
-ReturnValue<napi::Value> transaction_failed_reason_to_napi(napi::Env& env, const stun::ClientUDP::TransactionFailed::Reason& reason) {
+Result<napi::Value> transaction_failed_reason_to_napi(napi::Env& env, const stun::ClientUDP::TransactionFailed::Reason& reason) {
     return std::visit(
         util::overloaded {
             [&](const stun::ClientUDP::TransactionFailed::UnknownComprehensionRequiredAttribute&) {
@@ -65,7 +65,7 @@ ReturnValue<napi::Value> transaction_failed_reason_to_napi(napi::Env& env, const
         reason);
 }
 
-ReturnValue<napi::Object> transaction_failed_to_napi(napi::Env& env, const stun::ClientUDP::TransactionFailed& f) {
+Result<napi::Object> transaction_failed_to_napi(napi::Env& env, const stun::ClientUDP::TransactionFailed& f) {
     return env.create_object({
         {"type", env.create_string("transaction_fail")},
         {"handle", client_udp_handle_to_napi(env, f.handle)},
@@ -73,7 +73,7 @@ ReturnValue<napi::Object> transaction_failed_to_napi(napi::Env& env, const stun:
     });
 }
 
-ReturnValue<napi::Object> sleep_to_napi(napi::Env& env, const stun::ClientUDP::Sleep& s) {
+Result<napi::Object> sleep_to_napi(napi::Env& env, const stun::ClientUDP::Sleep& s) {
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(s.sleep);
     auto adj = s.sleep == ms ? 0 : 1; // adjust to next whole ms
     return env.create_object({
@@ -84,7 +84,7 @@ ReturnValue<napi::Object> sleep_to_napi(napi::Env& env, const stun::ClientUDP::S
 
 }
 
-ReturnValue<napi::Object> client_udp_effect_to_napi(napi::Env& env, const stun::ClientUDP::Effect& effect) {
+Result<napi::Object> client_udp_effect_to_napi(napi::Env& env, const stun::ClientUDP::Effect& effect) {
     return std::visit(
         util::overloaded {
             [&](const stun::ClientUDP::SendData& d)          { return send_data_to_napi(env, d); },

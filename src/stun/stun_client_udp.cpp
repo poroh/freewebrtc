@@ -49,10 +49,10 @@ ClientUDP::~ClientUDP()
 MaybeError ClientUDP::response(Timepoint now, util::ConstBinaryView view, std::optional<stun::Message>&& maybe_msg) {
     if (!maybe_msg.has_value()) {
         auto parsed_msg_rv = stun::Message::parse(view, m_stat.parse);
-        if (parsed_msg_rv.is_error()) {
-            return parsed_msg_rv.assert_error();
+        if (parsed_msg_rv.is_err()) {
+            return parsed_msg_rv.unwrap_err();
         }
-        maybe_msg.emplace(std::move(parsed_msg_rv.assert_value()));
+        maybe_msg.emplace(std::move(parsed_msg_rv.unwrap()));
     }
     auto& msg = maybe_msg.value();
     // Find transaction handle first not to spend time on
@@ -78,11 +78,11 @@ MaybeError ClientUDP::response(Timepoint now, util::ConstBinaryView view, std::o
         // RFC5389: 10.1.2.  Receiving a Request or Indication:
         // The response MUST NOT contain the USERNAME attribute.
         auto maybe_is_valid_rv = msg.is_valid(view, auth.integrity);
-        if (maybe_is_valid_rv.is_error()) {
-            return maybe_is_valid_rv.assert_error();
+        if (maybe_is_valid_rv.is_err()) {
+            return maybe_is_valid_rv.unwrap_err();
         }
 
-        const auto maybe_is_valid = maybe_is_valid_rv.assert_value();
+        const auto maybe_is_valid = maybe_is_valid_rv.unwrap();
         if (!maybe_is_valid.has_value()) {
             if (!m_settings.allow_unauthenticated_alternate || !msg.is_alternate_server()) {
                 m_stat.integrity_missing.inc();
@@ -138,7 +138,7 @@ ClientUDP::Effect ClientUDP::next(Timepoint now) {
     return Sleep{m_tid_timeline.top().first - now};
 }
 
-ReturnValue<ClientUDP::Handle> ClientUDP::do_create(Timepoint now, TransactionId&& tid, Request&& rq) {
+Result<ClientUDP::Handle> ClientUDP::do_create(Timepoint now, TransactionId&& tid, Request&& rq) {
     stun::Message request {
         stun::Header {
             stun::Class::request(),

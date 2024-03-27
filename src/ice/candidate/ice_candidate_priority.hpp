@@ -11,7 +11,7 @@
 
 #include <cstdint>
 #include <string_view>
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 
 namespace freewebrtc::ice::candidate {
 
@@ -22,8 +22,8 @@ public:
     Priority& operator=(const Priority&) = default;
     Priority& operator=(Priority&&) = default;
 
-    static ReturnValue<Priority> from_uint32(uint32_t) noexcept;
-    static ReturnValue<Priority> from_string(const std::string_view&) noexcept;
+    static Result<Priority> from_uint32(uint32_t) noexcept;
+    static Result<Priority> from_string(const std::string_view&) noexcept;
 
     bool operator==(const Priority&) const noexcept = default;
 

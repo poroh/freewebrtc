@@ -11,7 +11,7 @@
 #pragma once
 
 #include <string_view>
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 
 namespace freewebrtc::ice::candidate {
 
@@ -29,7 +29,7 @@ public:
 
     bool operator==(const TransportType&) const noexcept = default;
 
-    static ReturnValue<TransportType> from_string(const std::string_view&) noexcept;
+    static Result<TransportType> from_string(const std::string_view&) noexcept;
     const std::string& to_string() const;
 
 private:

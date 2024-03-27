@@ -12,7 +12,7 @@
 
 namespace freewebrtc::net {
 
-ReturnValue<Port> Port::from_string(const std::string_view& v) noexcept {
+Result<Port> Port::from_string(const std::string_view& v) noexcept {
     // RFC4566:
     // port = 1*DIGIT
     if (v.empty() || v.size() > 5) { // 16 bit 65536

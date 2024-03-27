@@ -16,7 +16,7 @@
 #include <string_view>
 #include "net/ip/ip_address_v4.hpp"
 #include "net/ip/ip_address_v6.hpp"
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 
 namespace freewebrtc::net::ip {
 
@@ -29,11 +29,11 @@ public:
     Address(AddressV4&&);
     Address(AddressV6&&);
 
-    static ReturnValue<Address> from_string(const std::string_view&);
+    static Result<Address> from_string(const std::string_view&);
 
     const Value& value() const noexcept;
 
-    ReturnValue<std::string> to_string() const;
+    Result<std::string> to_string() const;
     bool operator==(const Address&) const noexcept = default;
 
     util::ConstBinaryView view() const noexcept;

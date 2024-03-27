@@ -7,7 +7,7 @@
 //
 
 #include "util/util_fmap.hpp"
-#include "util/util_return_value_sugar.hpp"
+#include "util/util_result_sugar.hpp"
 #include "stun/stun_server_stateless.hpp"
 #include "node/openssl/node_openssl_hash.hpp"
 #include "node/napi_wrapper/napi_error.hpp"
@@ -23,12 +23,12 @@ using CallbackInfo = napi::CallbackInfo;
 
 namespace {
 
-ReturnValue<Value> constructor(Env&, const CallbackInfo& info) {
+Result<Value> constructor(Env&, const CallbackInfo& info) {
     return info.this_arg.as_object()
         > [](const auto& obj) { return obj.wrap(std::make_unique<stun::server::Stateless>(crypto::node_openssl::sha1)); };
 }
 
-ReturnValue<net::Endpoint> extract_rinfo(const Value& v) {
+Result<net::Endpoint> extract_rinfo(const Value& v) {
     auto v_as_obj = v.as_object();
     auto addr_rv = (v_as_obj
         > [](auto obj) { return obj.named_property("address"); }
@@ -42,14 +42,14 @@ ReturnValue<net::Endpoint> extract_rinfo(const Value& v) {
         ).add_context("rinfo.port");
 
     return combine(
-        [](auto&& addr, auto&& port) -> ReturnValue<net::Endpoint> {
+        [](auto&& addr, auto&& port) -> Result<net::Endpoint> {
             return net::Endpoint(net::UdpEndpoint{addr, net::Port(port)});
         },
         std::move(addr_rv),
         std::move(port_rv));
 }
 
-ReturnValue<Value> process_message(Env& env, const CallbackInfo& info) {
+Result<Value> process_message(Env& env, const CallbackInfo& info) {
     // (message, rinfo)
     auto buffer_rv = (info[0] > [](const auto& arg) { return arg.as_buffer(); }).add_context("buffer (1st parameter)");
     auto rinfo_rv = (info[1] > [](const auto& arg) { return extract_rinfo(arg); }).add_context("remote info (2nd parameter)");
@@ -57,7 +57,7 @@ ReturnValue<Value> process_message(Env& env, const CallbackInfo& info) {
 
     return combine(
         [&](auto&& message, auto&& endpoint, auto&& server) {
-            using RVO = ReturnValue<Object>;
+            using RVO = Result<Object>;
             auto result = server.get().process(endpoint, message);
             return std::visit(
                 util::overloaded {
@@ -93,7 +93,7 @@ ReturnValue<Value> process_message(Env& env, const CallbackInfo& info) {
 
 }
 
-ReturnValue<Value> add_user(Env& env, const CallbackInfo& info) {
+Result<Value> add_user(Env& env, const CallbackInfo& info) {
     // (username, password)
     auto username_rv = (info[0]
         > [](const auto& arg) { return arg.as_string(); }
@@ -121,7 +121,7 @@ ReturnValue<Value> add_user(Env& env, const CallbackInfo& info) {
 
 }
 
-ReturnValue<Value> server_stateless_class(Env& env, std::string_view name) {
+Result<Value> server_stateless_class(Env& env, std::string_view name) {
     return
         env.create_class(
             name,

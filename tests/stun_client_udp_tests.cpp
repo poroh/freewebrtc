@@ -19,15 +19,15 @@ using namespace std::chrono_literals;
 class StunClientTest : public ::testing::Test {
 public:
     StunClientTest()
-        : local_ipv4(net::ip::Address::from_string("192.168.0.1").assert_value())
-        , stun_server_ipv4(net::ip::Address::from_string("192.168.0.2").assert_value())
-        , stun_server_ipv4_2(net::ip::Address::from_string("192.168.0.3").assert_value())
-        , nat_ipv4(net::ip::Address::from_string("10.0.0.1").assert_value())
+        : local_ipv4(net::ip::Address::from_string("192.168.0.1").unwrap())
+        , stun_server_ipv4(net::ip::Address::from_string("192.168.0.2").unwrap())
+        , stun_server_ipv4_2(net::ip::Address::from_string("192.168.0.3").unwrap())
+        , nat_ipv4(net::ip::Address::from_string("10.0.0.1").unwrap())
         , nat_ep4(net::UdpEndpoint{nat_ipv4, net::Port(3478)})
         , default_auth{
                 precis::OpaqueString{"john doe"},
                 stun::IntegrityData{
-                    stun::Password::short_term(precis::OpaqueString("1234"), sha1).assert_value(),
+                    stun::Password::short_term(precis::OpaqueString("1234"), sha1).unwrap(),
                     sha1
                 }
             }
@@ -81,16 +81,16 @@ void StunClientTest::initial_request_check(
             .path = {local_ipv4, stun_server_ipv4},
             .maybe_auth = maybe_auth
         });
-    ASSERT_TRUE(hnd_rv.is_value());
-    const auto handle = hnd_rv.assert_value();
+    ASSERT_TRUE(hnd_rv.is_ok());
+    const auto handle = hnd_rv.unwrap();
     const auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     const auto send = std::get<ClientUDP::SendData>(next);
     EXPECT_EQ(send.handle, handle);
     stun::ParseStat stat;
     const auto msg_rv = Message::parse(send.message_view, stat);
-    ASSERT_TRUE(msg_rv.is_value());
-    msg = msg_rv.assert_value();
+    ASSERT_TRUE(msg_rv.is_ok());
+    msg = msg_rv.unwrap();
     view = send.message_view;
     EXPECT_EQ(msg->header.cls, stun::Class::request());
     EXPECT_EQ(msg->header.method, stun::Method::binding());
@@ -114,7 +114,7 @@ void StunClientTest::tick(Timepoint& now) {
 util::ByteVec StunClientTest::server_reponse(util::ConstBinaryView req_view) {
     const auto r = server.process(nat_ep4, req_view);
     const auto respond = std::get<StunServer::Respond>(r);
-    return respond.response.build(respond.maybe_integrity).assert_value();
+    return respond.response.build(respond.maybe_integrity).unwrap();
 }
 
 // ================================================================================
@@ -150,9 +150,9 @@ TEST_F(StunClientTest, initial_request_check_auth_with_fingerprint) {
     const auto& msg = maybe_msg.value();
     EXPECT_TRUE(msg.attribute_set.has_fingerprint());
     auto is_valid_rv = msg.is_valid(msg_view, default_auth.integrity);
-    ASSERT_TRUE(is_valid_rv.is_value());
-    ASSERT_TRUE(is_valid_rv.assert_value().has_value());
-    EXPECT_TRUE(is_valid_rv.assert_value().value());
+    ASSERT_TRUE(is_valid_rv.is_ok());
+    ASSERT_TRUE(is_valid_rv.unwrap().has_value());
+    EXPECT_TRUE(is_valid_rv.unwrap().value());
 }
 
 TEST_F(StunClientTest, initial_request_check_auth_no_fingerprint) {
@@ -165,16 +165,16 @@ TEST_F(StunClientTest, initial_request_check_auth_no_fingerprint) {
     const auto& msg = maybe_msg.value();
     EXPECT_TRUE(!msg.attribute_set.has_fingerprint());
     auto is_valid_rv = msg.is_valid(msg_view, default_auth.integrity);
-    ASSERT_TRUE(is_valid_rv.is_value());
-    ASSERT_TRUE(is_valid_rv.assert_value().has_value());
-    EXPECT_TRUE(is_valid_rv.assert_value().value());
+    ASSERT_TRUE(is_valid_rv.is_ok());
+    ASSERT_TRUE(is_valid_rv.unwrap().has_value());
+    EXPECT_TRUE(is_valid_rv.unwrap().value());
 }
 
 TEST_F(StunClientTest, initial_request_rto_default) {
     Settings settings;
     ClientUDP client(settings);
     auto now = Timepoint::epoch();
-    /* auto hnd = */ client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    /* auto hnd = */ client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     next = client.next(now);
@@ -189,7 +189,7 @@ TEST_F(StunClientTest, initial_request_rto_set) {
     settings.retransmit = rtx_settings;
     ClientUDP client(settings);
     auto now = Timepoint::epoch();
-    /* auto hnd = */ client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    /* auto hnd = */ client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     next = client.next(now);
@@ -206,7 +206,7 @@ TEST_F(StunClientTest, request_response_happy_path_no_auth) {
     ClientUDP client(settings);
     // Create request
     auto now = Timepoint::epoch();
-    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     auto sent_data = std::get<ClientUDP::SendData>(next);
@@ -217,7 +217,7 @@ TEST_F(StunClientTest, request_response_happy_path_no_auth) {
     const auto response_data = server_reponse(sent_data.message_view);
 
     // Process response by Client
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_ok());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& ok = std::get<ClientUDP::TransactionOk>(next);
@@ -237,7 +237,7 @@ TEST_F(StunClientTest, request_response_happy_path_with_auth) {
         ClientUDP::Request{
             .path = {local_ipv4, stun_server_ipv4},
             .maybe_auth = default_auth
-        }).assert_value();
+        }).unwrap();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     auto sent_data = std::get<ClientUDP::SendData>(next);
@@ -247,7 +247,7 @@ TEST_F(StunClientTest, request_response_happy_path_with_auth) {
     const auto response_data = server_reponse(sent_data.message_view);
 
     // Process response by Client
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_ok());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& ok = std::get<ClientUDP::TransactionOk>(next);
@@ -265,7 +265,7 @@ TEST_F(StunClientTest, request_response_parallel_transactions_abab) {
     auto now = Timepoint::epoch();
 
     // First request
-    auto hnd1 = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    auto hnd1 = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     auto sent_data1 = std::get<ClientUDP::SendData>(next);
@@ -275,7 +275,7 @@ TEST_F(StunClientTest, request_response_parallel_transactions_abab) {
     tick(now);
 
     // Second request
-    auto hnd2 = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    auto hnd2 = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     auto sent_data2 = std::get<ClientUDP::SendData>(next);
@@ -285,7 +285,7 @@ TEST_F(StunClientTest, request_response_parallel_transactions_abab) {
     const auto response_data2 = server_reponse(sent_data2.message_view);
 
     // Process First response by Client
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data1)).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data1)).is_ok());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& ok1 = std::get<ClientUDP::TransactionOk>(next);
@@ -294,7 +294,7 @@ TEST_F(StunClientTest, request_response_parallel_transactions_abab) {
     tick(now);
 
     // Process Second response by Client
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data2)).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data2)).is_ok());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& ok2 = std::get<ClientUDP::TransactionOk>(next);
@@ -314,7 +314,7 @@ TEST_F(StunClientTest, request_response_parallel_transactions_abba) {
     auto now = Timepoint::epoch();
 
     // First request
-    auto hnd1 = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    auto hnd1 = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     auto sent_data1 = std::get<ClientUDP::SendData>(next);
@@ -324,7 +324,7 @@ TEST_F(StunClientTest, request_response_parallel_transactions_abba) {
     tick(now);
 
     // Second request
-    auto hnd2 = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    auto hnd2 = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     auto sent_data2 = std::get<ClientUDP::SendData>(next);
@@ -334,7 +334,7 @@ TEST_F(StunClientTest, request_response_parallel_transactions_abba) {
     const auto response_data2 = server_reponse(sent_data2.message_view);
 
     // Process First response by Client
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data2)).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data2)).is_ok());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& ok2 = std::get<ClientUDP::TransactionOk>(next);
@@ -343,7 +343,7 @@ TEST_F(StunClientTest, request_response_parallel_transactions_abba) {
     tick(now);
 
     // Process Second response by Client
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data1)).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data1)).is_ok());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& ok1 = std::get<ClientUDP::TransactionOk>(next);
@@ -362,7 +362,7 @@ TEST_F(StunClientTest, retransmits) {
     ClientUDP client(settings);
     auto rtx_settings = std::get<Settings::RetransmitDefault>(settings.retransmit);
     auto now = Timepoint::epoch();
-    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     auto send_time = now;
@@ -413,7 +413,7 @@ TEST_F(StunClientTest, retransmits_rfc5389_example_timing_checks) {
     std::vector<Duration> send_times;
     auto now = Timepoint::epoch();
     auto start = now;
-    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     send_times.emplace_back(now - start);
@@ -445,14 +445,14 @@ TEST_F(StunClientTest, adjustment_of_rto_for_subsequent_request) {
     auto now = Timepoint::epoch();
     ClientUDP client({});
     // Send first request
-    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     auto sent_data = std::get<ClientUDP::SendData>(next);
     const auto rtt = 100ms;
     now = now.advance(rtt);
     const auto response_data = server_reponse(sent_data.message_view);
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_ok());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& tok = std::get<ClientUDP::TransactionOk>(next);
@@ -461,7 +461,7 @@ TEST_F(StunClientTest, adjustment_of_rto_for_subsequent_request) {
 
     // Send second request
     auto second_rtx_start = now;
-    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     next = client.next(now);
     // Retransmit:
     EXPECT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
@@ -476,7 +476,7 @@ TEST_F(StunClientTest, don_adjust_on_retransmit_of_request) {
     Settings settings;
     ClientUDP client(settings);
     // Send first request
-    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     // ignore first send
@@ -488,7 +488,7 @@ TEST_F(StunClientTest, don_adjust_on_retransmit_of_request) {
     now = now.advance(rtt);
 
     const auto response_data = server_reponse(sent_data.message_view);
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_ok());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& tok = std::get<ClientUDP::TransactionOk>(next);
@@ -496,7 +496,7 @@ TEST_F(StunClientTest, don_adjust_on_retransmit_of_request) {
 
     // Check that subsequent request is sent within initial_rto timeout
     auto second_rtx_start = now;
-    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     next = client.next(now);
     EXPECT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     // Retransmit:
@@ -511,14 +511,14 @@ TEST_F(StunClientTest, clear_history_after_history_duration) {
     Settings settings;
     ClientUDP client(settings);
     // Send first request
-    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     auto sent_data = std::get<ClientUDP::SendData>(next);
     const auto rtt = 100ms;
     now = now.advance(rtt);
     const auto response_data = server_reponse(sent_data.message_view);
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_ok());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& tok = std::get<ClientUDP::TransactionOk>(next);
@@ -529,17 +529,17 @@ TEST_F(StunClientTest, clear_history_after_history_duration) {
     now = now.advance(settings.rto_settings.history_duration);
     now = now.advance(1ms);
     // Create request to another destination to trigger cleanup
-    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4_2}, {}}).assert_value();
+    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4_2}, {}}).unwrap();
     next = client.next(now);
     auto sent_data2 = std::get<ClientUDP::SendData>(next);
     const auto response_data2 = server_reponse(sent_data2.message_view);
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data2)).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data2)).is_ok());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
 
     // Send second request to the initial destination
     auto second_rtx_start = now;
-    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     next = client.next(now);
     // Retransmit:
     EXPECT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
@@ -556,12 +556,12 @@ TEST_F(StunClientTest, success_response_with_unknown_comprehension_required_attr
     // attribute that client does not understand but requires to understand.
     ClientUDP client({});
     auto now = Timepoint::epoch();
-    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     auto sent_data = std::get<ClientUDP::SendData>(next);
     stun::ParseStat parse_stat;
-    auto req = Message::parse(sent_data.message_view, parse_stat).assert_value();
+    auto req = Message::parse(sent_data.message_view, parse_stat).unwrap();
     auto xaddr = stun::XoredAddress::from_address(nat_ep4.address, req.header.transaction_id);
     const stun::UnknownAttribute unknown_attr1(stun::AttributeType::from_uint16(0x7fff), util::ConstBinaryView({}));
     const stun::UnknownAttribute unknown_attr2(stun::AttributeType::from_uint16(0x7ff3), util::ConstBinaryView({}));
@@ -579,8 +579,8 @@ TEST_F(StunClientTest, success_response_with_unknown_comprehension_required_attr
             }),
         stun::IsRFC3489{false}
     };
-    auto response_data = response.build().assert_value();
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), response).is_value());
+    auto response_data = response.build().unwrap();
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), response).is_ok());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed>(next));
     const auto& tfailed = std::get<ClientUDP::TransactionFailed>(next);
@@ -596,12 +596,12 @@ TEST_F(StunClientTest, error_response_with_unknown_comprehension_required_attrib
     // attribute that client does not understand but requires to understand.
     ClientUDP client({});
     auto now = Timepoint::epoch();
-    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     auto sent_data = std::get<ClientUDP::SendData>(next);
     stun::ParseStat parse_stat;
-    auto req = Message::parse(sent_data.message_view, parse_stat).assert_value();
+    auto req = Message::parse(sent_data.message_view, parse_stat).unwrap();
     const stun::UnknownAttribute unknown_attr1(stun::AttributeType::from_uint16(0x7fff), util::ConstBinaryView({}));
     const stun::UnknownAttribute unknown_attr2(stun::AttributeType::from_uint16(0x7ff3), util::ConstBinaryView({}));
     Message response{
@@ -618,8 +618,8 @@ TEST_F(StunClientTest, error_response_with_unknown_comprehension_required_attrib
             }),
         stun::IsRFC3489{false}
     };
-    auto response_data = response.build().assert_value();
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), response).is_value());
+    auto response_data = response.build().unwrap();
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), response).is_ok());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed>(next));
     const auto& tfailed = std::get<ClientUDP::TransactionFailed>(next);
@@ -636,13 +636,13 @@ TEST_F(StunClientTest, error_response_300_alternate_server) {
     // and provides correct reason
     ClientUDP client({});
     auto now = Timepoint::epoch();
-    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     auto sent_data = std::get<ClientUDP::SendData>(next);
     stun::ParseStat parse_stat;
-    auto req = Message::parse(sent_data.message_view, parse_stat).assert_value();
-    const auto alternate_server_ipv4(net::ip::Address::from_string("192.168.0.2").assert_value());
+    auto req = Message::parse(sent_data.message_view, parse_stat).unwrap();
+    const auto alternate_server_ipv4(net::ip::Address::from_string("192.168.0.2").unwrap());
     const auto alternate_server_port = net::Port{3478};
     Message response{
         stun::Header {
@@ -656,8 +656,8 @@ TEST_F(StunClientTest, error_response_300_alternate_server) {
         }),
         stun::IsRFC3489{false}
     };
-    auto response_data = response.build().assert_value();
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), response).is_value());
+    auto response_data = response.build().unwrap();
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), response).is_ok());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed>(next));
     const auto& tfailed = std::get<ClientUDP::TransactionFailed>(next);
@@ -674,12 +674,12 @@ TEST_F(StunClientTest, error_response_300_alternate_server_without_attribute) {
     // and provides correct reason
     ClientUDP client({});
     auto now = Timepoint::epoch();
-    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).assert_value();
+    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}}).unwrap();
     auto next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
     auto sent_data = std::get<ClientUDP::SendData>(next);
     stun::ParseStat parse_stat;
-    auto req = Message::parse(sent_data.message_view, parse_stat).assert_value();
+    auto req = Message::parse(sent_data.message_view, parse_stat).unwrap();
     Message response{
         stun::Header {
             stun::Class::error_response(),
@@ -691,8 +691,8 @@ TEST_F(StunClientTest, error_response_300_alternate_server_without_attribute) {
         }),
         stun::IsRFC3489{false}
     };
-    auto response_data = response.build().assert_value();
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), response).is_value());
+    auto response_data = response.build().unwrap();
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), response).is_ok());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed>(next));
     const auto& tfailed = std::get<ClientUDP::TransactionFailed>(next);
@@ -711,13 +711,13 @@ TEST_F(StunClientTest, error_response_420_from_server) {
     const stun::UnknownAttribute unknown_attr1(stun::AttributeType::from_uint16(0x7fff), util::ConstBinaryView({}));
     const stun::UnknownAttribute unknown_attr2(stun::AttributeType::from_uint16(0x7ff3), util::ConstBinaryView({}));
     std::vector<stun::AttributeType> unknown_attrs{unknown_attr1.type, unknown_attr2.type};
-    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}, {unknown_attr1, unknown_attr2}}).assert_value();
+    auto hnd = client.create(rnd, now, ClientUDP::Request{{local_ipv4, stun_server_ipv4}, {}, {unknown_attr1, unknown_attr2}}).unwrap();
     auto next = client.next(now);
     auto sent_data = std::get<ClientUDP::SendData>(next);
 
     // Response using StunServer
     const auto response_data = server_reponse(sent_data.message_view);
-    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_value());
+    ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data)).is_ok());
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed>(next));
     const auto& tfailed = std::get<ClientUDP::TransactionFailed>(next);

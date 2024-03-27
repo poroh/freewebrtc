@@ -13,7 +13,7 @@
 
 namespace freewebrtc::node_stun {
 
-ReturnValue<stun::client_udp::Settings> client_udp_settings_from_napi(napi::Object obj);
+Result<stun::client_udp::Settings> client_udp_settings_from_napi(napi::Object obj);
 
 }
 

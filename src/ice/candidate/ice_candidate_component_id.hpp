@@ -13,7 +13,7 @@
 #include <optional>
 #include <string>
 
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 
 namespace freewebrtc::ice::candidate {
 
@@ -24,8 +24,8 @@ public:
     ComponentId& operator=(const ComponentId&) = default;
     ComponentId& operator=(ComponentId&&) = default;
 
-    static ReturnValue<ComponentId> from_unsigned(unsigned) noexcept;
-    static ReturnValue<ComponentId> from_string(const std::string_view&) noexcept;
+    static Result<ComponentId> from_unsigned(unsigned) noexcept;
+    static Result<ComponentId> from_string(const std::string_view&) noexcept;
 
     bool operator==(const ComponentId&) const noexcept = default;
     unsigned value() const noexcept;

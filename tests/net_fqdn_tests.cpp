@@ -27,8 +27,8 @@ TEST_F(NetFqdnTest, rfc1035_examples_tests) {
 
     for (const auto& v: vec) {
         auto rv = net::Fqdn::parse(v);
-        ASSERT_TRUE(rv.is_value());
-        auto parse_success = rv.assert_value();
+        ASSERT_TRUE(rv.is_ok());
+        auto parse_success = rv.unwrap();
         EXPECT_EQ(parse_success.value.to_string(), v);
         EXPECT_TRUE(parse_success.rest.empty());
     }
@@ -42,8 +42,8 @@ TEST_F(NetFqdnTest, with_final_dot) {
 
     for (const auto& v: vec) {
         auto rv = net::Fqdn::parse(v);
-        ASSERT_TRUE(rv.is_value());
-        auto parse_success = rv.assert_value();
+        ASSERT_TRUE(rv.is_ok());
+        auto parse_success = rv.unwrap();
         EXPECT_EQ(parse_success.value.to_string(), v);
         EXPECT_TRUE(parse_success.rest.empty());
     }
@@ -57,8 +57,8 @@ TEST_F(NetFqdnTest, with_hyphens) {
 
     for (const auto& v: vec) {
         auto rv = net::Fqdn::parse(v);
-        ASSERT_TRUE(rv.is_value());
-        auto parse_success = rv.assert_value();
+        ASSERT_TRUE(rv.is_ok());
+        auto parse_success = rv.unwrap();
         EXPECT_EQ(parse_success.value.to_string(), v);
         EXPECT_TRUE(parse_success.rest.empty());
     }
@@ -75,8 +75,8 @@ TEST_F(NetFqdnTest, with_underscores) {
 
     for (const auto& v: vec) {
         auto rv = net::Fqdn::parse(v);
-        ASSERT_TRUE(rv.is_value());
-        auto parse_success = rv.assert_value();
+        ASSERT_TRUE(rv.is_ok());
+        auto parse_success = rv.unwrap();
         EXPECT_EQ(parse_success.value.to_string(), v);
         EXPECT_TRUE(parse_success.rest.empty());
     }
@@ -91,8 +91,8 @@ TEST_F(NetFqdnTest, with_rest) {
 
     for (const auto& t: vec) {
         auto rv = net::Fqdn::parse(std::get<0>(t));
-        ASSERT_TRUE(rv.is_value());
-        auto parse_success = rv.assert_value();
+        ASSERT_TRUE(rv.is_ok());
+        auto parse_success = rv.unwrap();
         EXPECT_EQ(parse_success.value.to_string(), std::get<1>(t));
         EXPECT_EQ(parse_success.rest, std::get<2>(t));
     }
@@ -111,7 +111,7 @@ TEST_F(NetFqdnTest, failed_to_parse) {
     };
 
     for (const auto& v: vec) {
-        EXPECT_TRUE(net::Fqdn::parse(v).is_error());
+        EXPECT_TRUE(net::Fqdn::parse(v).is_err());
     }
 }
 

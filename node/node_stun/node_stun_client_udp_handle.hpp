@@ -13,13 +13,13 @@
 
 namespace freewebrtc::node_stun {
 
-ReturnValue<napi::Value> client_udp_handle_to_napi(napi::Env& env, stun::ClientUDP::Handle hnd);
+Result<napi::Value> client_udp_handle_to_napi(napi::Env& env, stun::ClientUDP::Handle hnd);
 
 
 //
 // inlines
 //
-inline ReturnValue<napi::Value> client_udp_handle_to_napi(napi::Env& env, stun::ClientUDP::Handle hnd) {
+inline Result<napi::Value> client_udp_handle_to_napi(napi::Env& env, stun::ClientUDP::Handle hnd) {
     return env.create_object({
             {"value", env.create_int32(hnd.value)}
         })

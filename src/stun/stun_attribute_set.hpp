@@ -44,7 +44,7 @@ public:
     using UnknownAttrVec = std::vector<UnknownAttribute>;
     static AttributeSet create(AttrVec&&, UnknownAttrVec&& = {});
 
-    ReturnValue<util::ByteVec> build(const Header&, const MaybeIntegrity&) const;
+    Result<util::ByteVec> build(const Header&, const MaybeIntegrity&) const;
 private:
     std::unordered_map<AttributeType, Attribute> m_map;
     std::vector<UnknownAttribute> m_unknown;

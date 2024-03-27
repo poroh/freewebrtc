@@ -23,7 +23,7 @@ const std::string unknown_str = "unknown";
 
 }
 
-ReturnValue<TransportType> TransportType::from_string(const std::string_view& v) noexcept {
+Result<TransportType> TransportType::from_string(const std::string_view& v) noexcept {
     // RFC8839:
     // This specification only defines UDP
     if (abnf::eq_string(v, udp_str)) {

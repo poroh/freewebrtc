@@ -13,7 +13,7 @@
 
 #include "util/util_binary_view.hpp"
 #include "util/util_tagged_type.hpp"
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 #include "util/util_flat.hpp"
 #include "crypto/crypto_hash.hpp"
 
@@ -23,7 +23,7 @@ template<uint8_t xorv>
 class PadKey {
 public:
     template<typename HashFunc>
-    static ReturnValue<PadKey> from_key(const util::ConstBinaryView&, HashFunc h);
+    static Result<PadKey> from_key(const util::ConstBinaryView&, HashFunc h);
 
     PadKey(const PadKey&) = default;
     PadKey(PadKey&&) = default;
@@ -46,10 +46,10 @@ template<typename Hash>
 using Digest = util::TaggedType<Hash>;
 
 template<typename HashFunc>
-using HMACReturnValue = ReturnValue<Digest<typename HashFunc::result_type::Value>>;
+using HMACResult = Result<Digest<typename HashFunc::result_type::Value>>;
 
 template<typename HashFunc>
-HMACReturnValue<HashFunc> digest(const std::vector<util::ConstBinaryView>& data, const OPadKey& opad, const IPadKey& ipad, HashFunc h);
+HMACResult<HashFunc> digest(const std::vector<util::ConstBinaryView>& data, const OPadKey& opad, const IPadKey& ipad, HashFunc h);
 
 //
 // implementation
@@ -65,15 +65,15 @@ inline PadKey<xorv>::PadKey(Data&& d)
 
 template<uint8_t xorv>
 template<typename HashFunc>
-inline ReturnValue<PadKey<xorv>> PadKey<xorv>::from_key(const util::ConstBinaryView& view, HashFunc h)
+inline Result<PadKey<xorv>> PadKey<xorv>::from_key(const util::ConstBinaryView& view, HashFunc h)
 {
     util::ConstBinaryView v = view;
     if (v.size() > B) {
         auto hash_rv = h({view});
-        if (hash_rv.is_error()) {
-            return hash_rv.assert_error();
+        if (hash_rv.is_err()) {
+            return hash_rv.unwrap_err();
         }
-        v = hash_rv.assert_value().view();
+        v = hash_rv.unwrap().view();
     }
     Data data = {0};
     std::copy(v.begin(), v.end(), data.begin());
@@ -86,18 +86,18 @@ inline util::ConstBinaryView PadKey<xorv>::view() const noexcept {
 }
 
 template<typename HashFunc>
-HMACReturnValue<HashFunc> digest(const std::vector<util::ConstBinaryView>& data, const OPadKey& opad, const IPadKey& ipad, HashFunc h) {
+HMACResult<HashFunc> digest(const std::vector<util::ConstBinaryView>& data, const OPadKey& opad, const IPadKey& ipad, HashFunc h) {
     std::vector<util::ConstBinaryView> inner_data = {ipad.view()};
     std::copy(data.begin(), data.end(), std::back_inserter(inner_data));
     auto inner = h(inner_data);
-    if (inner.is_error()) {
-        return inner.assert_error();
+    if (inner.is_err()) {
+        return inner.unwrap_err();
     }
-    auto outer = h({opad.view(), inner.assert_value().view()});
-    if (outer.is_error()) {
-        return outer.assert_error();
+    auto outer = h({opad.view(), inner.unwrap().view()});
+    if (outer.is_err()) {
+        return outer.unwrap_err();
     }
-    return (typename HMACReturnValue<HashFunc>::Value)(std::move(outer.assert_value()));
+    return (typename HMACResult<HashFunc>::Value)(std::move(outer.unwrap()));
 }
 
 }

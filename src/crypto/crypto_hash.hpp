@@ -16,7 +16,7 @@
 #include <functional>
 
 #include "util/util_binary_view.hpp"
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 
 namespace freewebrtc::crypto {
 
@@ -26,7 +26,7 @@ public:
     using Tag = TagType;
     using Value = std::array<uint8_t, SIZE>;
     using Input = std::vector<util::ConstBinaryView>;
-    using Result = ReturnValue<Hash>;
+    using Result = ::freewebrtc::Result<Hash>;
     using Func = std::function<Result(const Input&)>;
 
     static constexpr auto size = SIZE;

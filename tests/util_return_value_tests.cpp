@@ -9,257 +9,257 @@
 #include <gtest/gtest.h>
 #include <memory>
 #include <queue>
-#include "util/util_return_value.hpp"
+#include "util/util_result.hpp"
 
 namespace freewebrtc::test {
 
-class UtilReturnValueTest : public ::testing::Test {
+class UtilResultTest : public ::testing::Test {
 public:
-    using RVI = ReturnValue<int>;
+    using RVI = Result<int>;
 };
 
 // ================================================================================
 // Construction / destruction / assignments etc.
 
-TEST_F(UtilReturnValueTest, check_value) {
-    ReturnValue<int> rv(1);
-    ASSERT_TRUE(rv.is_value());
-    EXPECT_EQ(rv.assert_value(), 1);
+TEST_F(UtilResultTest, check_value) {
+    Result<int> rv(1);
+    ASSERT_TRUE(rv.is_ok());
+    EXPECT_EQ(rv.unwrap(), 1);
     ASSERT_TRUE(rv.maybe_value().has_value());
     EXPECT_EQ(rv.maybe_value().value(), 1);
-    EXPECT_FALSE(rv.is_error());
+    EXPECT_FALSE(rv.is_err());
 }
 
-TEST_F(UtilReturnValueTest, check_error) {
+TEST_F(UtilResultTest, check_error) {
     auto ec = std::make_error_code(std::errc::invalid_argument);
-    ReturnValue<int> rv(ec);
-    ASSERT_TRUE(rv.is_error());
-    EXPECT_EQ(rv.assert_error(), ec);
-    EXPECT_FALSE(rv.is_value());
+    Result<int> rv(ec);
+    ASSERT_TRUE(rv.is_err());
+    EXPECT_EQ(rv.unwrap_err(), ec);
+    EXPECT_FALSE(rv.is_ok());
     EXPECT_FALSE(rv.maybe_value().has_value());
 }
 
-TEST_F(UtilReturnValueTest, rvalue_constructor) {
+TEST_F(UtilResultTest, rvalue_constructor) {
     using T = std::unique_ptr<int>;
      // cannot be constructed without rvalue constructor
-    ReturnValue<T> rv(std::make_unique<int>(1));
-    ASSERT_TRUE(rv.is_value());
-    ASSERT_EQ(*rv.assert_value().get(), 1);
+    Result<T> rv(std::make_unique<int>(1));
+    ASSERT_TRUE(rv.is_ok());
+    ASSERT_EQ(*rv.unwrap().get(), 1);
 }
 
-TEST_F(UtilReturnValueTest, copy_constructor_with_value) {
-    ReturnValue<int> original(42);
-    ReturnValue<int> copy = original;
-    ASSERT_TRUE(copy.is_value());
-    EXPECT_EQ(copy.assert_value(), 42);
+TEST_F(UtilResultTest, copy_constructor_with_value) {
+    Result<int> original(42);
+    Result<int> copy = original;
+    ASSERT_TRUE(copy.is_ok());
+    EXPECT_EQ(copy.unwrap(), 42);
 }
 
-TEST_F(UtilReturnValueTest, move_constructor_with_value) {
+TEST_F(UtilResultTest, move_constructor_with_value) {
     using T = std::unique_ptr<int>;
-    ReturnValue<T> original(std::make_unique<int>(42));
-    ReturnValue<T> moved(std::move(original));
-    ASSERT_TRUE(moved.is_value());
-    EXPECT_EQ(*moved.assert_value().get(), 42);
-    ASSERT_TRUE(original.is_value());
-    EXPECT_EQ(original.assert_value().get(), nullptr);
+    Result<T> original(std::make_unique<int>(42));
+    Result<T> moved(std::move(original));
+    ASSERT_TRUE(moved.is_ok());
+    EXPECT_EQ(*moved.unwrap().get(), 42);
+    ASSERT_TRUE(original.is_ok());
+    EXPECT_EQ(original.unwrap().get(), nullptr);
 }
 
-TEST_F(UtilReturnValueTest, copy_assignment_with_value) {
-    ReturnValue<int> original(42);
-    ReturnValue<int> copy(0);
+TEST_F(UtilResultTest, copy_assignment_with_value) {
+    Result<int> original(42);
+    Result<int> copy(0);
     copy = original;
-    ASSERT_TRUE(copy.is_value());
-    EXPECT_EQ(copy.assert_value(), 42);
+    ASSERT_TRUE(copy.is_ok());
+    EXPECT_EQ(copy.unwrap(), 42);
 }
 
-TEST_F(UtilReturnValueTest, move_assignment_with_value) {
+TEST_F(UtilResultTest, move_assignment_with_value) {
     using T = std::unique_ptr<int>;
-    ReturnValue<T> original(std::make_unique<int>(42));
-    ReturnValue<T> moved(std::make_unique<int>(0));
+    Result<T> original(std::make_unique<int>(42));
+    Result<T> moved(std::make_unique<int>(0));
     moved = std::move(original); // Move assignment
-    ASSERT_TRUE(moved.is_value());
-    EXPECT_EQ(*moved.assert_value().get(), 42);
-    ASSERT_TRUE(original.is_value());
-    EXPECT_EQ(original.assert_value().get(), nullptr);
+    ASSERT_TRUE(moved.is_ok());
+    EXPECT_EQ(*moved.unwrap().get(), 42);
+    ASSERT_TRUE(original.is_ok());
+    EXPECT_EQ(original.unwrap().get(), nullptr);
 }
 
 // ================================================================================
 // fmap
 
-TEST_F(UtilReturnValueTest, fmap_value_reference) {
+TEST_F(UtilResultTest, fmap_value_reference) {
      // cannot be constructed without rvalue constructor
-    ReturnValue<int> int_rv(1);
+    Result<int> int_rv(1);
     auto string_rv = int_rv.fmap([](auto i) { return std::to_string(i); });
-    ASSERT_TRUE(string_rv.is_value());
-    EXPECT_EQ(string_rv.assert_value(), "1");
+    ASSERT_TRUE(string_rv.is_ok());
+    EXPECT_EQ(string_rv.unwrap(), "1");
 }
 
-TEST_F(UtilReturnValueTest, fmap_error) {
+TEST_F(UtilResultTest, fmap_error) {
     auto ec = std::make_error_code(std::errc::invalid_argument);
-    ReturnValue<int> int_rv(ec);
+    Result<int> int_rv(ec);
     auto string_rv = int_rv.fmap([](auto i) { return std::to_string(i); });
-    ASSERT_TRUE(string_rv.is_error());
-    EXPECT_EQ(string_rv.assert_error(), ec);
+    ASSERT_TRUE(string_rv.is_err());
+    EXPECT_EQ(string_rv.unwrap_err(), ec);
 }
 
-TEST_F(UtilReturnValueTest, fmap_rvalue) {
+TEST_F(UtilResultTest, fmap_rvalue) {
     using T = std::unique_ptr<int>;
-    ReturnValue<T> intptr_rv(std::make_unique<int>(1));
+    Result<T> intptr_rv(std::make_unique<int>(1));
     // It would compile without fmap for r-value
     auto string_rv = std::move(intptr_rv)
         .fmap([](auto i) { return std::to_string(*i.get()); });
-    ASSERT_TRUE(string_rv.is_value());
-    EXPECT_EQ(string_rv.assert_value(), "1");
+    ASSERT_TRUE(string_rv.is_ok());
+    EXPECT_EQ(string_rv.unwrap(), "1");
 }
 
-TEST_F(UtilReturnValueTest, fmap_reference) {
+TEST_F(UtilResultTest, fmap_reference) {
     using T = std::unique_ptr<int>;
-    ReturnValue<T> intptr_rv(std::make_unique<int>(1));
+    Result<T> intptr_rv(std::make_unique<int>(1));
     // It would compile without fmap for reference
     auto string_rv = intptr_rv
         .fmap([](T& i) { i.reset(); return "1"; });
-    ASSERT_TRUE(string_rv.is_value());
-    EXPECT_EQ(string_rv.assert_value(), "1");
+    ASSERT_TRUE(string_rv.is_ok());
+    EXPECT_EQ(string_rv.unwrap(), "1");
 }
 
-TEST_F(UtilReturnValueTest, fmap_const_reference) {
+TEST_F(UtilResultTest, fmap_const_reference) {
     using T = std::unique_ptr<int>;
-    const ReturnValue<T> intptr_rv(std::make_unique<int>(1));
+    const Result<T> intptr_rv(std::make_unique<int>(1));
     // It would compile without fmap for const reference
     auto string_rv = intptr_rv
         .fmap([](const T& i) { return std::to_string(*i.get()); });
-    ASSERT_TRUE(string_rv.is_value());
-    EXPECT_EQ(string_rv.assert_value(), "1");
+    ASSERT_TRUE(string_rv.is_ok());
+    EXPECT_EQ(string_rv.unwrap(), "1");
 }
 
-TEST_F(UtilReturnValueTest, fmap_error_propagation) {
+TEST_F(UtilResultTest, fmap_error_propagation) {
     auto ec = std::make_error_code(std::errc::invalid_argument);
-    ReturnValue<int> rv(ec);
+    Result<int> rv(ec);
     auto chained_rv = rv
         .fmap([](int value) { return value + 1; })
         .fmap([](int value) { return value * 2; });
-    ASSERT_TRUE(chained_rv.is_error());
-    EXPECT_EQ(chained_rv.assert_error(), ec);
+    ASSERT_TRUE(chained_rv.is_err());
+    EXPECT_EQ(chained_rv.unwrap_err(), ec);
 }
 
 // ================================================================================
 // bind
 
-TEST_F(UtilReturnValueTest, bind_return_value_unwrapping) {
-    ReturnValue<int> nested_rv(1);
+TEST_F(UtilResultTest, bind_return_value_unwrapping) {
+    Result<int> nested_rv(1);
     auto unwrapped_rv = nested_rv
-        .bind([](auto& i) { return ReturnValue<int>(i * 2); });
-    ASSERT_TRUE(unwrapped_rv.is_value());
-    EXPECT_EQ(unwrapped_rv.assert_value(), 2);
+        .bind([](auto& i) { return Result<int>(i * 2); });
+    ASSERT_TRUE(unwrapped_rv.is_ok());
+    EXPECT_EQ(unwrapped_rv.unwrap(), 2);
 }
 
-TEST_F(UtilReturnValueTest, bind_return_value_unwrapping_error) {
+TEST_F(UtilResultTest, bind_return_value_unwrapping_error) {
     auto ec = std::make_error_code(std::errc::invalid_argument);
-    ReturnValue<int> nested_rv(1);
+    Result<int> nested_rv(1);
     auto unwrapped_rv = nested_rv
-        .bind([&](auto&) { return ReturnValue<int>(ec); });
-    ASSERT_TRUE(unwrapped_rv.is_error());
-    EXPECT_EQ(unwrapped_rv.assert_error(), ec);
+        .bind([&](auto&) { return Result<int>(ec); });
+    ASSERT_TRUE(unwrapped_rv.is_err());
+    EXPECT_EQ(unwrapped_rv.unwrap_err(), ec);
 }
 
 // ================================================================================
 // combine
 
-TEST_F(UtilReturnValueTest, combine_two_values_success) {
-    using RVI = ReturnValue<int>;
-    ReturnValue<int> rv1(10);
-    ReturnValue<int> rv2(20);
+TEST_F(UtilResultTest, combine_two_values_success) {
+    using RVI = Result<int>;
+    Result<int> rv1(10);
+    Result<int> rv2(20);
     auto combined_rv = combine([](int a, int b) -> RVI { return a + b; }, std::move(rv1), std::move(rv2));
-    ASSERT_TRUE(combined_rv.is_value());
-    EXPECT_EQ(combined_rv.assert_value(), 30);
+    ASSERT_TRUE(combined_rv.is_ok());
+    EXPECT_EQ(combined_rv.unwrap(), 30);
 }
 
-TEST_F(UtilReturnValueTest, combine_value_with_error) {
-    ReturnValue<int> rv1(10);
+TEST_F(UtilResultTest, combine_value_with_error) {
+    Result<int> rv1(10);
     auto ec = std::make_error_code(std::errc::invalid_argument);
-    ReturnValue<int> rv2(ec);
+    Result<int> rv2(ec);
     auto combined_rv = combine([](int a, int b) -> RVI { return a + b; }, std::move(rv1), std::move(rv2));
-    ASSERT_TRUE(combined_rv.is_error());
-    EXPECT_EQ(combined_rv.assert_error(), ec);
+    ASSERT_TRUE(combined_rv.is_err());
+    EXPECT_EQ(combined_rv.unwrap_err(), ec);
 }
 
-TEST_F(UtilReturnValueTest, combine_multiple_values_success) {
-    ReturnValue<int> rv1(10);
-    ReturnValue<int> rv2(20);
-    ReturnValue<int> rv3(30);
+TEST_F(UtilResultTest, combine_multiple_values_success) {
+    Result<int> rv1(10);
+    Result<int> rv2(20);
+    Result<int> rv3(30);
     auto combined_rv = combine([](int a, int b, int c) -> RVI { return a + b + c; }, std::move(rv1), std::move(rv2), std::move(rv3));
-    ASSERT_TRUE(combined_rv.is_value());
-    EXPECT_EQ(combined_rv.assert_value(), 60);
+    ASSERT_TRUE(combined_rv.is_ok());
+    EXPECT_EQ(combined_rv.unwrap(), 60);
 }
 
-TEST_F(UtilReturnValueTest, combine_multiple_values_one_error) {
-    ReturnValue<int> rv1(10);
-    ReturnValue<int> rv2(20);
+TEST_F(UtilResultTest, combine_multiple_values_one_error) {
+    Result<int> rv1(10);
+    Result<int> rv2(20);
     auto ec = std::make_error_code(std::errc::invalid_argument);
-    ReturnValue<int> rv3(ec);
+    Result<int> rv3(ec);
     auto combined_rv = combine([](int a, int b, int c) -> RVI { return a + b + c; }, std::move(rv1), std::move(rv2), std::move(rv3));
-    ASSERT_TRUE(combined_rv.is_error());
-    EXPECT_EQ(combined_rv.assert_error(), ec);
+    ASSERT_TRUE(combined_rv.is_err());
+    EXPECT_EQ(combined_rv.unwrap_err(), ec);
 }
 
-TEST_F(UtilReturnValueTest, combine_moved_rvalues) {
+TEST_F(UtilResultTest, combine_moved_rvalues) {
     using T = std::unique_ptr<int>;
-    ReturnValue<T> rv1(std::make_unique<int>(10));
-    ReturnValue<T> rv2(std::make_unique<int>(20));
-    auto combined_rv = combine([](T&& p1, T&& p2) -> ReturnValue<std::vector<T>> {
+    Result<T> rv1(std::make_unique<int>(10));
+    Result<T> rv2(std::make_unique<int>(20));
+    auto combined_rv = combine([](T&& p1, T&& p2) -> Result<std::vector<T>> {
         std::vector<T> vec;
         vec.emplace_back(std::move(p1));
         vec.emplace_back(std::move(p2));
         return vec;
     }, std::move(rv1), std::move(rv2));
 
-    ASSERT_TRUE(combined_rv.is_value());
-    auto& vec = combined_rv.assert_value();
+    ASSERT_TRUE(combined_rv.is_ok());
+    auto& vec = combined_rv.unwrap();
 
     ASSERT_EQ(vec.size(), 2u); // Ensure there are two elements in the vector
     EXPECT_EQ(*vec[0], 10);    // Verify the first unique_ptr's value
     EXPECT_EQ(*vec[1], 20);
 
-    ASSERT_TRUE(rv1.is_value());
-    ASSERT_TRUE(rv2.is_value());
-    EXPECT_EQ(rv1.assert_value().get(), nullptr);
-    EXPECT_EQ(rv2.assert_value().get(), nullptr);
+    ASSERT_TRUE(rv1.is_ok());
+    ASSERT_TRUE(rv2.is_ok());
+    EXPECT_EQ(rv1.unwrap().get(), nullptr);
+    EXPECT_EQ(rv2.unwrap().get(), nullptr);
 }
 
-TEST_F(UtilReturnValueTest, combine_references) {
+TEST_F(UtilResultTest, combine_references) {
     using T = std::unique_ptr<int>;
-    ReturnValue<T> rv1(std::make_unique<int>(10));
-    ReturnValue<T> rv2(std::make_unique<int>(20));
-    auto combined_rv = combine([](T& p1, T& p2) -> ReturnValue<std::vector<T>> {
+    Result<T> rv1(std::make_unique<int>(10));
+    Result<T> rv2(std::make_unique<int>(20));
+    auto combined_rv = combine([](T& p1, T& p2) -> Result<std::vector<T>> {
         std::vector<T> vec;
         vec.emplace_back(std::move(p1));
         vec.emplace_back(std::move(p2));
         return vec;
     }, rv1, rv2);
 
-    ASSERT_TRUE(combined_rv.is_value());
-    auto& vec = combined_rv.assert_value();
+    ASSERT_TRUE(combined_rv.is_ok());
+    auto& vec = combined_rv.unwrap();
 
     ASSERT_EQ(vec.size(), 2u); // Ensure there are two elements in the vector
     EXPECT_EQ(*vec[0], 10);    // Verify the first unique_ptr's value
     EXPECT_EQ(*vec[1], 20);
 
-    ASSERT_TRUE(rv1.is_value());
-    ASSERT_TRUE(rv2.is_value());
-    EXPECT_EQ(rv1.assert_value().get(), nullptr);
-    EXPECT_EQ(rv2.assert_value().get(), nullptr);
+    ASSERT_TRUE(rv1.is_ok());
+    ASSERT_TRUE(rv2.is_ok());
+    EXPECT_EQ(rv1.unwrap().get(), nullptr);
+    EXPECT_EQ(rv2.unwrap().get(), nullptr);
 }
 
-TEST_F(UtilReturnValueTest, combine_const_references) {
+TEST_F(UtilResultTest, combine_const_references) {
     using T = std::unique_ptr<int>;
-    const ReturnValue<T> rv1(std::make_unique<int>(10));
-    const ReturnValue<T> rv2(std::make_unique<int>(20));
+    const Result<T> rv1(std::make_unique<int>(10));
+    const Result<T> rv2(std::make_unique<int>(20));
     auto combined_rv = combine([](const T& p1, const T& p2) -> RVI {
         return *p1.get() + *p2.get();
     }, rv1, rv2);
 
-    ASSERT_TRUE(combined_rv.is_value());
-    EXPECT_EQ(combined_rv.assert_value(), 30);
+    ASSERT_TRUE(combined_rv.is_ok());
+    EXPECT_EQ(combined_rv.unwrap(), 30);
 }
 
 }

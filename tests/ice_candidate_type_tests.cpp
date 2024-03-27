@@ -24,17 +24,17 @@ TEST_F(IceCandidateTypeTest, from_string_tests) {
     // peer-reflexive, and relayed candidates, respectively.
     const std::vector<std::string_view> all { "host", "srflx", "prflx", "relay" };
     for (auto t: all) {
-        ASSERT_TRUE(Type::from_string(t).is_value());
+        ASSERT_TRUE(Type::from_string(t).is_ok());
     }
-    EXPECT_EQ(Type::from_string("host").assert_value(),  Type::host());
-    EXPECT_EQ(Type::from_string("srflx").assert_value(), Type::server_reflexive());
-    EXPECT_EQ(Type::from_string("prflx").assert_value(), Type::peer_reflexive());
-    EXPECT_EQ(Type::from_string("relay").assert_value(), Type::relayed());
+    EXPECT_EQ(Type::from_string("host").unwrap(),  Type::host());
+    EXPECT_EQ(Type::from_string("srflx").unwrap(), Type::server_reflexive());
+    EXPECT_EQ(Type::from_string("prflx").unwrap(), Type::peer_reflexive());
+    EXPECT_EQ(Type::from_string("relay").unwrap(), Type::relayed());
 }
 
 TEST_F(IceCandidateTypeTest, from_unknown_string_tests) {
-    ASSERT_TRUE(Type::from_string("unknown_string").is_error());
-    ASSERT_EQ(Type::from_string("unknown_string").assert_error().value(), (int)ice::candidate::Error::unknown_candidate_type);
+    ASSERT_TRUE(Type::from_string("unknown_string").is_err());
+    ASSERT_EQ(Type::from_string("unknown_string").unwrap_err().value(), (int)ice::candidate::Error::unknown_candidate_type);
 }
 
 }
