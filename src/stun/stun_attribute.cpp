@@ -88,7 +88,7 @@ Result<MappedAddressAttribute> MappedAddressAttribute::parse(const util::ConstBi
     const auto family = *maybe_family;
     const auto port = net::Port(*maybe_port);
     const auto& addr_view = *maybe_addr_view;
-    auto addr_rv =
+    return
         ([&]() -> Result<net::ip::Address> {
             switch (family) {
             case attr_registry::FAMILY_IPV4:
@@ -99,13 +99,15 @@ Result<MappedAddressAttribute> MappedAddressAttribute::parse(const util::ConstBi
                     .fmap([](auto&& addr) { return net::ip::Address(std::move(addr)); });
             }
             return make_error_code(ParseError::unknown_addr_family);
-        })();
-    if (addr_rv.is_err()) {
-        stat.error.inc();
-        stat.invalid_ip_address.inc();
-        return addr_rv.unwrap_err();
-    }
-    return MappedAddressAttribute{std::move(addr_rv.unwrap()), port};
+        })()
+        .bind_err([&](auto&& err) {
+            stat.error.inc();
+            stat.invalid_ip_address.inc();
+            return err;
+        })
+        .fmap([&](auto&& addr) {
+            return MappedAddressAttribute{std::move(addr), port};
+        });
 }
 
 util::ByteVec MappedAddressAttribute::build() const {
@@ -145,13 +147,15 @@ Result<XorMappedAddressAttribute> XorMappedAddressAttribute::parse(const util::C
     // X-Port is computed by XOR'ing the mapped port with the most
     // significant 16 bits of the magic cookie.
     auto port = net::Port(*maybe_xport ^ (details::MAGIC_COOKIE >> 16));
-    auto xaddr_rv = XoredAddress::from_view(*maybe_family, *maybe_xaddr_view);
-    if (xaddr_rv.is_err()) {
-        stat.error.inc();
-        stat.invalid_ip_address.inc();
-        return xaddr_rv.unwrap_err();
-    }
-    return XorMappedAddressAttribute{std::move(xaddr_rv.unwrap()), port};
+    return XoredAddress::from_view(*maybe_family, *maybe_xaddr_view)
+        .bind_err([&](auto&& err) {
+            stat.error.inc();
+            stat.invalid_ip_address.inc();
+            return err;
+        })
+        .fmap([&](auto&& xaddr) {
+            return XorMappedAddressAttribute{std::move(xaddr), port};
+        });
 }
 
 util::ByteVec XorMappedAddressAttribute::build() const {

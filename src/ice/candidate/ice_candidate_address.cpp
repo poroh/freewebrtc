@@ -13,15 +13,19 @@
 namespace freewebrtc::ice::candidate {
 
 Result<Address> Address::from_string(std::string_view v) noexcept {
-    auto ipaddr_rv = net::ip::Address::from_string(v);
-    if (ipaddr_rv.is_ok()) {
-        return Address{std::move(ipaddr_rv.unwrap())};
-    }
-    auto fqdn_rv = net::Fqdn::from_string(v);
-    if (fqdn_rv.is_ok()) {
-        return Address(std::move(fqdn_rv.unwrap()));
-    }
-    return ipaddr_rv.unwrap_err();
+    return net::ip::Address::from_string(v)
+        .fmap([](net::ip::Address&& ip) {
+            return Address{std::move(ip)};
+        })
+        .bind_err([&](auto&& iperr) {
+            return net::Fqdn::from_string(v)
+                .fmap([](net::Fqdn&& fqdn) {
+                    return Address{std::move(fqdn)};
+                })
+                .bind_err([&](auto&&) {
+                    return iperr;
+                });
+        });
 }
 
 }

@@ -212,11 +212,10 @@ Env::RVV Env::create_array(const Container& c, F&& f) {
         > [&](auto&& array) -> RVA {
             size_t i = 0;
             for (const auto& v: c) {
-                auto napiv_rv = f(v);
-                if (napiv_rv.is_err()) {
-                    return napiv_rv.unwrap_err();
-                }
-                auto maybe_err = array.set_element(i++, napiv_rv.unwrap());
+                auto maybe_err = f(v)
+                    .bind([&](auto&& napiv) {
+                        return array.set_element(i++, napiv);
+                    });
                 if (maybe_err.is_err()) {
                     return maybe_err.unwrap_err();
                 }

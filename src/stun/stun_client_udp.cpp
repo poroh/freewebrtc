@@ -48,11 +48,14 @@ ClientUDP::~ClientUDP()
 
 MaybeError ClientUDP::response(Timepoint now, util::ConstBinaryView view, std::optional<stun::Message>&& maybe_msg) {
     if (!maybe_msg.has_value()) {
-        auto parsed_msg_rv = stun::Message::parse(view, m_stat.parse);
-        if (parsed_msg_rv.is_err()) {
-            return parsed_msg_rv.unwrap_err();
+        auto maybe_err = stun::Message::parse(view, m_stat.parse)
+            .fmap([&](auto&& parsed) {
+                maybe_msg.emplace(std::move(parsed));
+                return Unit{};
+            });
+        if (maybe_err.is_err()) {
+            return maybe_err;
         }
-        maybe_msg.emplace(std::move(parsed_msg_rv.unwrap()));
     }
     auto& msg = maybe_msg.value();
     // Find transaction handle first not to spend time on
@@ -71,36 +74,39 @@ MaybeError ClientUDP::response(Timepoint now, util::ConstBinaryView view, std::o
     }
     const auto& trans = j->second;
 
-    // Check authorization
-    if (trans.maybe_auth.has_value()) {
-        auto& auth = trans.maybe_auth.value();
-        // We don't check username because per:
-        // RFC5389: 10.1.2.  Receiving a Request or Indication:
-        // The response MUST NOT contain the USERNAME attribute.
-        auto maybe_is_valid_rv = msg.is_valid(view, auth.integrity);
-        if (maybe_is_valid_rv.is_err()) {
-            return maybe_is_valid_rv.unwrap_err();
-        }
-
-        const auto maybe_is_valid = maybe_is_valid_rv.unwrap();
-        if (!maybe_is_valid.has_value()) {
-            if (!m_settings.allow_unauthenticated_alternate || !msg.is_alternate_server()) {
-                m_stat.integrity_missing.inc();
-                return make_error_code(ClientError::no_integrity_attribute_in_response);
-            } // otherwise process as authenticated alternate server response
-        } else if (!maybe_is_valid.value()) {
-            m_stat.integrity_check_errors.inc();
-            return make_error_code(ClientError::digest_is_not_valid);
-        }
-    }
-
-    if (msg.header.cls == Class::success_response()) {
-        return handle_success_response(now, hnd, msg);
-    } else if (msg.header.cls == Class::error_response()) {
-        return handle_error_response(now, hnd, msg);
-    }
-
-    return success();
+    return
+        Result(Unit{})
+        .bind([&](auto&&) {
+            // Check authorization
+            if (!trans.maybe_auth.has_value()) {
+                return success();
+            }
+            auto& auth = trans.maybe_auth.value();
+            // We don't check username because per:
+            // RFC5389: 10.1.2.  Receiving a Request or Indication:
+            // The response MUST NOT contain the USERNAME attribute.
+            return msg.is_valid(view, auth.integrity)
+                .bind([&](auto&& maybe_is_valid) -> MaybeError {
+                    if (!maybe_is_valid.has_value()) {
+                        if (!m_settings.allow_unauthenticated_alternate || !msg.is_alternate_server()) {
+                            m_stat.integrity_missing.inc();
+                            return make_error_code(ClientError::no_integrity_attribute_in_response);
+                        } // otherwise process as authenticated alternate server response
+                    } else if (!maybe_is_valid.value()) {
+                        m_stat.integrity_check_errors.inc();
+                        return make_error_code(ClientError::digest_is_not_valid);
+                    }
+                    return success();
+                });
+        })
+        .bind([&](auto&&) {
+            if (msg.header.cls == Class::success_response()) {
+                return handle_success_response(now, hnd, msg);
+            } else if (msg.header.cls == Class::error_response()) {
+                return handle_error_response(now, hnd, msg);
+            }
+            return success();
+        });
 }
 
 ClientUDP::Effect ClientUDP::next(Timepoint now) {

@@ -49,15 +49,14 @@ Stateless::Stateless(crypto::SHA1Hash::Func sha1, const std::optional<Settings>&
 {}
 
 Stateless::ProcessResult Stateless::process(const net::Endpoint& ep, const util::ConstBinaryView& view) {
-    auto maybe_msg = stun::Message::parse(view, m_stat);
-    if (!maybe_msg.is_ok()) {
-        return Ignore{};
-    }
-    auto& msg = maybe_msg.unwrap();
-    if (msg.header.cls == stun::Class::request()) {
-        return process_request(ep, std::move(msg), view);
-    }
-    return Ignore{std::move(msg)};
+    return stun::Message::parse(view, m_stat)
+        .fmap([&](auto&& msg) -> ProcessResult {
+            if (msg.header.cls == stun::Class::request()) {
+                return process_request(ep, std::move(msg), view);
+            }
+            return Ignore{std::move(msg)};
+        })
+        .unwrap_or(Ignore{});
 }
 
 void Stateless::add_user(const precis::OpaqueString& name, const stun::Password& password) {

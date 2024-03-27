@@ -209,11 +209,10 @@ Result<std::optional<bool>> Message::is_valid(const util::ConstBinaryView& data,
             uint8_t((integrity_message_len >> 8) & 0xFF),
             uint8_t(integrity_message_len & 0xFF)
         };
-    const auto digest_rv = crypto::hmac::digest({util::ConstBinaryView(header), *without_4byte_header}, password.opad(), password.ipad(), h);
-    if (digest_rv.is_err()) {
-        return digest_rv.unwrap_err();
-    }
-    return MaybeBool{digest_rv.unwrap().value == integrity.get().value};
+    return crypto::hmac::digest({util::ConstBinaryView(header), *without_4byte_header}, password.opad(), password.ipad(), h)
+        .fmap([&](auto&& digest) {
+            return MaybeBool{digest.value == integrity.get().value};
+        });
 }
 
 Result<util::ByteVec> Message::build(const MaybeIntegrity& maybeintegrity) const noexcept {

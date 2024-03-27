@@ -221,11 +221,15 @@ Result<util::ByteVec> AttributeSet::build(const Header& header, const MaybeInteg
         auto fake_header = header.build(total_size + details::STUN_ATTR_HEADER_SIZE + crypto::SHA1Hash::size);
         result[0] = util::ConstBinaryView(fake_header);
         maybe_integrity_digest_rv = crypto::hmac::digest(result, p.opad(), p.ipad(), h);
-        const auto& integrity_digest_rv = maybe_integrity_digest_rv.value();
-        if (integrity_digest_rv.is_err()) {
-            return integrity_digest_rv.unwrap_err();
+        auto maybe_err = maybe_integrity_digest_rv.value()
+            .fmap([&](auto&& integrity_digest) {
+                add_attr(attr_registry::MESSAGE_INTEGRITY, util::ConstBinaryView(integrity_digest.value.value()));
+                return Unit{};
+            });
+        if (maybe_err.is_err()) {
+            // Just adjust return type (fmap function never called);
+            return maybe_err.fmap([](auto&&) { return util::ByteVec{}; });
         }
-        add_attr(attr_registry::MESSAGE_INTEGRITY, util::ConstBinaryView(integrity_digest_rv.unwrap().value.value()));
     }
 
     util::ByteVec real_header;

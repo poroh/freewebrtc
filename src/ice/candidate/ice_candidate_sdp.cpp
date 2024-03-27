@@ -84,13 +84,14 @@ Result<SDPAttrParseResult> parse_sdp_attr(std::string_view inv) {
         } else if (att_name == "rport") {
             maybe_rport = tstr.required_bind(net::Port::from_string).add_context("rport");
         } else {
-            auto att_value_rv = tstr.required();
-            if (att_value_rv.is_ok()) {
-                extensions.emplace_back(Supported::Extension{
-                        .att_name = std::string{att_name},
-                        .att_value = std::string{att_value_rv.unwrap()}
+            tstr.required()
+                .fmap([&](auto&& att_value) {
+                    extensions.emplace_back(Supported::Extension{
+                        .att_name = std::string{std::move(att_name)},
+                        .att_value = std::string{std::move(att_value)}
                     });
-            }
+                    return Unit{};
+                });
         }
     }
 

@@ -67,17 +67,21 @@ template<uint8_t xorv>
 template<typename HashFunc>
 inline Result<PadKey<xorv>> PadKey<xorv>::from_key(const util::ConstBinaryView& view, HashFunc h)
 {
-    util::ConstBinaryView v = view;
-    if (v.size() > B) {
-        auto hash_rv = h({view});
-        if (hash_rv.is_err()) {
-            return hash_rv.unwrap_err();
-        }
-        v = hash_rv.unwrap().view();
-    }
-    Data data = {0};
-    std::copy(v.begin(), v.end(), data.begin());
-    return PadKey<xorv>(std::move(data));
+    using ViewRV = Result<util::ConstBinaryView>;
+    return ViewRV(view)
+        .bind([&](auto&& v) -> ViewRV {
+            if (v.size() > B) {
+                // TODO: is result of v.view is valid after exit from this function?
+                return h({v}).fmap([](auto&& v) { return v.view(); });
+            } else {
+                return v;
+            }
+        })
+        .fmap([](auto&& v) {
+            Data data = {0};
+            std::copy(v.begin(), v.end(), data.begin());
+            return PadKey<xorv>(std::move(data));
+        });
 }
 
 template<uint8_t xorv>
@@ -89,15 +93,14 @@ template<typename HashFunc>
 HMACResult<HashFunc> digest(const std::vector<util::ConstBinaryView>& data, const OPadKey& opad, const IPadKey& ipad, HashFunc h) {
     std::vector<util::ConstBinaryView> inner_data = {ipad.view()};
     std::copy(data.begin(), data.end(), std::back_inserter(inner_data));
-    auto inner = h(inner_data);
-    if (inner.is_err()) {
-        return inner.unwrap_err();
-    }
-    auto outer = h({opad.view(), inner.unwrap().view()});
-    if (outer.is_err()) {
-        return outer.unwrap_err();
-    }
-    return (typename HMACResult<HashFunc>::Value)(std::move(outer.unwrap()));
+    return h(inner_data)
+        .bind([&](auto&& inner) {
+            // TODO: is result of inner.view is valid after exit from this function?
+            return h({opad.view(), inner.view()});
+        })
+        .fmap([](auto&& outer) {
+            return (typename HMACResult<HashFunc>::Value)(std::move(outer));
+        });
 }
 
 }

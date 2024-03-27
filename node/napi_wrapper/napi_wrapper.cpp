@@ -185,15 +185,11 @@ Result<Object> Env::create_object(const ObjectSpec& spec) const noexcept {
         if (!mrvv.has_value()) {
             continue;
         }
-        auto& rvv = mrvv.value();
-        if (rvv.is_err()) {
-            rvv.add_context(k + " attribute");
-            return rvv.unwrap_err();
-        }
-        const auto& vv = rvv.unwrap();
-        if (auto maybe_error = object.set_named_property(k, vv); maybe_error.is_err()) {
-            maybe_error.add_context(k + " attribute");
-            return maybe_error.unwrap_err();
+        auto maybe_err = mrvv.value()
+            .bind([&](auto&& vv) { return object.set_named_property(k, vv); });
+        if (maybe_err.is_err()) {
+            maybe_err.add_context(k + " attribute");
+            return maybe_err.unwrap_err();
         }
     }
     return object_result;
@@ -375,19 +371,18 @@ Result<Value> Env::create_class(std::string_view name, Function ctor, const Clas
                             };
                     },
                     [&](const Result<Value>& rvv) -> DescrRV {
-                            if (rvv.is_err()) {
-                                return rvv.unwrap_err();
-                            }
+                        return rvv.fmap([&](auto&& v) {
                             return napi_property_descriptor{
                                 p.first.c_str(),
                                 nullptr, // name
                                 function_wrapper, // method
                                 nullptr, // getter
                                 nullptr, // setter
-                                rvv.unwrap().to_napi(), // value
+                                v.to_napi(), // value
                                 napi_default, // attributes
                                 nullptr  // data
                             };
+                        });
                     },
                     [&](const ClassAttr& attr) -> DescrRV {
                         return napi_property_descriptor{
@@ -402,12 +397,15 @@ Result<Value> Env::create_class(std::string_view name, Function ctor, const Clas
                         };
                     }
                 },
-                p.second);
-        rvv.add_context("attribute create", p.first);
+                p.second)
+            .add_context("attribute create", p.first)
+            .fmap([&](auto&& v) {
+                descriptors.emplace_back(std::move(v));
+                return Unit{};
+            });
         if (rvv.is_err()) {
             return rvv.unwrap_err();
         }
-        descriptors.emplace_back(rvv.unwrap());
     }
     napi_value result;
     auto status =

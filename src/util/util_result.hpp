@@ -16,12 +16,14 @@
 #include <utility>
 
 #include "util/util_error.hpp"
+#include "util/util_unit.hpp"
 
 namespace freewebrtc {
 
 template<typename V>
 class Result {
 public:
+    using Self = Result<V>;
     using Value = V;
     using Error = ::freewebrtc::Error;
 
@@ -47,6 +49,7 @@ public:
     MaybeConstValue maybe_value() const noexcept;
     Value& unwrap() noexcept;
     const Value& unwrap() const noexcept;
+    const Value& unwrap_or(const Value&) const noexcept;
 
     // Functor's fmap
     // Apply function to Value if it Result is value
@@ -68,16 +71,23 @@ public:
     template<typename F>
     auto bind(F&& f) && -> Result<typename std::invoke_result_t<F, V&&>::Value>;
 
+    // Bind error alternative
+    template<typename F>
+    Self bind_err(F&&) &;
+    template<typename F>
+    Self bind_err(F&&) const&;
+    template<typename F>
+    Self bind_err(F&&) &&;
+
     // Context to error (if Result contains error);
     template<typename... Ts>
-    Result<V>& add_context(Ts&&...);
+    Self& add_context(Ts&&...);
 
 private:
     std::variant<Value, Error> m_result;
 };
 
-struct ResultUnitType{};
-using MaybeError = Result<ResultUnitType>;
+using MaybeError = Result<Unit>;
 MaybeError success() noexcept;
 
 // Create Result from the type. In FP it is full anaglogue of return
@@ -186,6 +196,15 @@ Result<V>::unwrap() noexcept {
 }
 
 template<typename V>
+inline const typename Result<V>::Value&
+Result<V>::unwrap_or(const V& v) const noexcept {
+    if (is_ok()) {
+        return unwrap();
+    }
+    return v;
+}
+
+template<typename V>
 template<typename F>
 auto Result<V>::fmap(F&& f) & -> Result<std::invoke_result_t<F, V&>> {
     if (is_err()) {
@@ -238,6 +257,34 @@ auto Result<V>::bind(F&& f) && -> Result<typename std::invoke_result_t<F, V&&>::
     }
     return f(std::get<Value>(std::move(m_result)));
 }
+
+template<typename V>
+template<typename F>
+Result<V> Result<V>::bind_err(F&& f) & {
+    if (is_err()) {
+        return f(unwrap_err());
+    }
+    return *this;
+}
+
+template<typename V>
+template<typename F>
+Result<V> Result<V>::bind_err(F&& f) const& {
+    if (is_err()) {
+        return f(unwrap_err());
+    }
+    return *this;
+}
+
+template<typename V>
+template<typename F>
+Result<V> Result<V>::bind_err(F&& f) && {
+    if (is_err()) {
+        return f(unwrap_err());
+    }
+    return *this;
+}
+
 
 template<typename V>
 template<typename... Ts>
@@ -364,7 +411,7 @@ auto combine(F&& f, Result<Ts>&&... rvs) -> Result<typename std::invoke_result_t
 }
 
 inline MaybeError success() noexcept {
-    return MaybeError{ResultUnitType{}};
+    return MaybeError{Unit{}};
 }
 
 template<typename T>
