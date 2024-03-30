@@ -45,6 +45,8 @@ std::string IceCandidateError::message(int code) const {
     case Error::invalid_priority_length: return "Invalid candidate priority length";
     case Error::invalid_priority_value: return "Invalid candidate priority value";
     case Error::invalid_type_preference_value: return "Invalid candidate type preference value";
+    case Error::invalid_component_preference_value: return "Invalid component preference value";
+    case Error::invalid_local_preference_value: return "Invalid local preference value";
     }
     return "Unknown ice candidate error: " + std::to_string(code);
 }

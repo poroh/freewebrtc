@@ -41,6 +41,33 @@ Result<TypePreference> TypePreference::from_unsigned(unsigned v) noexcept {
     return Self{v};
 }
 
+LocalPreference::LocalPreference(unsigned v) noexcept
+    : m_value(v)
+{}
+
+Result<LocalPreference> LocalPreference::from_unsigned(unsigned v) noexcept {
+    // The local preference MUST be an integer from 0 to 65535 inclusive.
+    if (v > 65535) {
+        return make_error_code(Error::invalid_local_preference_value);
+    }
+    return Self{v};
+}
+
+ComponentPreference::ComponentPreference(unsigned v) noexcept
+    : m_value(v)
+{}
+
+ComponentPreference ComponentPreference::recommended_for(ComponentId id) noexcept {
+    return ComponentPreference(256 - id.value());
+}
+
+Result<ComponentPreference> ComponentPreference::from_unsigned(unsigned v) noexcept {
+    if (v >= 256) {
+        return make_error_code(Error::invalid_component_preference_value);
+    }
+    return Self{v};
+}
+
 Result<Priority> Preference::to_priority() const noexcept {
     unsigned p = (type.value() << 24)
         | (local.value() << 8)

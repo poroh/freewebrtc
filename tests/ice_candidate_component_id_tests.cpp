@@ -18,12 +18,13 @@ public:
 
 TEST_F(IceCandidateComponentIdTest, from_string_tests) {
     EXPECT_TRUE(ComponentId::from_string("0").is_ok());
-    EXPECT_FALSE(ComponentId::from_string("").is_ok());
+    EXPECT_TRUE(ComponentId::from_string("").is_err());
     EXPECT_TRUE(ComponentId::from_string("123").is_ok());
-    EXPECT_FALSE(ComponentId::from_string("1234").is_ok());
+    EXPECT_TRUE(ComponentId::from_string("256").is_ok());
+    EXPECT_TRUE(ComponentId::from_string("1234").is_err());
 
     EXPECT_TRUE(ComponentId::from_string("90").is_ok());
-    EXPECT_EQ(ComponentId::from_string("0").unwrap(), ComponentId::from_unsigned(0).unwrap());
+    EXPECT_EQ(ComponentId::from_string("1").unwrap(), ComponentId::from_unsigned(1).unwrap());
     EXPECT_EQ(ComponentId::from_string("123").unwrap(), ComponentId::from_unsigned(123).unwrap());
 }
 

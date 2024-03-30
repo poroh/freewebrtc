@@ -14,7 +14,10 @@
 namespace freewebrtc::ice::candidate {
 
 Result<ComponentId> ComponentId::from_unsigned(unsigned v) noexcept {
-    if (v >= 1000) {
+    // <component-id>:  is a positive integer between 1 and 256 that
+    // identifies the specific component of the media stream for which
+    // this is a candidate.
+    if (v == 0 || v > 256) {
         return make_error_code(Error::invalid_component_id_value);
     }
     return ComponentId(v);
@@ -36,4 +39,3 @@ Result<ComponentId> ComponentId::from_string(const std::string_view& v) noexcept
 }
 
 }
-

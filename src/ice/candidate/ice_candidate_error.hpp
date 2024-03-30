@@ -27,6 +27,8 @@ enum class Error {
     invalid_priority_length,
     invalid_priority_value,
     invalid_type_preference_value,
+    invalid_component_preference_value,
+    invalid_local_preference_value,
 };
 
 std::error_code make_error_code(Error) noexcept;
