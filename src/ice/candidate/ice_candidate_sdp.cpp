@@ -135,7 +135,7 @@ Result<SDPAttrParseResult> parse_sdp_attr(std::string_view inv) {
                         .port = std::move(port),
                         .transport_type = std::move(t),
                         .foundation = std::move(f),
-                        .maybe_component = std::move(cid),
+                        .component = std::move(cid),
                         .priority = std::move(p),
                         .type = std::move(type),
                         .maybe_related_address = std::move(raddr),

@@ -29,8 +29,7 @@ TEST_F(IceCandidateSDPAttrTests, parse_tests_rfc8839_example_host) {
     EXPECT_EQ(candidate.transport_type, ice::candidate::TransportType::udp());
     EXPECT_EQ(candidate.type, ice::candidate::Type::host());
     EXPECT_EQ(candidate.priority, ice::candidate::Priority::from_uint32(2130706431).unwrap());
-    ASSERT_TRUE(candidate.maybe_component.has_value());
-    EXPECT_EQ(candidate.maybe_component.value(), ice::candidate::ComponentId::from_unsigned(1).unwrap());
+    EXPECT_EQ(candidate.component, ice::candidate::ComponentId::from_unsigned(1).unwrap());
     EXPECT_FALSE(candidate.maybe_related_address.has_value());
     EXPECT_FALSE(candidate.maybe_related_port.has_value());
 }
@@ -49,8 +48,7 @@ TEST_F(IceCandidateSDPAttrTests, parse_tests_rfc8839_example_srflx) {
     EXPECT_EQ(candidate.transport_type, ice::candidate::TransportType::udp());
     EXPECT_EQ(candidate.type, ice::candidate::Type::server_reflexive());
     EXPECT_EQ(candidate.priority, ice::candidate::Priority::from_uint32(1694498815).unwrap());
-    ASSERT_TRUE(candidate.maybe_component.has_value());
-    EXPECT_EQ(candidate.maybe_component.value(), ice::candidate::ComponentId::from_unsigned(1).unwrap());
+    EXPECT_EQ(candidate.component, ice::candidate::ComponentId::from_unsigned(1).unwrap());
     ASSERT_TRUE(candidate.maybe_related_address.has_value());
     ASSERT_TRUE(candidate.maybe_related_port.has_value());
     ASSERT_TRUE(candidate.maybe_related_address->as_ip_address().has_value());
@@ -73,8 +71,7 @@ TEST_F(IceCandidateSDPAttrTests, parse_tests_rfc8839_example_host_ipv6) {
     EXPECT_EQ(candidate.transport_type, ice::candidate::TransportType::udp());
     EXPECT_EQ(candidate.type, ice::candidate::Type::host());
     EXPECT_EQ(candidate.priority, ice::candidate::Priority::from_uint32(2130706431).unwrap());
-    ASSERT_TRUE(candidate.maybe_component.has_value());
-    EXPECT_EQ(candidate.maybe_component.value(), ice::candidate::ComponentId::from_unsigned(1).unwrap());
+    EXPECT_EQ(candidate.component, ice::candidate::ComponentId::from_unsigned(1).unwrap());
     EXPECT_FALSE(candidate.maybe_related_address.has_value());
     EXPECT_FALSE(candidate.maybe_related_port.has_value());
 }
@@ -93,8 +90,7 @@ TEST_F(IceCandidateSDPAttrTests, parse_tests_rfc8839_example_srflx_ipv6) {
     EXPECT_EQ(candidate.transport_type, ice::candidate::TransportType::udp());
     EXPECT_EQ(candidate.type, ice::candidate::Type::server_reflexive());
     EXPECT_EQ(candidate.priority, ice::candidate::Priority::from_uint32(1694498815).unwrap());
-    ASSERT_TRUE(candidate.maybe_component.has_value());
-    EXPECT_EQ(candidate.maybe_component.value(), ice::candidate::ComponentId::from_unsigned(1).unwrap());
+    EXPECT_EQ(candidate.component, ice::candidate::ComponentId::from_unsigned(1).unwrap());
     ASSERT_TRUE(candidate.maybe_related_address.has_value());
     ASSERT_TRUE(candidate.maybe_related_port.has_value());
     ASSERT_TRUE(candidate.maybe_related_address->as_ip_address().has_value());

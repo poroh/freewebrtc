@@ -25,7 +25,7 @@ struct Candidate {
     net::Port port;
     TransportType transport_type;
     Foundation foundation;
-    MaybeComponentId maybe_component;
+    ComponentId component;
     Priority priority;
     Type type;
     std::optional<Address> maybe_related_address;
