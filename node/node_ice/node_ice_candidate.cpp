@@ -29,7 +29,7 @@ Result<napi::Object> ice_candidate_to_object(napi::Env& env, const ice::candidat
                 { "type", env.create_string(c.type.to_string()) },
                 { "transport", env.create_string(c.transport_type.to_string()) },
                 { "foundation", env.create_string(c.foundation.to_string()) },
-                { "component", util::fmap(c.maybe_component, [&](auto&& id) { return env.create_int32(id.value()); }) },
+                { "component", env.create_int32(c.component.value()) },
                 { "raddr", util::fmap(c.maybe_related_address, ice_addr_to_string) },
                 { "rport", util::fmap(c.maybe_related_port, [&](auto&& rport) { return env.create_int32(rport.value()); }) },
                 { "extensions", env.create_array(v.extensions, ext_to_obj) }}) },
