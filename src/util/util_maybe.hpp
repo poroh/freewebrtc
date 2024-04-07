@@ -20,6 +20,7 @@
 #pragma once
 
 #include <variant>
+#include <type_traits>
 
 #include "util/util_tagged_type.hpp"
 #include "util/util_unit.hpp"
@@ -47,6 +48,9 @@ public:
 
     const T& value_or(const T&) const;
 
+    template<typename F>
+    auto value_or_call(F&& f) -> std::invoke_result_t<F>;
+
     bool is_some() const;
     bool is_none() const;
 
@@ -58,6 +62,7 @@ public:
     auto fmap(F&& f) const& -> Maybe<std::invoke_result_t<F, const T&>>;
     template<typename F>
     auto fmap(F&& f) && -> Maybe<std::invoke_result_t<F, T&&>>;
+
 
 private:
     std::variant<T, None> m_value;
@@ -98,6 +103,16 @@ template<typename T>
 const T& Maybe<T>::value_or(const T& dflt) const {
     if (is_none()) {
         return dflt;
+    }
+    return unwrap();
+}
+
+template<typename T>
+template<typename F>
+auto Maybe<T>::value_or_call(F&& f) -> std::invoke_result_t<F> {
+    static_assert(std::is_same_v<T, std::remove_cvref_t<std::invoke_result_t<F>>>);
+    if (is_none()) {
+        return f();
     }
     return unwrap();
 }

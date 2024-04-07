@@ -47,30 +47,28 @@ void ClientUDPRtoCalculator::new_rtt(Timepoint now, const net::Path& path, Durat
     // Clear backoff value for further requests
     data.backoff = none();
     // Update SRTT
-    if (!it->second.smooth.is_some()) {
-        // SRTT <- R
-        // RTTVAR <- R/2
-        it->second.smooth = Data::SmoothVals{rtt, rtt / 2};
-        return;
-    }
-    auto& smooth = data.smooth.unwrap();
-    auto& rttvar = smooth.rttvar;
-    auto& srtt = smooth.srtt;
+    data.smooth = data.smooth
+        .fmap([&](Data::SmoothVals smooth) -> Data::SmoothVals {
+            auto& rttvar = smooth.rttvar;
+            auto& srtt = smooth.srtt;
 
-    // RFC6298:
-    // The above SHOULD be computed using alpha=1/8 and beta=1/4 (as
-    // suggested in [JK88]).
-    const constexpr std::ratio<1, 8> alpha;
-    const constexpr std::ratio<1, 4> beta;
-    auto srtt_delta = srtt - rtt;
-    if (srtt_delta.count() < 0) {
-        srtt_delta = -srtt_delta;
-    }
-    // RFC6298:
-    // RTTVAR <- (1 - beta) * RTTVAR + beta * |SRTT - R'|
-    rttvar = ((beta.den - beta.num) * rttvar + beta.num * srtt_delta) / beta.den;
-    // SRTT <- (1 - alpha) * SRTT + alpha * R'
-    srtt = ((alpha.den - alpha.num) * srtt + alpha.num * rtt) / alpha.den;
+            // RFC6298:
+            // The above SHOULD be computed using alpha=1/8 and beta=1/4 (as
+            // suggested in [JK88]).
+            const constexpr std::ratio<1, 8> alpha;
+            const constexpr std::ratio<1, 4> beta;
+            auto srtt_delta = srtt - rtt;
+            if (srtt_delta.count() < 0) {
+                srtt_delta = -srtt_delta;
+            }
+            // RFC6298:
+            // RTTVAR <- (1 - beta) * RTTVAR + beta * |SRTT - R'|
+            rttvar = ((beta.den - beta.num) * rttvar + beta.num * srtt_delta) / beta.den;
+            // SRTT <- (1 - alpha) * SRTT + alpha * R'
+            srtt = ((alpha.den - alpha.num) * srtt + alpha.num * rtt) / alpha.den;
+            return smooth;
+        })
+        .value_or(Data::SmoothVals{rtt, rtt / 2});
 }
 
 void ClientUDPRtoCalculator::backoff(Timepoint now, const net::Path& path, Duration backoff) {
@@ -88,13 +86,16 @@ void ClientUDPRtoCalculator::backoff(Timepoint now, const net::Path& path, Durat
 }
 
 void ClientUDPRtoCalculator::clear_outdated(Timepoint now) {
-    while (true) {
-        const auto& front = m_timeline.front();
-        if (!front.is_some()
-            || now - front.unwrap().get().last_update <= m_settings.history_duration) {
-            break;
-        }
-        m_by_path.erase(front.unwrap().get().path);
+    while (
+        m_timeline.front()
+        .fmap([&](auto&& front) {
+            if (now - front.get().last_update > m_settings.history_duration) {
+                m_by_path.erase(front.get().path);
+                return true;
+            }
+            return false;
+        }).value_or(false)) {
+        ; // sic!
     }
 }
 

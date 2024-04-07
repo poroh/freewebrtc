@@ -50,21 +50,19 @@ MessageDigest::MessageDigest(const EVP_MD *md)
 
 template<typename Hash>
 typename Hash::Result MessageDigest::calc(const typename Hash::Input& input) {
-    if (auto maybe_err = init(); maybe_err.is_err()) {
-        return maybe_err.unwrap_err();
-    }
-
-    for (const auto& chunk: input) {
-        if (auto maybe_err = update(chunk); maybe_err.is_err()) {
-            return maybe_err.unwrap_err();
-        }
-    }
-
     typename Hash::Value v;
-    if (auto maybe_err = finalize(v.data()); maybe_err.is_err()) {
-        return maybe_err.unwrap_err();
-    }
-    return Hash{std::move(v)};
+    return init()
+        .bind([&](auto&&) -> MaybeError {
+            for (const auto& chunk: input) {
+                if (auto maybe_err = update(chunk); maybe_err.is_err()) {
+                    return maybe_err.unwrap_err();
+                }
+            }
+            return finalize(v.data());
+        })
+        .fmap([&](auto&&) {
+            return Hash{std::move(v)};
+        });
 }
 
 MaybeError MessageDigest::init() {

@@ -306,10 +306,15 @@ util::ByteVec ErrorCodeAttribute::build() const {
     // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     uint32_t first_word = util::host_to_network_u32(((code / 100) << 8) | (code % 100));
     return util::ConstBinaryView::concat({
-            util::ConstBinaryView(&first_word, sizeof(first_word)),
-            reason_phrase.is_some() ? util::ConstBinaryView(reason_phrase.unwrap().data(), reason_phrase.unwrap().size())
-                                    : util::ConstBinaryView(&first_word, 0) // 0 is by intention!
-        });
+        util::ConstBinaryView(&first_word, sizeof(first_word)),
+        reason_phrase
+            .fmap([](const auto& reason_phrase) {
+                return util::ConstBinaryView(
+                    reason_phrase.data(),
+                    reason_phrase.size());
+            })
+            .value_or(util::ConstBinaryView(&first_word, 0)) // 0 is by intention!
+    });
 }
 
 Result<ErrorCodeAttribute> ErrorCodeAttribute::parse(const util::ConstBinaryView& v, ParseStat& stat) {
