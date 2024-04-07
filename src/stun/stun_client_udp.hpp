@@ -108,11 +108,12 @@ private:
     using RetransmitAlgoPtr = std::unique_ptr<RetransmitAlgo>;
     struct Transaction {
         ~Transaction();
-        Transaction(Timepoint now, TransactionId&&, util::ByteVec&& msg_data, RetransmitAlgoPtr&& rtx_algo, net::Path&&, MaybeAuth&&);
+        Transaction(Timepoint now, TransactionId&&, Handle, util::ByteVec&& msg_data, RetransmitAlgoPtr&& rtx_algo, net::Path&&, MaybeAuth&&);
         Transaction(const Transaction&) = delete;
         Transaction(Transaction&&) = default;
 
         TransactionId tid;
+        Handle hnd;
         util::ByteVec msg_data;
         RetransmitAlgoPtr rtx_algo;
         net::Path path;
@@ -120,6 +121,7 @@ private:
         MaybeAuth maybe_auth;
         unsigned rtx_count = 0;
     };
+    using TransactionRef = std::reference_wrapper<Transaction>;
     using TimelineItem = std::pair<Timepoint, Handle>;
     struct TimelineGreater {
         bool operator()(const TimelineItem&, const TimelineItem&) const noexcept;
@@ -127,9 +129,11 @@ private:
     using RtoCalculator = details::ClientUDPRtoCalculator;
     using RtoCalculatorPtr = std::unique_ptr<RtoCalculator>;
 
+    Result<TransactionRef> find_transaction(const TransactionId&) noexcept;
+    MaybeError check_response_auth(const Transaction&, const Message&, util::ConstBinaryView view) noexcept;
     Result<Handle> do_create(Timepoint, TransactionId&&, Request&&);
-    MaybeError handle_success_response(Timepoint now, Handle hnd, Message& msg);
-    MaybeError handle_error_response(Timepoint now, Handle hnd, const Message& msg);
+    MaybeError handle_success_response(Timepoint now, Transaction& trans, Message&& msg);
+    MaybeError handle_error_response(Timepoint now, Transaction& trans, Message&& msg);
     Handle allocate_handle() noexcept;
     RetransmitAlgoPtr allocate_rtx_algo(const net::Path& path, Timepoint now);
     void cleanup(const Handle&);
