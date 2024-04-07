@@ -10,10 +10,10 @@
 #pragma once
 
 #include <cstdint>
-#include <optional>
 #include <string>
 
 #include "util/util_result.hpp"
+#include "util/util_maybe.hpp"
 
 namespace freewebrtc::ice::candidate {
 
@@ -35,7 +35,7 @@ private:
     unsigned m_value;
 };
 
-using MaybeComponentId = std::optional<ComponentId>;
+using MaybeComponentId = Maybe<ComponentId>;
 
 //
 // implementation

@@ -12,7 +12,6 @@
 
 #include "stun/stun_server_stateless.hpp"
 #include "crypto/openssl/openssl_hash.hpp"
-#include "util/util_fmap.hpp"
 
 namespace freewebrtc::test {
 
@@ -33,8 +32,8 @@ public:
     }
     void check_error_code(const stun::Message& msg, stun::ErrorCodeAttribute::Code expected) {
         const auto maybe_errcode_attr = msg.attribute_set.error_code();
-        ASSERT_TRUE(maybe_errcode_attr.has_value());
-        const auto& error_code_attr = maybe_errcode_attr.value().get();
+        ASSERT_TRUE(maybe_errcode_attr.is_some());
+        const auto& error_code_attr = maybe_errcode_attr.unwrap().get();
         EXPECT_EQ(error_code_attr.code, expected);
     }
     stun::TransactionId rand_tid() {
@@ -72,19 +71,20 @@ TEST_P(STUNServerStatelessTest, request_rfc5389) {
             rand_tid()
         },
         stun::AttributeSet::create({}),
-        stun::IsRFC3489{false}
+        stun::IsRFC3489{false},
+        none()
     };
     const auto r = server.process(endpoint, util::ConstBinaryView(build(request)));
     ASSERT_TRUE(std::holds_alternative<StunServer::Respond>(r));
     const auto& rsp = std::get<StunServer::Respond>(r).response;
     check_success_response(rsp, request);
     const auto& maybe_xor_mapped = rsp.attribute_set.xor_mapped();
-    ASSERT_TRUE(maybe_xor_mapped.has_value());
-    const auto& xor_mapped = maybe_xor_mapped.value().get();
+    ASSERT_TRUE(maybe_xor_mapped.is_some());
+    const auto& xor_mapped = maybe_xor_mapped.unwrap().get();
     EXPECT_EQ(xor_mapped.addr.to_address(rsp.header.transaction_id), endpoint.address());
     EXPECT_EQ(xor_mapped.port, endpoint.port());
     // No integrity because not username / integrity in the request
-    EXPECT_TRUE(!rsp.attribute_set.integrity().has_value());
+    EXPECT_TRUE(!rsp.attribute_set.integrity().is_some());
 }
 
 TEST_P(STUNServerStatelessTest, request_rfc5389_authenticated) {
@@ -107,7 +107,8 @@ TEST_P(STUNServerStatelessTest, request_rfc5389_authenticated) {
                 stun::UsernameAttribute{joe},
                 stun::FingerprintAttribute{0},
             }),
-        stun::IsRFC3489{false}
+        stun::IsRFC3489{false},
+        none()
     };
 
     stun::IntegrityData integrity_data{joe_password, sha1};
@@ -120,20 +121,20 @@ TEST_P(STUNServerStatelessTest, request_rfc5389_authenticated) {
     const auto& rsp = std::get<StunServer::Respond>(r).response;
     check_success_response(rsp, request);
     const auto& maybe_xor_mapped = rsp.attribute_set.xor_mapped();
-    ASSERT_TRUE(maybe_xor_mapped.has_value());
-    const auto& xor_mapped = maybe_xor_mapped.value().get();
+    ASSERT_TRUE(maybe_xor_mapped.is_some());
+    const auto& xor_mapped = maybe_xor_mapped.unwrap().get();
     EXPECT_EQ(xor_mapped.addr.to_address(rsp.header.transaction_id), endpoint.address());
     EXPECT_EQ(xor_mapped.port, endpoint.port());
 
     // Integrity must be used for response:
     const auto maybe_rsp_integrity_data = std::get<StunServer::Respond>(r).maybe_integrity;
-    ASSERT_TRUE(maybe_rsp_integrity_data.has_value());
-    const auto& rsp_integrity_data = maybe_rsp_integrity_data.value();
+    ASSERT_TRUE(maybe_rsp_integrity_data.is_some());
+    const auto& rsp_integrity_data = maybe_rsp_integrity_data.unwrap();
     ASSERT_EQ(rsp_integrity_data.password, joe_password);
 
     // RFC5389: 10.1.2. Receiving a Request or Indication
     // The response MUST NOT contain the USERNAME attribute
-    EXPECT_FALSE(rsp.attribute_set.username().has_value());
+    EXPECT_FALSE(rsp.attribute_set.username().is_some());
 }
 
 TEST_P(STUNServerStatelessTest, request_rfc3489) {
@@ -146,7 +147,8 @@ TEST_P(STUNServerStatelessTest, request_rfc3489) {
             rand_tid_rfc3489()
         },
         stun::AttributeSet::create({}),
-        stun::IsRFC3489{true}
+        stun::IsRFC3489{true},
+        none()
     };
 
     const auto r = server.process(endpoint, util::ConstBinaryView(build(request)));
@@ -155,11 +157,11 @@ TEST_P(STUNServerStatelessTest, request_rfc3489) {
     check_success_response(rsp, request);
 
     const auto& maybe_xor_mapped = rsp.attribute_set.xor_mapped();
-    ASSERT_FALSE(maybe_xor_mapped.has_value());
+    ASSERT_FALSE(maybe_xor_mapped.is_some());
 
     const auto& maybe_mapped = rsp.attribute_set.mapped();
-    ASSERT_TRUE(maybe_mapped.has_value());
-    const auto& mapped = maybe_mapped.value().get();
+    ASSERT_TRUE(maybe_mapped.is_some());
+    const auto& mapped = maybe_mapped.unwrap().get();
     EXPECT_EQ(mapped.addr, endpoint.address());
     EXPECT_EQ(mapped.port, endpoint.port());
 }
@@ -185,7 +187,8 @@ TEST_P(STUNServerStatelessTest, request_with_unknown_attribute_requires_comprehe
             rand_tid()
         },
         stun::AttributeSet::create({}, {unknown_attr}),
-        stun::IsRFC3489{false}
+        stun::IsRFC3489{false},
+        none()
     };
     const auto r = server.process(endpoint, util::ConstBinaryView(build(request)));
     ASSERT_TRUE(std::holds_alternative<StunServer::Respond>(r));
@@ -195,8 +198,8 @@ TEST_P(STUNServerStatelessTest, request_with_unknown_attribute_requires_comprehe
 
     // Check UNKNOWN-ATTRIBUTS
     const auto maybe_unknown_attributes_attr = rsp.attribute_set.unknown_attributes();
-    ASSERT_TRUE(maybe_unknown_attributes_attr.has_value());
-    const auto& unknown_attributes_attr = maybe_unknown_attributes_attr.value().get();
+    ASSERT_TRUE(maybe_unknown_attributes_attr.is_some());
+    const auto& unknown_attributes_attr = maybe_unknown_attributes_attr.unwrap().get();
     EXPECT_EQ(unknown_attributes_attr.types.size(), 1);
     EXPECT_EQ(unknown_attributes_attr.types[0], unknown_attr.type);
 }
@@ -220,7 +223,8 @@ TEST_P(STUNServerStatelessTest, request_with_username_attribute_without_integrit
         stun::AttributeSet::create({
                 stun::UsernameAttribute{precis::OpaqueString{"test"}}
             }),
-        stun::IsRFC3489{false}
+        stun::IsRFC3489{false},
+        none()
     };
     const auto r = server.process(endpoint, util::ConstBinaryView(build(request)));
     ASSERT_TRUE(std::holds_alternative<StunServer::Respond>(r));
@@ -248,7 +252,8 @@ TEST_P(STUNServerStatelessTest, request_with_integrity_attribute_without_usernam
             rand_tid()
         },
         stun::AttributeSet::create({}),
-        stun::IsRFC3489{false}
+        stun::IsRFC3489{false},
+        none()
     };
 
     auto maybepassword = stun::Password::short_term(precis::OpaqueString("1234"), sha1);
@@ -275,7 +280,8 @@ TEST_P(STUNServerStatelessTest, unknown_username) {
         stun::AttributeSet::create({
                 stun::UsernameAttribute{precis::OpaqueString{"joe"}}
             }),
-        stun::IsRFC3489{false}
+        stun::IsRFC3489{false},
+        none()
     };
 
     auto maybepassword = stun::Password::short_term(precis::OpaqueString("1234"), sha1);
@@ -303,7 +309,8 @@ TEST_P(STUNServerStatelessTest, wrong_password) {
         stun::AttributeSet::create({
                 stun::UsernameAttribute{joe}
             }),
-        stun::IsRFC3489{false}
+        stun::IsRFC3489{false},
+        none()
     };
 
     auto joe_password_rv = stun::Password::short_term(precis::OpaqueString("4321"), sha1);

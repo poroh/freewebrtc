@@ -32,5 +32,4 @@ inline std::error_code make_error_code(Error ec) noexcept {
     return std::error_code((int)ec, net_error_category());
 }
 
-
 }

@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <optional>
+#include "util/util_maybe.hpp"
 #include "stun/stun_password.hpp"
 
 namespace freewebrtc::stun {
@@ -18,7 +18,7 @@ struct IntegrityData {
     crypto::SHA1Hash::Func hash;
 };
 
-using MaybeIntegrity = std::optional<IntegrityData>;
+using MaybeIntegrity = Maybe<IntegrityData>;
 
 
 }

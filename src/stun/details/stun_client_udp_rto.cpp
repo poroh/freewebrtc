@@ -6,7 +6,6 @@
 // Retransmit timeout (RTO) calculation for STUN UDP Client
 
 #include <cmath>
-#include "util/util_fmap.hpp"
 #include "stun/details/stun_client_udp_rto.hpp"
 
 
@@ -31,7 +30,7 @@ Duration ClientUDPRtoCalculator::rto(const net::Path& path) const {
     // we get reliable RTT value.
     return data.backoff
         .value_or(
-            util::fmap(data.smooth, [](auto&& s) { return s.srtt + K * s.rttvar; })
+            data.smooth.fmap([](auto&& s) { return s.srtt + K * s.rttvar; })
                 .value_or(m_settings.initial_rto));
 }
 
@@ -46,15 +45,15 @@ void ClientUDPRtoCalculator::new_rtt(Timepoint now, const net::Path& path, Durat
     m_timeline.push_back(data);
     clear_outdated(now);
     // Clear backoff value for further requests
-    data.backoff.reset();
+    data.backoff = none();
     // Update SRTT
-    if (!it->second.smooth.has_value()) {
+    if (!it->second.smooth.is_some()) {
         // SRTT <- R
         // RTTVAR <- R/2
-        it->second.smooth.emplace(Data::SmoothVals{rtt, rtt / 2});
+        it->second.smooth = Data::SmoothVals{rtt, rtt / 2};
         return;
     }
-    auto& smooth = data.smooth.value();
+    auto& smooth = data.smooth.unwrap();
     auto& rttvar = smooth.rttvar;
     auto& srtt = smooth.srtt;
 
@@ -91,23 +90,26 @@ void ClientUDPRtoCalculator::backoff(Timepoint now, const net::Path& path, Durat
 void ClientUDPRtoCalculator::clear_outdated(Timepoint now) {
     while (true) {
         const auto& front = m_timeline.front();
-        if (!front.has_value()
-            || now - front.value().get().last_update <= m_settings.history_duration) {
+        if (!front.is_some()
+            || now - front.unwrap().get().last_update <= m_settings.history_duration) {
             break;
         }
-        m_by_path.erase(front.value().get().path);
+        m_by_path.erase(front.unwrap().get().path);
     }
 }
 
 ClientUDPRtoCalculator::Data::Data(const net::Path& p, Timepoint now)
     : path(p)
     , last_update(now)
+    , smooth(none())
+    , backoff(none())
     , link(*this)
 {}
 
 ClientUDPRtoCalculator::Data::Data(const net::Path& p, Timepoint now, Duration backoff_)
     : path(p)
     , last_update(now)
+    , smooth(none())
     , backoff(backoff_)
     , link(*this)
 {}

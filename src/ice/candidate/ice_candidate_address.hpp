@@ -15,6 +15,7 @@
 
 #include "net/ip/ip_address.hpp"
 #include "net/net_fqdn.hpp"
+#include "util/util_maybe.hpp"
 
 namespace freewebrtc::ice::candidate {
 
@@ -22,8 +23,8 @@ class Address {
 public:
     using FqdnCRef = std::reference_wrapper<const net::Fqdn>;
     using IpAddressCRef = std::reference_wrapper<const net::ip::Address>;
-    using MaybeFqdnCRef = std::optional<FqdnCRef>;
-    using MaybeIpAddressCRef = std::optional<IpAddressCRef>;
+    using MaybeFqdnCRef = Maybe<FqdnCRef>;
+    using MaybeIpAddressCRef = Maybe<IpAddressCRef>;
 
     Address(const Address&) = default;
     Address(Address&&) = default;
@@ -59,14 +60,14 @@ inline Address::MaybeFqdnCRef Address::as_fqdn() const noexcept {
     if (std::holds_alternative<net::Fqdn>(m_value)) {
         return std::cref(std::get<net::Fqdn>(m_value));
     }
-    return std::nullopt;
+    return none();
 }
 
 inline Address::MaybeIpAddressCRef Address::as_ip_address() const noexcept{
     if (std::holds_alternative<net::ip::Address>(m_value)) {
         return std::cref(std::get<net::ip::Address>(m_value));
     }
-    return std::nullopt;
+    return none();
 }
 
 inline Result<std::string> Address::to_string() const {

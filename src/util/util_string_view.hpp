@@ -11,21 +11,20 @@
 #pragma once
 
 #include <string_view>
-#include <optional>
 #include <utility>
 #include <sstream>
 #include <vector>
-#include "util/util_fmap.hpp"
+#include "util/util_maybe.hpp"
 
 namespace freewebrtc::util::string_view {
 
 using SV = std::string_view;
-using MaybeSV = std::optional<SV>;
+using MaybeSV = Maybe<SV>;
 
 // Safe version of std::string_view::remote_prefix
 MaybeSV remote_prefix(SV, size_t sz);
 
-std::optional<std::pair<SV, SV>> split(SV, char sep);
+Maybe<std::pair<SV, SV>> split(SV, char sep);
 
 template<template <typename...> class Result = std::vector>
 Result<SV> split_all(SV, char sep);
@@ -38,21 +37,21 @@ std::string join(const Container&, const std::string& sep);
 //
 inline MaybeSV remove_prefix(SV sv, size_t sz) {
     if (sz > sv.size()) {
-        return std::nullopt;
+        return None{};
     }
     sv.remove_prefix(sz);
     return sv;
 }
 
-inline std::optional<std::pair<SV, SV>> split(SV sv, char sep) {
+inline Maybe<std::pair<SV, SV>> split(SV sv, char sep) {
     if (auto pos = sv.find(sep); pos != std::string_view::npos) {
         auto first = SV{sv.data(), pos};
-        return util::fmap(remove_prefix(sv, pos + 1),
-            [&](const SV& second) {
+        return remove_prefix(sv, pos + 1)
+            .fmap([&](const SV& second) {
                 return std::make_pair(std::move(first), std::move(second));
             });
     }
-    return std::nullopt;
+    return None{};
 }
 
 template<template <typename...> class Result>
@@ -60,8 +59,8 @@ Result<SV> split_all(SV sv, char sep) {
     Result<SV> result;
     while (!sv.empty()) {
         auto maybe_pair = split(sv, sep);
-        if (maybe_pair.has_value()) {
-            auto& pair = maybe_pair.value();
+        if (maybe_pair.is_some()) {
+            auto& pair = maybe_pair.unwrap();
             result.emplace_back(std::move(pair.first));
             sv = pair.second;
         } else {

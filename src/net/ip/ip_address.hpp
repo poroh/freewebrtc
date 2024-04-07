@@ -12,7 +12,6 @@
 #pragma once
 
 #include <variant>
-#include <optional>
 #include <string_view>
 #include "net/ip/ip_address_v4.hpp"
 #include "net/ip/ip_address_v6.hpp"

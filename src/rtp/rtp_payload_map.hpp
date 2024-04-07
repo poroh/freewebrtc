@@ -8,10 +8,12 @@
 
 #pragma once
 
+#include <unordered_map>
+
+#include "util/util_maybe.hpp"
 #include "rtp/rtp_clock_rate.hpp"
 #include "rtp/rtp_payload_type.hpp"
 
-#include <unordered_map>
 
 namespace freewebrtc::rtp {
 
@@ -25,7 +27,7 @@ public:
     using InitPair = std::pair<PayloadType, PayloadMapItem>;
     using PairInitializer = std::initializer_list<InitPair>;
     explicit PayloadMap(PairInitializer);
-    std::optional<ClockRate> rtp_clock_rate(PayloadType) const noexcept;
+    Maybe<ClockRate> rtp_clock_rate(PayloadType) const noexcept;
 private:
     std::unordered_map<PayloadType, PayloadMapItem> m_items;
 };
@@ -33,11 +35,11 @@ private:
 //
 // inlines
 //
-inline std::optional<ClockRate> PayloadMap::rtp_clock_rate(PayloadType pt) const noexcept {
+inline Maybe<ClockRate> PayloadMap::rtp_clock_rate(PayloadType pt) const noexcept {
     if (auto it = m_items.find(pt); it != m_items.end()) {
         return it->second.clock_rate;
     }
-    return std::nullopt;
+    return none();
 }
 
 }

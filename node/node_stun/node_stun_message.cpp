@@ -8,8 +8,8 @@
 
 #include "node_stun_message.hpp"
 #include "node_stun_header.hpp"
-#include "util/util_fmap.hpp"
 #include "util/util_result_sugar.hpp"
+#include "util/util_maybe.hpp"
 
 namespace freewebrtc::node_stun {
 
@@ -19,19 +19,19 @@ using Env = napi::Env;
 using CallbackInfo = napi::CallbackInfo;
 
 Result<Object> stun_attributes(const Env& env, const stun::TransactionId& tid, const stun::AttributeSet& attrs) {
-    using MaybeRVV = std::optional<Result<Value>>;
+    using MaybeRVV = Maybe<Result<Value>>;
     return
         env.create_object({
             { "username",
-                    util::fmap(attrs.username(), [&](const auto& v) {
+                    attrs.username().fmap([&](auto&& v) {
                         return env.create_string(v.get().value);
                     })},
             { "software",
-                    util::fmap(attrs.software(), [&](const auto& v) {
+                    attrs.software().fmap([&](const auto& v) {
                         return env.create_string(v.get());
                     })},
             { "xor_mapped",
-                    util::fmap(attrs.xor_mapped(), [&](const auto& v) {
+                    attrs.xor_mapped().fmap([&](const auto& v) {
                         return
                             v.get().addr.to_address(tid)
                             .to_string()
@@ -44,20 +44,20 @@ Result<Object> stun_attributes(const Env& env, const stun::TransactionId& tid, c
                             };
                     })},
             { "priority",
-                    util::fmap(attrs.priority(), [&](const auto& v) {
+                    attrs.priority().fmap([&](const auto& v) {
                         return env.create_uint32(v.get());
                     })},
             { "ice-controlling",
-                    util::fmap(attrs.ice_controlling(), [&](const auto& v) {
+                    attrs.ice_controlling().fmap([&](const auto& v) {
                         return env.create_bigint_uint64(v.get());
                     })},
             { "ice-controlled",
-                    util::fmap(attrs.ice_controlled(), [&](const auto& v) {
+                    attrs.ice_controlled().fmap([&](const auto& v) {
                         return env.create_bigint_uint64(v.get());
                     })},
-            { "use-candidate", attrs.has_use_candidate() ? MaybeRVV(env.create_boolean(true)) : std::nullopt },
+            { "use-candidate", attrs.has_use_candidate() ? MaybeRVV(env.create_boolean(true)) : None{} },
             { "error_code",
-                    util::fmap(attrs.error_code(), [&](const auto& v) {
+                    attrs.error_code().fmap([&](const auto& v) {
                         return
                             env.create_object({
                                     { "code", env.create_int32(v.get().code)},

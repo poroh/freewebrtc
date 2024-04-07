@@ -8,7 +8,6 @@
 
 #include "node_ice_candidate.hpp"
 #include "util/util_result_sugar.hpp"
-#include "util/util_fmap.hpp"
 #include "ice/candidate/ice_candidate_sdp.hpp"
 
 namespace freewebrtc::node_ice {
@@ -30,8 +29,8 @@ Result<napi::Object> ice_candidate_to_object(napi::Env& env, const ice::candidat
                 { "transport", env.create_string(c.transport_type.to_string()) },
                 { "foundation", env.create_string(c.foundation.to_string()) },
                 { "component", env.create_int32(c.component.value()) },
-                { "raddr", util::fmap(c.maybe_related_address, ice_addr_to_string) },
-                { "rport", util::fmap(c.maybe_related_port, [&](auto&& rport) { return env.create_int32(rport.value()); }) },
+                { "raddr", c.maybe_related_address.fmap(ice_addr_to_string) },
+                { "rport", c.maybe_related_port.fmap([&](auto&& rport) { return env.create_int32(rport.value()); }) },
                 { "extensions", env.create_array(v.extensions, ext_to_obj) }}) },
         { "error", env.create_null() }
     });

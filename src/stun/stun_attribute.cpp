@@ -12,7 +12,6 @@
 #include "stun/details/stun_attr_registry.hpp"
 #include "stun/details/stun_fingerprint.hpp"
 #include "stun/details/stun_constants.hpp"
-#include "util/util_fmap.hpp"
 #include "util/util_variant_overloaded.hpp"
 
 namespace freewebrtc::stun {
@@ -77,37 +76,36 @@ Result<MappedAddressAttribute> MappedAddressAttribute::parse(const util::ConstBi
     // |                             Address                           |
     // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     //
-    auto maybe_family = vv.read_u8(1);
-    auto maybe_port = vv.read_u16be(2);
-    const auto maybe_addr_view = vv.subview(4);
-    if (!maybe_family.has_value() || !maybe_port.has_value() || !maybe_addr_view.has_value()) {
-        stat.error.inc();
-        stat.invalid_mapped_address.inc();
-        return make_error_code(ParseError::invalid_mapped_addr);
-    }
-    const auto family = *maybe_family;
-    const auto port = net::Port(*maybe_port);
-    const auto& addr_view = *maybe_addr_view;
-    return
-        ([&]() -> Result<net::ip::Address> {
-            switch (family) {
-            case attr_registry::FAMILY_IPV4:
-                return net::ip::AddressV4::from_view(addr_view)
-                    .fmap([](auto&& addr) { return net::ip::Address(std::move(addr)); });
-            case attr_registry::FAMILY_IPV6:
-                return net::ip::AddressV6::from_view(addr_view)
-                    .fmap([](auto&& addr) { return net::ip::Address(std::move(addr)); });
-            }
-            return make_error_code(ParseError::unknown_addr_family);
-        })()
-        .bind_err([&](auto&& err) {
-            stat.error.inc();
-            stat.invalid_ip_address.inc();
-            return err;
-        })
-        .fmap([&](auto&& addr) {
-            return MappedAddressAttribute{std::move(addr), port};
-        });
+    auto family_rv = vv.read_u8(1).require();
+    auto port_rv = vv.read_u16be(2).require()
+        .fmap([](auto& v) { return net::Port(v); });
+    const auto addr_view_rv = vv.subview(4).require();
+    return combine(
+        [&](auto&& family, auto&& port, auto&& addr_view) {
+            return
+                ([&]() -> Result<net::ip::Address> {
+                    switch (family) {
+                    case attr_registry::FAMILY_IPV4:
+                        return net::ip::AddressV4::from_view(addr_view)
+                            .fmap([](auto&& addr) { return net::ip::Address(std::move(addr)); });
+                    case attr_registry::FAMILY_IPV6:
+                        return net::ip::AddressV6::from_view(addr_view)
+                            .fmap([](auto&& addr) { return net::ip::Address(std::move(addr)); });
+                    }
+                    return make_error_code(ParseError::unknown_addr_family);
+                })()
+                .bind_err([&](auto&& err) {
+                    stat.error.inc();
+                    stat.invalid_ip_address.inc();
+                    return err;
+                })
+                .fmap([&](auto&& addr) {
+                    return MappedAddressAttribute{std::move(addr), port};
+                });
+        },
+        std::move(family_rv),
+        std::move(port_rv),
+        std::move(addr_view_rv));
 }
 
 util::ByteVec MappedAddressAttribute::build() const {
@@ -136,26 +134,35 @@ Result<XorMappedAddressAttribute> XorMappedAddressAttribute::parse(const util::C
     // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     // |                X-Address (Variable)
     // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    auto maybe_family = Family::from_uint8(vv.read_u8(1));
-    auto maybe_xport = vv.read_u16be(2);
-    const auto maybe_xaddr_view = vv.subview(4);
-    if (!maybe_family.has_value() || !maybe_xport.has_value() || !maybe_xaddr_view.has_value()) {
-        stat.error.inc();
-        stat.invalid_xor_mapped_address.inc();
-        return make_error_code(ParseError::invalid_xor_mapped_addr);
+    const auto family_rv = vv.read_u8(1).require().bind(Family::from_uint8);
+    const auto port_rv = vv.read_u16be(2).require()
+        .bind_err([&](auto&& err) {
+            stat.error.inc();
+            stat.invalid_xor_mapped_address.inc();
+            return err;
+        })
+        .fmap([](auto xport) {
+            // X-Port is computed by XOR'ing the mapped port with the most
+            // significant 16 bits of the magic cookie.
+            return net::Port(xport ^ (details::MAGIC_COOKIE >> 16));
+        });
+    if (port_rv.is_err()) {
+        return port_rv.unwrap_err();
     }
-    // X-Port is computed by XOR'ing the mapped port with the most
-    // significant 16 bits of the magic cookie.
-    auto port = net::Port(*maybe_xport ^ (details::MAGIC_COOKIE >> 16));
-    return XoredAddress::from_view(*maybe_family, *maybe_xaddr_view)
+    const auto xaddr_view_rv = vv.subview(4).require();
+    const auto xaddr_rv =
+        combine([&](auto&& family, auto&& xaddr_view) {
+            return XoredAddress::from_view(family, xaddr_view);
+        }, std::move(family_rv), std::move(xaddr_view_rv))
         .bind_err([&](auto&& err) {
             stat.error.inc();
             stat.invalid_ip_address.inc();
             return err;
-        })
-        .fmap([&](auto&& xaddr) {
-            return XorMappedAddressAttribute{std::move(xaddr), port};
         });
+    return
+        combine([&](auto&& xaddr, auto&& port) {
+            return success(XorMappedAddressAttribute{std::move(xaddr), port});
+        }, std::move(xaddr_rv), std::move(port_rv));
 }
 
 util::ByteVec XorMappedAddressAttribute::build() const {
@@ -177,53 +184,68 @@ Result<UsernameAttribute> UsernameAttribute::parse(const util::ConstBinaryView& 
 }
 
 Result<MessageIntegityAttribute> MessageIntegityAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
-    auto maybe_digest = Digest::Value::from_view(vv);
-    if (!maybe_digest.has_value()) {
-        stat.error.inc();
-        stat.invalid_message_integrity.inc();
-        return make_error_code(ParseError::integrity_digest_size);
-    }
-    return MessageIntegityAttribute{Digest(std::move(*maybe_digest))};
+    return Digest::Value::from_view(vv)
+        .require()
+        .bind_err([&](auto&&) {
+            stat.error.inc();
+            stat.invalid_message_integrity.inc();
+            return make_error_code(ParseError::integrity_digest_size);
+        })
+        .fmap([](auto&& v) {
+            return MessageIntegityAttribute{Digest(std::move(v))};
+        });
 }
 
 Result<FingerprintAttribute> FingerprintAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
-    auto maybe_crc32 = vv.read_u32be(0);
-    if (!maybe_crc32.has_value()) {
-        stat.error.inc();
-        stat.invalid_fingerprint_size.inc();
-        return make_error_code(ParseError::fingerprint_crc_size);
-    }
-    return FingerprintAttribute{*maybe_crc32 ^ FINGERPRINT_XOR};
+    return vv.read_u32be(0)
+        .require()
+        .bind_err([&](auto&&) {
+            stat.error.inc();
+            stat.invalid_fingerprint_size.inc();
+            return make_error_code(ParseError::fingerprint_crc_size);
+        })
+        .fmap([](auto&& crc32) {
+            return FingerprintAttribute{crc32 ^ FINGERPRINT_XOR};
+        });
 }
 
 Result<PriorityAttribute> PriorityAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
-    auto maybe_priority = vv.read_u32be(0);
-    if (!maybe_priority.has_value()) {
-        stat.error.inc();
-        stat.invalid_priority_size.inc();
-        return make_error_code(ParseError::priority_attribute_size);
-    }
-    return PriorityAttribute{*maybe_priority};
+    return vv.read_u32be(0)
+        .require()
+        .bind_err([&](auto&&) {
+            stat.error.inc();
+            stat.invalid_priority_size.inc();
+            return make_error_code(ParseError::priority_attribute_size);
+        })
+        .fmap([](auto&& priority) {
+            return PriorityAttribute{priority};
+        });
 }
 
 Result<IceControllingAttribute> IceControllingAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
-    auto maybe_tiebreaker = vv.read_u64be(0);
-    if (!maybe_tiebreaker.has_value()) {
-        stat.error.inc();
-        stat.invalid_ice_controlling_size.inc();
-        return make_error_code(ParseError::ice_controlling_size);
-    }
-    return IceControllingAttribute{*maybe_tiebreaker};
+    return vv.read_u64be(0)
+        .require()
+        .bind_err([&](auto&&) {
+            stat.error.inc();
+            stat.invalid_ice_controlling_size.inc();
+            return make_error_code(ParseError::ice_controlling_size);
+        })
+        .fmap([](auto&& tiebreaker) {
+            return IceControllingAttribute{tiebreaker};
+        });
 }
 
 Result<IceControlledAttribute> IceControlledAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
-    auto maybe_tiebreaker = vv.read_u64be(0);
-    if (!maybe_tiebreaker.has_value()) {
-        stat.error.inc();
-        stat.invalid_ice_controlled_size.inc();
-        return make_error_code(ParseError::ice_controlled_size);
-    }
-    return IceControlledAttribute{*maybe_tiebreaker};
+    return vv.read_u64be(0)
+        .require()
+        .bind_err([&](auto&&) {
+            stat.error.inc();
+            stat.invalid_ice_controlled_size.inc();
+            return make_error_code(ParseError::ice_controlled_size);
+        })
+        .fmap([](auto&& tiebreaker) {
+            return IceControlledAttribute{tiebreaker};
+        });
 }
 
 Result<UseCandidateAttribute> UseCandidateAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
@@ -285,25 +307,34 @@ util::ByteVec ErrorCodeAttribute::build() const {
     uint32_t first_word = util::host_to_network_u32(((code / 100) << 8) | (code % 100));
     return util::ConstBinaryView::concat({
             util::ConstBinaryView(&first_word, sizeof(first_word)),
-            reason_phrase.has_value() ? util::ConstBinaryView(reason_phrase->data(), reason_phrase->size())
-                                      : util::ConstBinaryView(&first_word, 0) // 0 is by intention!
+            reason_phrase.is_some() ? util::ConstBinaryView(reason_phrase.unwrap().data(), reason_phrase.unwrap().size())
+                                    : util::ConstBinaryView(&first_word, 0) // 0 is by intention!
         });
 }
 
 Result<ErrorCodeAttribute> ErrorCodeAttribute::parse(const util::ConstBinaryView& v, ParseStat& stat) {
-    auto maybe_first_word = v.read_u32be(0);
     auto maybe_reason = v.subview(4);
-    if (!maybe_first_word.has_value()) {
-        stat.error.inc();
-        stat.invalid_error_code_size.inc();
-        return make_error_code(ParseError::error_code_attribute_size);
-    }
-    int first_word = *maybe_first_word;
-    return ErrorCodeAttribute{(first_word >> 8) * 100 + (first_word & 0xFF),
-                              util::fmap(maybe_reason, [](auto view) {
-                                  return std::string(view.begin(), view.end());
-                              })};
+    return v.read_u32be(0)
+        .require()
+        .bind_err([&](auto&&) {
+            stat.error.inc();
+            stat.invalid_error_code_size.inc();
+            return make_error_code(ParseError::error_code_attribute_size);
+        })
+        .fmap([&](uint32_t first_word) {
+            return ErrorCodeAttribute{
+                .code = (first_word >> 8) * 100 + (first_word & 0xFF),
+                .reason_phrase = maybe_reason.fmap(
+                    [](auto&& view) {
+                        return std::string(view.begin(), view.end());
+                    })};
+        });
 }
+
+bool ErrorCodeAttribute::operator==(const ErrorCodeAttribute& other) const noexcept {
+    return this->code == other.code;
+}
+
 
 Result<AlternateServerAttribute> AlternateServerAttribute::parse(const util::ConstBinaryView& view, ParseStat& stat) {
     // It is encoded in the same way as MAPPED-ADDRESS, and thus refers to a

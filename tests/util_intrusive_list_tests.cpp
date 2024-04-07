@@ -31,8 +31,8 @@ public:
 
 TEST_F(IntrusiveListTest, emptylist) {
     List list{&ListItem::link};
-    EXPECT_FALSE(list.front().has_value());
-    EXPECT_FALSE(list.back().has_value());
+    EXPECT_FALSE(list.front().is_some());
+    EXPECT_FALSE(list.back().is_some());
 }
 
 TEST_F(IntrusiveListTest, push_back_and_front) {
@@ -43,8 +43,8 @@ TEST_F(IntrusiveListTest, push_back_and_front) {
     list.push_back(a);
     list.push_front(b);
 
-    EXPECT_EQ(list.front()->get().value, 2);
-    EXPECT_EQ(list.back()->get().value, 1);
+    EXPECT_EQ(list.front().unwrap().get().value, 2);
+    EXPECT_EQ(list.back().unwrap().get().value, 1);
 }
 
 TEST_F(IntrusiveListTest, item_check_in_list) {
@@ -88,14 +88,14 @@ TEST_F(IntrusiveListTest, item_check_remove) {
     list.push_back(b);
     list.push_back(c);
 
-    EXPECT_EQ(list.front()->get().value, 1);
-    EXPECT_EQ(list.back()->get().value, 3);
+    EXPECT_EQ(list.front().unwrap().get().value, 1);
+    EXPECT_EQ(list.back().unwrap().get().value, 3);
     c.link.remove();
-    EXPECT_EQ(list.front()->get().value, 1);
-    EXPECT_EQ(list.back()->get().value, 2);
+    EXPECT_EQ(list.front().unwrap().get().value, 1);
+    EXPECT_EQ(list.back().unwrap().get().value, 2);
     b.link.remove();
-    EXPECT_EQ(list.front()->get().value, 1);
-    EXPECT_EQ(list.back()->get().value, 1);
+    EXPECT_EQ(list.front().unwrap().get().value, 1);
+    EXPECT_EQ(list.back().unwrap().get().value, 1);
     a.link.remove();
     EXPECT_TRUE(list.empty());
 }
@@ -110,14 +110,14 @@ TEST_F(IntrusiveListTest, auto_remove_on_item_dtor) {
     list.push_back(*b);
     list.push_back(*c);
 
-    EXPECT_EQ(list.front()->get().value, 1);
-    EXPECT_EQ(list.back()->get().value, 3);
+    EXPECT_EQ(list.front().unwrap().get().value, 1);
+    EXPECT_EQ(list.back().unwrap().get().value, 3);
     b.reset();
-    EXPECT_EQ(list.front()->get().value, 1);
-    EXPECT_EQ(list.back()->get().value, 3);
+    EXPECT_EQ(list.front().unwrap().get().value, 1);
+    EXPECT_EQ(list.back().unwrap().get().value, 3);
     a.reset();
-    EXPECT_EQ(list.front()->get().value, 3);
-    EXPECT_EQ(list.back()->get().value, 3);
+    EXPECT_EQ(list.front().unwrap().get().value, 3);
+    EXPECT_EQ(list.back().unwrap().get().value, 3);
     c.reset();
     EXPECT_TRUE(list.empty());
 }
@@ -128,12 +128,12 @@ TEST_F(IntrusiveListTest, place_one_item_in_two_lists) {
     ListItem a(1);
 
     list.push_back(a);
-    EXPECT_EQ(list.front()->get().value, 1);
+    EXPECT_EQ(list.front().unwrap().get().value, 1);
 
     list2.push_back(a);
     EXPECT_TRUE(list.empty());
     EXPECT_FALSE(list2.empty());
-    EXPECT_EQ(list2.front()->get().value, 1);
+    EXPECT_EQ(list2.front().unwrap().get().value, 1);
 }
 
 TEST_F(IntrusiveListTest, place_one_item_twice) {
@@ -143,8 +143,8 @@ TEST_F(IntrusiveListTest, place_one_item_twice) {
     list.push_back(a);
     list.push_back(b);
     list.push_back(a);
-    EXPECT_EQ(list.front()->get().value, 2);
-    EXPECT_EQ(list.back()->get().value, 1);
+    EXPECT_EQ(list.front().unwrap().get().value, 2);
+    EXPECT_EQ(list.back().unwrap().get().value, 1);
 }
 
 TEST_F(IntrusiveListTest, push_after_removal) {
@@ -153,8 +153,8 @@ TEST_F(IntrusiveListTest, push_after_removal) {
     list.push_back(a);
     a.link.remove();
     list.push_back(a);
-    EXPECT_EQ(list.front()->get().value, 1);
-    EXPECT_EQ(list.back()->get().value, 1);
+    EXPECT_EQ(list.front().unwrap().get().value, 1);
+    EXPECT_EQ(list.back().unwrap().get().value, 1);
 }
 
 
@@ -166,8 +166,8 @@ TEST_F(IntrusiveListTest, remove_first_and_last_items) {
     list.push_back(c);
     a.link.remove();
     c.link.remove();
-    EXPECT_EQ(&list.front()->get(), &b);
-    EXPECT_EQ(&list.back()->get(), &b);
+    EXPECT_EQ(&list.front().unwrap().get(), &b);
+    EXPECT_EQ(&list.back().unwrap().get(), &b);
 }
 
 TEST_F(IntrusiveListTest, pop_front) {
@@ -179,7 +179,7 @@ TEST_F(IntrusiveListTest, pop_front) {
     list.push_front(b);
     list.pop_front();
 
-    EXPECT_EQ(list.front()->get().value, 1);
+    EXPECT_EQ(list.front().unwrap().get().value, 1);
 }
 
 TEST_F(IntrusiveListTest, pop_back) {
@@ -191,11 +191,11 @@ TEST_F(IntrusiveListTest, pop_back) {
     list.push_back(a);
     list.push_back(b);
     list.push_back(c);
-    EXPECT_EQ(list.back()->get().value, 3);
+    EXPECT_EQ(list.back().unwrap().get().value, 3);
     list.pop_back();
-    EXPECT_EQ(list.back()->get().value, 2);
+    EXPECT_EQ(list.back().unwrap().get().value, 2);
     list.pop_back();
-    EXPECT_EQ(list.back()->get().value, 1);
+    EXPECT_EQ(list.back().unwrap().get().value, 1);
     list.pop_back();
     EXPECT_TRUE(list.empty());
 }
@@ -225,8 +225,8 @@ TEST_F(IntrusiveListTest, list_item_move_semantics) {
     list.push_back(a);
     ListItem b(std::move(a));
 
-    EXPECT_EQ(list.front()->get().value, 1);
-    EXPECT_EQ(&list.front()->get(), &b);
+    EXPECT_EQ(list.front().unwrap().get().value, 1);
+    EXPECT_EQ(&list.front().unwrap().get(), &b);
 }
 
 TEST_F(IntrusiveListTest, list_move_semantics) {
@@ -237,8 +237,8 @@ TEST_F(IntrusiveListTest, list_move_semantics) {
     list.push_back(b);
 
     List list2(std::move(list));
-    EXPECT_EQ(list2.front()->get().value, 1);
-    EXPECT_EQ(list2.back()->get().value, 2);
+    EXPECT_EQ(list2.front().unwrap().get().value, 1);
+    EXPECT_EQ(list2.back().unwrap().get().value, 2);
     EXPECT_TRUE(list.empty());
 }
 
@@ -251,8 +251,8 @@ TEST_F(IntrusiveListTest, list_move_semantics_assign_operator) {
     list.push_back(b);
 
     list2 = std::move(list);
-    EXPECT_EQ(list2.front()->get().value, 1);
-    EXPECT_EQ(list2.back()->get().value, 2);
+    EXPECT_EQ(list2.front().unwrap().get().value, 1);
+    EXPECT_EQ(list2.back().unwrap().get().value, 2);
     EXPECT_TRUE(list.empty());
 }
 
@@ -263,8 +263,8 @@ TEST_F(IntrusiveListTest, self_assignment) {
     list.push_back(b);
     List& list2 = list;
     list = std::move(list2);
-    EXPECT_EQ(list.front()->get().value, 1);
-    EXPECT_EQ(list.back()->get().value, 2);
+    EXPECT_EQ(list.front().unwrap().get().value, 1);
+    EXPECT_EQ(list.back().unwrap().get().value, 2);
 }
 
 }

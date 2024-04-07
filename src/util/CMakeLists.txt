@@ -9,6 +9,7 @@ set(SOURCES
     util_binary_view.cpp
     util_token_stream.cpp
     util_error.cpp
+    util_error_code.cpp
 )
 file(GLOB HEADERS "*.hpp")
 

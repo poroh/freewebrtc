@@ -54,8 +54,8 @@ private:
             Duration srtt;
             Duration rttvar;
         };
-        std::optional<SmoothVals> smooth;
-        std::optional<Duration> backoff;
+        Maybe<SmoothVals> smooth;
+        Maybe<Duration> backoff;
         Timeline::Link link;
     };
     using ByPath = std::unordered_map<net::Path, Data, net::PathHash>;

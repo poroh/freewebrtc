@@ -10,6 +10,7 @@
 
 #include "util/util_typed_bool.hpp"
 #include "util/util_binary_view.hpp"
+#include "util/util_result.hpp"
 #include "stat/stat_counter.hpp"
 #include "rtp/rtp_header.hpp"
 
@@ -32,7 +33,7 @@ struct ParseStat {
 struct Packet {
     Header header;
     util::ConstBinaryView::Interval payload;
-    static std::optional<Packet> parse(const util::ConstBinaryView&, const PayloadMap&, ParseStat&) noexcept;
+    static Result<Packet> parse(const util::ConstBinaryView&, const PayloadMap&, ParseStat&) noexcept;
 };
 
 

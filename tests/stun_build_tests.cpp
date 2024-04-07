@@ -20,7 +20,7 @@ public:
         std::random_device random;
         return stun::TransactionId::generate(random);
     }
-    Result<stun::Message> rebuild(const stun::Message& msg, const stun::MaybeIntegrity& maybe_integrity = std::nullopt) {
+    Result<stun::Message> rebuild(const stun::Message& msg, const stun::MaybeIntegrity& maybe_integrity = None{}) {
         const auto rv = msg.build(maybe_integrity);
         assert(!rv.is_err());
         const auto& data = rv.unwrap();
@@ -45,7 +45,8 @@ TEST_F(STUNMessageBuildTest, build_simple_binding_request) {
             tid
         },
         stun::AttributeSet::create({}),
-        stun::IsRFC3489{false}
+        stun::IsRFC3489{false},
+        none()
     };
 
     const auto& req_rv = rebuild(request);
@@ -62,7 +63,8 @@ TEST_F(STUNMessageBuildTest, build_binding_request_with_fingerprint) {
             rand_tid()
         },
         stun::AttributeSet::create({stun::FingerprintAttribute{0}}),
-        stun::IsRFC3489{false}
+        stun::IsRFC3489{false},
+        none()
     };
     const auto& req_rv = rebuild(request);
     ASSERT_TRUE(req_rv.is_ok());
@@ -78,7 +80,8 @@ TEST_F(STUNMessageBuildTest, build_binding_request_with_integrity) {
             rand_tid()
         },
         stun::AttributeSet::create({}),
-        stun::IsRFC3489{false}
+        stun::IsRFC3489{false},
+        none()
     };
 
     auto password = stun::Password::short_term(precis::OpaqueString("VOkJxbRl1RmTxUk/WvJxBt"), sha1);
@@ -104,18 +107,19 @@ TEST_F(STUNMessageBuildTest, build_error_response_with_errocode) {
             rand_tid()
         },
         stun::AttributeSet::create({
-                stun::ErrorCodeAttribute{stun::ErrorCodeAttribute::BadRequest, "Bad Request"},
-            }),
-        stun::IsRFC3489{false}
+            stun::ErrorCodeAttribute{stun::ErrorCodeAttribute::BadRequest, std::string{"Bad Request"}},
+        }),
+        stun::IsRFC3489{false},
+        none()
     };
     const auto& rsp_rv = rebuild(response);
     ASSERT_TRUE(rsp_rv.is_ok());
     const auto& rsp = rsp_rv.unwrap();
     expect_headers_are_equal(rsp, response);
 
-    ASSERT_TRUE(rsp.attribute_set.error_code().has_value());
-    ASSERT_TRUE(response.attribute_set.error_code().has_value());
-    EXPECT_EQ(rsp.attribute_set.error_code()->get(), response.attribute_set.error_code()->get());
+    ASSERT_TRUE(rsp.attribute_set.error_code().is_some());
+    ASSERT_TRUE(response.attribute_set.error_code().is_some());
+    EXPECT_EQ(rsp.attribute_set.error_code().unwrap().get(), response.attribute_set.error_code().unwrap().get());
 }
 
 TEST_F(STUNMessageBuildTest, build_success_response_with_xor_mapped) {
@@ -130,16 +134,17 @@ TEST_F(STUNMessageBuildTest, build_success_response_with_xor_mapped) {
         stun::AttributeSet::create({
                 stun::XorMappedAddressAttribute{xaddr, net::Port(1234)},
             }),
-        stun::IsRFC3489{false}
+        stun::IsRFC3489{false},
+        none()
     };
     const auto& rsp_rv = rebuild(response);
     ASSERT_TRUE(rsp_rv.is_ok());
     const auto& rsp = rsp_rv.unwrap();
     expect_headers_are_equal(rsp, response);
 
-    ASSERT_TRUE(rsp.attribute_set.xor_mapped().has_value());
-    ASSERT_TRUE(response.attribute_set.xor_mapped().has_value());
-    EXPECT_EQ(rsp.attribute_set.xor_mapped()->get(), response.attribute_set.xor_mapped()->get());
+    ASSERT_TRUE(rsp.attribute_set.xor_mapped().is_some());
+    ASSERT_TRUE(response.attribute_set.xor_mapped().is_some());
+    EXPECT_EQ(rsp.attribute_set.xor_mapped().unwrap().get(), response.attribute_set.xor_mapped().unwrap().get());
 }
 
 

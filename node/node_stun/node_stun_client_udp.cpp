@@ -8,7 +8,6 @@
 #include <memory>
 #include <iostream>
 
-#include "util/util_fmap.hpp"
 #include "util/util_result_sugar.hpp"
 #include "stun/stun_client_udp.hpp"
 #include "stun/details/stun_client_udp_rto.hpp"
@@ -49,12 +48,14 @@ Result<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj) {
 
     Result<MaybeAuth> maybe_auth_rv
         = (obj.maybe_named_property("auth")
-           > [](auto&& maybe_val) { return util::fmap(maybe_val, napi::Value::to_object); }
+           > [](auto&& maybe_val) { return maybe_val.fmap(napi::Value::to_object); }
            > [](auto&& maybe_obj) {
-               if (!maybe_obj.has_value()) {
-                   return Result<MaybeAuth>{std::nullopt};
+               if (maybe_obj.is_none()) {
+                   return Result<MaybeAuth>{none()};
                }
-               return maybe_obj.value() > parse_auth > [](Auth&& auth) { return MaybeAuth{std::move(auth)}; };
+               return maybe_obj.unwrap()
+                    > parse_auth
+                    > [](Auth&& auth) { return MaybeAuth{auth}; };
            }).add_context("auth field");
 
     return combine(

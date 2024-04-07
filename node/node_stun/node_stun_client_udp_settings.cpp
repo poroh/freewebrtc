@@ -13,7 +13,7 @@ namespace freewebrtc::node_stun {
 
 namespace {
 
-using MaybeBool = std::optional<bool>;
+using MaybeBool = Maybe<bool>;
 using Settings = stun::client_udp::Settings;
 
 }
@@ -22,17 +22,18 @@ Result<stun::client_udp::Settings> client_udp_settings_from_napi(napi::Object ob
     Result<MaybeBool> maybe_use_fingerprint_rv
         = (obj.maybe_named_property("use_fingerprint")
            > [](auto&& maybe_v) {
-               if (!maybe_v.has_value()) {
-                   return Result<MaybeBool>{std::nullopt};
+               if (maybe_v.is_none()) {
+                   return Result<MaybeBool>{none()};
                }
-               return maybe_v.value().as_boolean() > [](const bool& v) { return MaybeBool{v}; };
+               return maybe_v.unwrap().as_boolean()
+                   > [](const bool& v) { return MaybeBool{v}; };
            }).add_context("use_fingerprint attibute");
 
     return combine(
         [](auto&& maybe_use_fingerprint) -> Result<stun::client_udp::Settings> {
             stun::client_udp::Settings result;
-            if (maybe_use_fingerprint.has_value()) {
-                result.use_fingerprint = Settings::UseFingerprint{maybe_use_fingerprint.value()};
+            if (maybe_use_fingerprint.is_some()) {
+                result.use_fingerprint = Settings::UseFingerprint{maybe_use_fingerprint.unwrap()};
             }
             return result;
         }

@@ -59,7 +59,7 @@ public:
         ClientUDP&,
         std::optional<Message>&,
         std::optional<util::ConstBinaryView>&,
-        const ClientUDP::MaybeAuth& maybe_auth = std::nullopt);
+        const ClientUDP::MaybeAuth& maybe_auth = None{});
     void advance_sleeps(ClientUDP&, Timepoint& now, ClientUDP::Effect&);
     void tick(Timepoint& now);
     util::ByteVec server_reponse(util::ConstBinaryView req_view);
@@ -151,8 +151,8 @@ TEST_F(StunClientTest, initial_request_check_auth_with_fingerprint) {
     EXPECT_TRUE(msg.attribute_set.has_fingerprint());
     auto is_valid_rv = msg.is_valid(msg_view, default_auth.integrity);
     ASSERT_TRUE(is_valid_rv.is_ok());
-    ASSERT_TRUE(is_valid_rv.unwrap().has_value());
-    EXPECT_TRUE(is_valid_rv.unwrap().value());
+    ASSERT_TRUE(is_valid_rv.unwrap().is_some());
+    EXPECT_TRUE(is_valid_rv.unwrap().unwrap());
 }
 
 TEST_F(StunClientTest, initial_request_check_auth_no_fingerprint) {
@@ -166,8 +166,8 @@ TEST_F(StunClientTest, initial_request_check_auth_no_fingerprint) {
     EXPECT_TRUE(!msg.attribute_set.has_fingerprint());
     auto is_valid_rv = msg.is_valid(msg_view, default_auth.integrity);
     ASSERT_TRUE(is_valid_rv.is_ok());
-    ASSERT_TRUE(is_valid_rv.unwrap().has_value());
-    EXPECT_TRUE(is_valid_rv.unwrap().value());
+    ASSERT_TRUE(is_valid_rv.unwrap().is_some());
+    EXPECT_TRUE(is_valid_rv.unwrap().unwrap());
 }
 
 TEST_F(StunClientTest, initial_request_rto_default) {
@@ -185,7 +185,7 @@ TEST_F(StunClientTest, initial_request_rto_default) {
 
 TEST_F(StunClientTest, initial_request_rto_set) {
     Settings settings;
-    Settings::RetransmitDefault rtx_settings{1s};
+    Settings::RetransmitDefault rtx_settings{Duration{1s}};
     settings.retransmit = rtx_settings;
     ClientUDP client(settings);
     auto now = Timepoint::epoch();
@@ -371,8 +371,8 @@ TEST_F(StunClientTest, retransmits) {
     unsigned backoff = 1;
     for (unsigned i = 0; i + 1 < rtx_settings.request_count; ++i) {
         auto expected_timeout = settings.rto_settings.initial_rto * backoff;
-        if (rtx_settings.max_rto.has_value()) {
-            expected_timeout = std::max(expected_timeout, rtx_settings.max_rto.value());
+        if (rtx_settings.max_rto.is_some()) {
+            expected_timeout = std::max(expected_timeout, rtx_settings.max_rto.unwrap());
         }
         EXPECT_EQ(now - send_time, expected_timeout);
         ASSERT_TRUE(std::holds_alternative<ClientUDP::SendData>(next));
@@ -389,8 +389,8 @@ TEST_F(StunClientTest, retransmits) {
     // client SHOULD consider the transaction to have failed.  Rm
     // SHOULD be configurable and SHOULD have a default of 16.
     auto expected_timeout = settings.rto_settings.initial_rto * rtx_settings.retransmission_multiplier;
-    if (rtx_settings.max_rto.has_value()) {
-        expected_timeout = std::max(expected_timeout, rtx_settings.max_rto.value());
+    if (rtx_settings.max_rto.is_some()) {
+        expected_timeout = std::max(expected_timeout, rtx_settings.max_rto.unwrap());
     }
     EXPECT_EQ(now - send_time, expected_timeout);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionFailed>(next));
@@ -405,7 +405,7 @@ TEST_F(StunClientTest, retransmits_rfc5389_example_timing_checks) {
     // Force RFC5389 settings:
     Settings::RetransmitDefault rtx_settings;
     settings.rto_settings.initial_rto = 500ms;
-    rtx_settings.max_rto = std::nullopt;
+    rtx_settings.max_rto = None{};
     rtx_settings.request_count = 7;
     settings.retransmit = rtx_settings;
 
@@ -456,8 +456,8 @@ TEST_F(StunClientTest, adjustment_of_rto_for_subsequent_request) {
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& tok = std::get<ClientUDP::TransactionOk>(next);
-    ASSERT_TRUE(tok.round_trip.has_value());
-    ASSERT_EQ(tok.round_trip.value(), rtt);
+    ASSERT_TRUE(tok.round_trip.is_some());
+    ASSERT_EQ(tok.round_trip.unwrap(), rtt);
 
     // Send second request
     auto second_rtx_start = now;
@@ -492,7 +492,7 @@ TEST_F(StunClientTest, don_adjust_on_retransmit_of_request) {
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& tok = std::get<ClientUDP::TransactionOk>(next);
-    EXPECT_FALSE(tok.round_trip.has_value()); // No RTT value on retransmit
+    EXPECT_FALSE(tok.round_trip.is_some()); // No RTT value on retransmit
 
     // Check that subsequent request is sent within initial_rto timeout
     auto second_rtx_start = now;
@@ -522,8 +522,8 @@ TEST_F(StunClientTest, clear_history_after_history_duration) {
     next = client.next(now);
     ASSERT_TRUE(std::holds_alternative<ClientUDP::TransactionOk>(next));
     const auto& tok = std::get<ClientUDP::TransactionOk>(next);
-    ASSERT_TRUE(tok.round_trip.has_value());
-    ASSERT_EQ(tok.round_trip.value(), rtt);
+    ASSERT_TRUE(tok.round_trip.is_some());
+    ASSERT_EQ(tok.round_trip.unwrap(), rtt);
 
     // Wait history timeout
     now = now.advance(settings.rto_settings.history_duration);
@@ -577,7 +577,8 @@ TEST_F(StunClientTest, success_response_with_unknown_comprehension_required_attr
                 unknown_attr1,
                 unknown_attr2
             }),
-        stun::IsRFC3489{false}
+        stun::IsRFC3489{false},
+        none()
     };
     auto response_data = response.build().unwrap();
     ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), response).is_ok());
@@ -611,12 +612,13 @@ TEST_F(StunClientTest, error_response_with_unknown_comprehension_required_attrib
             req.header.transaction_id
         },
         stun::AttributeSet::create({
-                stun::ErrorCodeAttribute{stun::ErrorCodeAttribute::BadRequest, "Bad request"},
-            },{
-                unknown_attr1,
-                unknown_attr2
-            }),
-        stun::IsRFC3489{false}
+            stun::ErrorCodeAttribute{stun::ErrorCodeAttribute::BadRequest, std::string{"Bad request"}},
+        },{
+            unknown_attr1,
+            unknown_attr2
+        }),
+        stun::IsRFC3489{false},
+        none()
     };
     auto response_data = response.build().unwrap();
     ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), response).is_ok());
@@ -651,10 +653,11 @@ TEST_F(StunClientTest, error_response_300_alternate_server) {
             req.header.transaction_id
         },
         stun::AttributeSet::create({
-            stun::ErrorCodeAttribute{stun::ErrorCodeAttribute::TryAlternate, "Try alternate server"},
+            stun::ErrorCodeAttribute{stun::ErrorCodeAttribute::TryAlternate, std::string{"Try alternate server"}},
             stun::AlternateServerAttribute{alternate_server_ipv4, alternate_server_port}
         }),
-        stun::IsRFC3489{false}
+        stun::IsRFC3489{false},
+        none()
     };
     auto response_data = response.build().unwrap();
     ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), response).is_ok());
@@ -687,9 +690,10 @@ TEST_F(StunClientTest, error_response_300_alternate_server_without_attribute) {
             req.header.transaction_id
         },
         stun::AttributeSet::create({
-            stun::ErrorCodeAttribute{stun::ErrorCodeAttribute::TryAlternate, "Try alternate server"},
+            stun::ErrorCodeAttribute{stun::ErrorCodeAttribute::TryAlternate, std::string{"Try alternate server"}},
         }),
-        stun::IsRFC3489{false}
+        stun::IsRFC3489{false},
+        none()
     };
     auto response_data = response.build().unwrap();
     ASSERT_TRUE(client.response(now, util::ConstBinaryView(response_data), response).is_ok());

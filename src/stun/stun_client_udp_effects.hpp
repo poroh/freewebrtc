@@ -9,10 +9,10 @@
 #pragma once
 
 #include <vector>
-#include <optional>
 #include <system_error>
 #include <variant>
 
+#include "util/util_maybe.hpp"
 #include "util/util_binary_view.hpp"
 #include "net/net_endpoint.hpp"
 #include "clock/clock_timepoint.hpp"
@@ -42,7 +42,7 @@ struct TransactionOk {
     // Round-trip time maybe not calculated if
     // we used retransmissions and no cerainty about attributing
     // response to act of sending request.
-    std::optional<Duration> round_trip;
+    Maybe<Duration> round_trip;
 };
 
 struct TransactionFailed {

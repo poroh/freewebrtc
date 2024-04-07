@@ -9,7 +9,6 @@
 #pragma once
 
 #include <chrono>
-#include <optional>
 #include <thread>
 
 #include "clock/clock_timepoint.hpp"

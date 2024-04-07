@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "util/util_maybe.hpp"
 #include "net/net_endpoint.hpp"
 
 #include "ice/candidate/ice_candidate_foundation.hpp"
@@ -28,8 +29,8 @@ struct Candidate {
     ComponentId component;
     Priority priority;
     Type type;
-    std::optional<Address> maybe_related_address;
-    std::optional<net::Port> maybe_related_port;
+    Maybe<Address> maybe_related_address;
+    Maybe<net::Port> maybe_related_port;
 };
 
 }

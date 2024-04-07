@@ -9,14 +9,14 @@
 #pragma once
 
 #include <cstdint>
-#include <optional>
+#include "util/util_maybe.hpp"
 
 namespace freewebrtc::rtp {
 
 class PayloadType {
 public:
     uint8_t value() const noexcept;
-    static std::optional<PayloadType> from_uint8(uint8_t pt);
+    static Maybe<PayloadType> from_uint8(uint8_t pt);
     bool operator==(const PayloadType&) const noexcept;
 
 private:
@@ -40,11 +40,11 @@ inline bool PayloadType::operator==(const PayloadType& other) const noexcept {
     return m_value == other.m_value;
 }
 
-inline std::optional<PayloadType> PayloadType::from_uint8(uint8_t pt) {
+inline Maybe<PayloadType> PayloadType::from_uint8(uint8_t pt) {
     if (pt <= 127) {
         return PayloadType(pt);
     }
-    return std::nullopt;
+    return none();
 }
 
 

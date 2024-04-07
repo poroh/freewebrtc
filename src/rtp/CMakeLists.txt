@@ -7,6 +7,7 @@
 set(SOURCES
     rtp_packet.cpp
     rtp_payload_map.cpp
+    rtp_error.cpp
 )
 file(GLOB HEADERS "*.hpp")
 

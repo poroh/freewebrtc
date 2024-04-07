@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "util/util_maybe.hpp"
 #include "stun/stun_message.hpp"
 #include "stun/stun_integrity.hpp"
 #include "net/net_endpoint.hpp"
@@ -20,7 +21,7 @@ public:
     struct Settings {
         bool use_fingerprint = true;
     };
-    Stateless(crypto::SHA1Hash::Func, const std::optional<Settings>& = std::nullopt);
+    Stateless(crypto::SHA1Hash::Func, const Maybe<Settings>& = None{});
     struct Respond {
         Message response;
         Message request;
@@ -32,7 +33,7 @@ public:
     struct Ignore {
         // Message is set if message is parsed as STUN message bu
         // it is not Request or has unknown method
-        std::optional<Message> message;
+        Maybe<Message> message;
     };
     using ProcessResult = std::variant<Respond, Ignore, Error>;
 

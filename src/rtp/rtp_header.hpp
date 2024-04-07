@@ -16,6 +16,7 @@
 #include "rtp/rtp_sequence.hpp"
 #include "rtp/rtp_ssrc.hpp"
 #include "util/util_binary_view.hpp"
+#include "util/util_maybe.hpp"
 
 namespace freewebrtc::rtp {
 
@@ -30,7 +31,7 @@ struct Header {
         uint16_t profile_defined;
         util::ConstBinaryView::Interval data;
     };
-    std::optional<Extension> extension;
+    Maybe<Extension> maybe_extension;
 };
 
 }
