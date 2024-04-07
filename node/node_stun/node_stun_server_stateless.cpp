@@ -6,7 +6,6 @@
 // Mapping of stateless STUN server to NAPI
 //
 
-#include "util/util_fmap.hpp"
 #include "util/util_result_sugar.hpp"
 #include "stun/stun_server_stateless.hpp"
 #include "node/openssl/node_openssl_hash.hpp"
@@ -66,7 +65,7 @@ Result<Value> process_message(Env& env, const CallbackInfo& info) {
                             env.create_object({
                                 {"result", env.create_string("ignore")},
                                 {"message",
-                                        util::fmap(std::move(ign.message), [&](const auto& msg) {
+                                        std::move(ign.message).fmap([&](const auto& msg) {
                                             return node_stun::message(env, msg);
                                         })}
                             });

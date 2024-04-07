@@ -46,18 +46,18 @@ ClientUDP::ClientUDP(const Settings& settings)
 ClientUDP::~ClientUDP()
 {}
 
-MaybeError ClientUDP::response(Timepoint now, util::ConstBinaryView view, std::optional<stun::Message>&& maybe_msg) {
-    if (!maybe_msg.has_value()) {
+MaybeError ClientUDP::response(Timepoint now, util::ConstBinaryView view, Maybe<stun::Message>&& maybe_msg) {
+    if (!maybe_msg.is_some()) {
         auto maybe_err = stun::Message::parse(view, m_stat.parse)
-            .fmap([&](auto&& parsed) {
-                maybe_msg.emplace(std::move(parsed));
+            .fmap([&](stun::Message&& parsed) {
+                maybe_msg = std::move(parsed);
                 return Unit{};
             });
         if (maybe_err.is_err()) {
             return maybe_err;
         }
     }
-    auto& msg = maybe_msg.value();
+    auto& msg = maybe_msg.unwrap();
     // Find transaction handle first not to spend time on
     // message validation if we don't know anything about
     // transaction
@@ -78,21 +78,21 @@ MaybeError ClientUDP::response(Timepoint now, util::ConstBinaryView view, std::o
         Result(Unit{})
         .bind([&](auto&&) {
             // Check authorization
-            if (!trans.maybe_auth.has_value()) {
+            if (trans.maybe_auth.is_none()) {
                 return success();
             }
-            auto& auth = trans.maybe_auth.value();
+            auto& auth = trans.maybe_auth.unwrap();
             // We don't check username because per:
             // RFC5389: 10.1.2.  Receiving a Request or Indication:
             // The response MUST NOT contain the USERNAME attribute.
             return msg.is_valid(view, auth.integrity)
                 .bind([&](auto&& maybe_is_valid) -> MaybeError {
-                    if (!maybe_is_valid.has_value()) {
+                    if (!maybe_is_valid.is_some()) {
                         if (!m_settings.allow_unauthenticated_alternate || !msg.is_alternate_server()) {
                             m_stat.integrity_missing.inc();
                             return make_error_code(ClientError::no_integrity_attribute_in_response);
                         } // otherwise process as authenticated alternate server response
-                    } else if (!maybe_is_valid.value()) {
+                    } else if (!maybe_is_valid.unwrap()) {
                         m_stat.integrity_check_errors.inc();
                         return make_error_code(ClientError::digest_is_not_valid);
                     }
@@ -116,10 +116,10 @@ ClientUDP::Effect ClientUDP::next(Timepoint now) {
         m_tid_timeline.pop();
         if (auto it = m_tmap.find(hnd); it != m_tmap.end()) {
             auto& t = it->second;
-            if (auto next = t.rtx_algo->next(now); next.has_value()) {
+            if (auto next = t.rtx_algo->next(now); next.is_some()) {
                 m_stat.retransmits.inc();
                 t.rtx_count++;
-                m_tid_timeline.emplace(std::make_pair(*next, hnd));
+                m_tid_timeline.emplace(std::make_pair(next.unwrap(), hnd));
                 m_effects.emplace(SendData{hnd, util::ConstBinaryView(t.msg_data)});
             } else {
                 auto reason = TransactionFailed::Timeout{};
@@ -152,12 +152,13 @@ Result<ClientUDP::Handle> ClientUDP::do_create(Timepoint now, TransactionId&& ti
             std::move(tid)
         },
         stun::AttributeSet::create(std::move(rq.attrs), std::move(rq.unknown_attrs)),
-        stun::IsRFC3489{false}
+        stun::IsRFC3489{false},
+        none()
     };
 
-    MaybeIntegrity maybe_integrity;
-    if (rq.maybe_auth.has_value()) {
-        const auto& auth = rq.maybe_auth.value();
+    MaybeIntegrity maybe_integrity = none();
+    if (rq.maybe_auth.is_some()) {
+        const auto& auth = rq.maybe_auth.unwrap();
         request.attribute_set.emplace(Attribute::create(UsernameAttribute{auth.username}));
         maybe_integrity = auth.integrity;
     }
@@ -182,8 +183,8 @@ Result<ClientUDP::Handle> ClientUDP::do_create(Timepoint now, TransactionId&& ti
             auto [it, _] = m_tmap.emplace(handle, std::move(transaction));
             auto& t = it->second;
             m_effects.emplace(SendData{handle, util::ConstBinaryView(t.msg_data)});
-            if (auto maybe_timepoint = t.rtx_algo->init(now); maybe_timepoint.has_value()) {
-                m_tid_timeline.emplace(maybe_timepoint.value(), handle);
+            if (auto maybe_timepoint = t.rtx_algo->init(now); maybe_timepoint.is_some()) {
+                m_tid_timeline.emplace(maybe_timepoint.unwrap(), handle);
             }
             m_stat.started.inc();
             return handle;
@@ -205,7 +206,7 @@ MaybeError ClientUDP::handle_success_response(Timepoint now, Handle hnd, Message
         return success();
     }
 
-    std::optional<Duration> maybe_rtt;
+    Maybe<Duration> maybe_rtt = none();
     if (auto it = m_tmap.find(hnd); it != m_tmap.end()) {
         auto& trans = it->second;
         if (trans.rtx_count == 0) {
@@ -215,23 +216,23 @@ MaybeError ClientUDP::handle_success_response(Timepoint now, Handle hnd, Message
             //   1. Don't use RTT calculated based on retransmit
             //   2. Maintain back-off RTO when send next packet
             maybe_rtt = now - trans.create_time;
-            m_rto_calc->new_rtt(now, trans.path, maybe_rtt.value());
+            m_rto_calc->new_rtt(now, trans.path, maybe_rtt.unwrap());
         } else {
             m_rto_calc->backoff(now, trans.path, trans.rtx_algo->last_timeout());
         }
     }
 
-    if (const auto& maybe_xor_mapped = msg.attribute_set.xor_mapped(); maybe_xor_mapped.has_value()) {
+    if (const auto& maybe_xor_mapped = msg.attribute_set.xor_mapped(); maybe_xor_mapped.is_some()) {
         m_stat.success.inc();
-        auto& xor_mapped = maybe_xor_mapped.value().get();
+        auto& xor_mapped = maybe_xor_mapped.unwrap().get();
         net::UdpEndpoint ep{xor_mapped.addr.to_address(msg.header.transaction_id), xor_mapped.port};
         m_effects.emplace(TransactionOk{hnd, std::move(ep), std::move(msg), maybe_rtt});
         return success();
     }
 
-    if (const auto& maybe_mapped = msg.attribute_set.mapped(); maybe_mapped.has_value()) {
+    if (const auto& maybe_mapped = msg.attribute_set.mapped(); maybe_mapped.is_some()) {
         m_stat.success.inc();
-        auto& mapped = maybe_mapped.value().get();
+        auto& mapped = maybe_mapped.unwrap().get();
         net::UdpEndpoint ep{mapped.addr, mapped.port};
         m_effects.emplace(TransactionOk{hnd, std::move(ep), std::move(msg), maybe_rtt});
         return success();
@@ -258,24 +259,24 @@ MaybeError ClientUDP::handle_error_response(Timepoint now, Handle hnd, const Mes
     }
 
     const auto& maybe_msg_error_code = msg.attribute_set.error_code();
-    if (!maybe_msg_error_code.has_value()) {
+    if (maybe_msg_error_code.is_none()) {
         m_stat.no_error_code.inc();
         auto reason = TransactionFailed::Error{make_error_code(ClientError::no_error_code_in_response)};
         m_effects.emplace(TransactionFailed{hnd, std::move(reason)});
         return success();
     }
-    const auto& msg_error_code = maybe_msg_error_code.value().get();
+    const auto& msg_error_code = maybe_msg_error_code.unwrap().get();
 
     if (msg.is_alternate_server()) {
         m_stat.response_3xx.inc();
         const auto& maybe_alt_srv = msg.attribute_set.alternate_server();
-        if (!maybe_alt_srv.has_value()) {
+        if (maybe_alt_srv.is_none()) {
             m_stat.no_alternate_server_attr.inc();
             auto reason = TransactionFailed::Error{make_error_code(ClientError::no_alternate_server_in_response)};
             m_effects.emplace(TransactionFailed{hnd, std::move(reason)});
             return success();
         }
-        const auto& alt_srv = maybe_alt_srv.value().get();
+        const auto& alt_srv = maybe_alt_srv.unwrap().get();
         m_stat.try_alternate_responses.inc();
         auto reason = TransactionFailed::AlternateServer{{alt_srv.addr, alt_srv.port}};
         m_effects.emplace(TransactionFailed{hnd, std::move(reason)});
@@ -303,8 +304,8 @@ MaybeError ClientUDP::handle_error_response(Timepoint now, Handle hnd, const Mes
         m_stat.response_4xx.inc();
         if (msg_error_code.code == ErrorCodeAttribute::UnknownAttribute) {
             const auto& maybe_ua = msg.attribute_set.unknown_attributes();
-            if (maybe_ua.has_value()) {
-                auto reason = TransactionFailed::UnknownAttributeReported{maybe_ua->get().types};
+            if (maybe_ua.is_some()) {
+                auto reason = TransactionFailed::UnknownAttributeReported{maybe_ua.unwrap().get().types};
                 m_effects.emplace(TransactionFailed{hnd, std::move(reason)});
                 return success();
             }
@@ -399,47 +400,47 @@ ClientUDP::RetransmitAlgo::RetransmitAlgo(Duration initial_rto, const Settings::
 
 ClientUDP::MaybeTimepoint ClientUDP::RetransmitAlgo::init(Timepoint now) {
     m_maybe_next = now.advance(m_last_timeout);
-    return m_maybe_next.value();
+    return m_maybe_next;
 }
 
 ClientUDP::MaybeTimepoint ClientUDP::RetransmitAlgo::next(Timepoint now) {
-    if (!m_maybe_next.has_value() || now.is_before(m_maybe_next.value())) {
+    if (!m_maybe_next.is_some() || now.is_before(m_maybe_next.unwrap())) {
         return m_maybe_next;
     }
     if (m_rtx_count + 1 >= m_settings.request_count + m_5xx_count) {
-        m_maybe_next.reset();
-        return std::nullopt;
+        m_maybe_next = none();
+        return m_maybe_next;
     }
     ++m_rtx_count;
     if (m_rtx_count + 1 == m_settings.request_count) {
         auto timeout = m_initial_rto * m_settings.retransmission_multiplier;
-        if (m_settings.max_rto.has_value()) {
-            timeout = std::max(timeout, m_settings.max_rto.value());
+        if (m_settings.max_rto.is_some()) {
+            timeout = std::max(timeout, m_settings.max_rto.unwrap());
         }
         m_last_timeout = timeout;
         m_maybe_next = now.advance(timeout);
-        return m_maybe_next.value();
+        return m_maybe_next;
     } else {
         auto timeout = m_last_timeout * 2;
-        if (m_settings.max_rto.has_value()) {
-            timeout = std::max(timeout, m_settings.max_rto.value());
+        if (m_settings.max_rto.is_some()) {
+            timeout = std::max(timeout, m_settings.max_rto.unwrap());
         }
         m_last_timeout = timeout;
         m_maybe_next = now.advance(timeout);
-        return m_maybe_next.value();
+        return m_maybe_next;
     }
 }
 
 ClientUDP::RetransmitAlgo::Process5xxResult
 ClientUDP::RetransmitAlgo::process_5xx(Timepoint now, int) {
-    if (!m_settings.server_error_timeout.has_value()) {
+    if (!m_settings.server_error_timeout.is_some()) {
         return Process5xxResult::TransactionFailed;
     }
     if (m_5xx_count >= m_settings.server_error_max_retransmits) {
         return Process5xxResult::TransactionFailed;
     }
     m_5xx_count++;
-    m_maybe_next = now.advance(m_settings.server_error_timeout.value());
+    m_maybe_next = now.advance(m_settings.server_error_timeout.unwrap());
     return Process5xxResult::RetransmitScheduled;
 }
 

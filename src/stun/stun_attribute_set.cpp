@@ -14,81 +14,86 @@
 
 namespace freewebrtc::stun {
 
+template<typename T>
+Maybe<std::reference_wrapper<const T>> some_ref(const T& v) {
+    return std::ref(v);
+}
+
 AttributeSet::MaybeAttr<MessageIntegityAttribute::Digest> AttributeSet::integrity() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::MESSAGE_INTEGRITY)); it != m_map.end()) {
-        return it->second.as<MessageIntegityAttribute>()->digest;
+        return some_ref(it->second.as<MessageIntegityAttribute>()->digest);
     }
-    return std::nullopt;
+    return none();
 }
 
 AttributeSet::MaybeAttr<precis::OpaqueString> AttributeSet::username() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::USERNAME)); it != m_map.end()) {
-        return it->second.as<UsernameAttribute>()->name;
+        return some_ref(it->second.as<UsernameAttribute>()->name);
     }
-    return std::nullopt;
+    return none();
 }
 
 AttributeSet::MaybeAttr<std::string> AttributeSet::software() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::SOFTWARE)); it != m_map.end()) {
-        return it->second.as<SoftwareAttribute>()->name;
+        return some_ref(it->second.as<SoftwareAttribute>()->name);
     }
-    return std::nullopt;
+    return none();
 }
 
 AttributeSet::MaybeAttr<XorMappedAddressAttribute> AttributeSet::xor_mapped() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::XOR_MAPPED_ADDRESS)); it != m_map.end()) {
-        return *it->second.as<XorMappedAddressAttribute>();
+        return some_ref(*it->second.as<XorMappedAddressAttribute>());
     }
-    return std::nullopt;
+    return none();
 }
 
 AttributeSet::MaybeAttr<MappedAddressAttribute> AttributeSet::mapped() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::MAPPED_ADDRESS)); it != m_map.end()) {
-        return *it->second.as<MappedAddressAttribute>();
+        return some_ref(*it->second.as<MappedAddressAttribute>());
     }
-    return std::nullopt;
+    return none();
 }
 
 AttributeSet::MaybeAttr<uint32_t> AttributeSet::priority() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::PRIORITY)); it != m_map.end()) {
-        return it->second.as<PriorityAttribute>()->priority;
+        return some_ref(it->second.as<PriorityAttribute>()->priority);
     }
-    return std::nullopt;
+    return none();
 }
 
 AttributeSet::MaybeAttr<uint64_t> AttributeSet::ice_controlling() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::ICE_CONTROLLING)); it != m_map.end()) {
-        return it->second.as<IceControllingAttribute>()->tiebreaker;
+        return some_ref(it->second.as<IceControllingAttribute>()->tiebreaker);
     }
-    return std::nullopt;
+    return none();
 }
 
 AttributeSet::MaybeAttr<uint64_t> AttributeSet::ice_controlled() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::ICE_CONTROLLED)); it != m_map.end()) {
-        return it->second.as<IceControlledAttribute>()->tiebreaker;
+        return some_ref(it->second.as<IceControlledAttribute>()->tiebreaker);
     }
-    return std::nullopt;
+    return none();
 }
 
 AttributeSet::MaybeAttr<ErrorCodeAttribute> AttributeSet::error_code() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::ERROR_CODE)); it != m_map.end()) {
-        return *it->second.as<ErrorCodeAttribute>();
+        return some_ref(*it->second.as<ErrorCodeAttribute>());
     }
-    return std::nullopt;
+    return none();
 }
 
 AttributeSet::MaybeAttr<UnknownAttributesAttribute> AttributeSet::unknown_attributes() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::UNKNOWN_ATTRIBUTES)); it != m_map.end()) {
-        return *it->second.as<UnknownAttributesAttribute>();
+        return some_ref(*it->second.as<UnknownAttributesAttribute>());
     }
-    return std::nullopt;
+    return none();
 }
 
 AttributeSet::MaybeAttr<AlternateServerAttribute> AttributeSet::alternate_server() const noexcept {
     if (auto it = m_map.find(AttributeType::from_uint16(attr_registry::ALTERNATE_SERVER)); it != m_map.end()) {
-        return *it->second.as<AlternateServerAttribute>();
+        return some_ref(*it->second.as<AlternateServerAttribute>());
     }
-    return std::nullopt;
+    return none();
 }
 
 bool AttributeSet::has_use_candidate() const noexcept {
@@ -122,7 +127,7 @@ AttributeSet AttributeSet::create(std::vector<Attribute::Value>&& ka, std::vecto
 
 Result<util::ByteVec> AttributeSet::build(const Header& header, const MaybeIntegrity& maybe_integrity) const {
     std::vector<util::ConstBinaryView> result;
-    const size_t num_attrs = m_map.size() + m_unknown.size() + (maybe_integrity.has_value() ? 1 : 0);
+    const size_t num_attrs = m_map.size() + m_unknown.size() + (maybe_integrity.is_some() ? 1 : 0);
     result.reserve(num_attrs * 3 + 1); // We can have up to three views per attribute
     int dummy_hdr;
     result.emplace_back(&dummy_hdr, 0);
@@ -148,14 +153,14 @@ Result<util::ByteVec> AttributeSet::build(const Header& header, const MaybeInteg
         }
     };
 
-    std::optional<util::ByteVec> xor_mapped_data;
-    std::optional<util::ByteVec> mapped_data;
+    Maybe<util::ByteVec> xor_mapped_data = none();
+    Maybe<util::ByteVec> mapped_data = none();
     uint32_t prio = 0;
     uint64_t ice_controlling = 0;
     uint64_t ice_controlled = 0;
-    std::optional<util::ByteVec> error_code_data;
-    std::optional<util::ByteVec> unknown_attributes_data;
-    std::optional<util::ByteVec> altenate_server_data;
+    Maybe<util::ByteVec> error_code_data = none();
+    Maybe<util::ByteVec> unknown_attributes_data = none();
+    Maybe<util::ByteVec> altenate_server_data = none();
 
     for (const auto& p: m_map) {
         const auto type = p.first.value();
@@ -170,11 +175,11 @@ Result<util::ByteVec> AttributeSet::build(const Header& header, const MaybeInteg
                 },
                 [&](const XorMappedAddressAttribute& a) {
                     xor_mapped_data = a.build();
-                    add_attr(type, util::ConstBinaryView(*xor_mapped_data));
+                    add_attr(type, util::ConstBinaryView(xor_mapped_data.unwrap()));
                 },
                 [&](const MappedAddressAttribute& a) {
                     mapped_data = a.build();
-                    add_attr(type, util::ConstBinaryView(*mapped_data));
+                    add_attr(type, util::ConstBinaryView(mapped_data.unwrap()));
                 },
                 [&](const PriorityAttribute& a) {
                     prio = util::host_to_network_u32(a.priority);
@@ -193,15 +198,15 @@ Result<util::ByteVec> AttributeSet::build(const Header& header, const MaybeInteg
                 },
                 [&](const ErrorCodeAttribute& ec) {
                     error_code_data = ec.build();
-                    add_attr(type, util::ConstBinaryView(*error_code_data));
+                    add_attr(type, util::ConstBinaryView(error_code_data.unwrap()));
                 },
                 [&](const UnknownAttributesAttribute& a) {
                     unknown_attributes_data = a.build();
-                    add_attr(type, util::ConstBinaryView(*unknown_attributes_data));
+                    add_attr(type, util::ConstBinaryView(unknown_attributes_data.unwrap()));
                 },
                 [&](const AlternateServerAttribute& a) {
                     altenate_server_data = a.build();
-                    add_attr(type, util::ConstBinaryView(*altenate_server_data));
+                    add_attr(type, util::ConstBinaryView(altenate_server_data.unwrap()));
                 },
                 [&](const MessageIntegityAttribute&) { /* Do not add integrity here */ },
                 [&](const FingerprintAttribute&) { /* Do not add fingerprint here */ }
@@ -214,14 +219,14 @@ Result<util::ByteVec> AttributeSet::build(const Header& header, const MaybeInteg
     }
 
     // Add message integrity with dummy content (if exist in m_map);
-    std::optional<Result<MessageIntegityAttribute::Digest>> maybe_integrity_digest_rv;
-    if (maybe_integrity.has_value()) {
-        const auto& h = maybe_integrity->hash;
-        const auto& p = maybe_integrity->password;
+    Maybe<Result<MessageIntegityAttribute::Digest>> maybe_integrity_digest_rv = none();
+    if (maybe_integrity.is_some()) {
+        const auto& h = maybe_integrity.unwrap().hash;
+        const auto& p = maybe_integrity.unwrap().password;
         auto fake_header = header.build(total_size + details::STUN_ATTR_HEADER_SIZE + crypto::SHA1Hash::size);
         result[0] = util::ConstBinaryView(fake_header);
         maybe_integrity_digest_rv = crypto::hmac::digest(result, p.opad(), p.ipad(), h);
-        auto maybe_err = maybe_integrity_digest_rv.value()
+        auto maybe_err = maybe_integrity_digest_rv.unwrap()
             .fmap([&](auto&& integrity_digest) {
                 add_attr(attr_registry::MESSAGE_INTEGRITY, util::ConstBinaryView(integrity_digest.value.value()));
                 return Unit{};

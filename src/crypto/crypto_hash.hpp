@@ -17,6 +17,7 @@
 
 #include "util/util_binary_view.hpp"
 #include "util/util_result.hpp"
+#include "util/util_maybe.hpp"
 
 namespace freewebrtc::crypto {
 
@@ -31,7 +32,7 @@ public:
 
     static constexpr auto size = SIZE;
 
-    static std::optional<Hash> from_view(const util::ConstBinaryView&);
+    static Maybe<Hash> from_view(const util::ConstBinaryView&);
 
     explicit Hash(Value&&);
 
@@ -60,9 +61,9 @@ using SHA256Hash = Hash<SHA256HashTag, 32>;
 // implementation
 //
 template<typename TagType, size_t SIZE>
-std::optional<Hash<TagType, SIZE>> Hash<TagType, SIZE>::from_view(const util::ConstBinaryView& vv) {
+Maybe<Hash<TagType, SIZE>> Hash<TagType, SIZE>::from_view(const util::ConstBinaryView& vv) {
     if (vv.size() != size) {
-        return std::nullopt;
+        return none();
     }
     Value v;
     std::copy(vv.begin(), vv.end(), v.begin());

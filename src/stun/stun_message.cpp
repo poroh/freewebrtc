@@ -68,7 +68,7 @@ Result<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& stat)
                     : vv.assured_subview(4, TRANSACTION_ID_SIZE_RFC3489);
 
     AttributeSet attrs;
-    std::optional<util::ConstBinaryView::Interval> integrity_interval;
+    Maybe<util::ConstBinaryView::Interval> integrity_interval = none();
     size_t attr_offset = STUN_HEADER_SIZE;
     while (attr_offset < vv.size()) {
         // 0                   1                   2                   3
@@ -78,19 +78,22 @@ Result<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& stat)
         // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
         // |                         Value (variable)                ....
         // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-        const auto maybe_type = vv.read_u16be(attr_offset);
-        const auto maybe_length = vv.read_u16be(attr_offset + 2);
+        const auto type_rv = vv.read_u16be(attr_offset).require();
+        const auto length_rv = vv.read_u16be(attr_offset + 2).require();
         // The value in the length field MUST contain the length of the Value
         // part of the attribute, prior to padding, measured in bytes.
-        const auto length = maybe_length.value_or(0);
-        const auto maybe_attr_view = vv.subview(attr_offset + sizeof(uint32_t), length);
-        if (!maybe_type.has_value() || !maybe_length.has_value() || !maybe_attr_view.has_value()) {
+        const auto attr_view_rv =
+            length_rv.bind([&](auto&& length) {
+                return vv.subview(attr_offset + sizeof(uint32_t), length).require();
+            });
+        if (any_is_err(type_rv, length_rv, attr_view_rv).is_err()) {
             stat.error.inc();
             stat.invalid_attr_size.inc();
             return make_error_code(ParseError::invalid_attr_size);
         }
-        const auto type = *maybe_type;
-        const auto attr_view = *maybe_attr_view;
+        const auto type = type_rv.unwrap();
+        const auto attr_view = attr_view_rv.unwrap();
+        const auto length = length_rv.unwrap();
         // Since STUN aligns attributes on 32-bit boundaries, attributes whose content
         // is not a multiple of 4 bytes are padded with 1, 2, or 3 bytes of
         // padding so that its value contains a multiple of 4 bytes.  The
@@ -105,7 +108,7 @@ Result<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& stat)
         // With the exception of the FINGERPRINT attribute, which
         // appears after MESSAGE-INTEGRITY, agents MUST ignore all
         // other attributes that follow MESSAGE-INTEGRITY.
-        if (integrity_interval.has_value() && type != attr_registry::FINGERPRINT) {
+        if (integrity_interval.is_some() && type != attr_registry::FINGERPRINT) {
             attr_offset = next_attr_offset;
             continue;
         }
@@ -178,27 +181,27 @@ Result<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& stat)
     };
 }
 
-Result<std::optional<bool>> Message::is_valid(const util::ConstBinaryView& data, const IntegrityData& idata) const noexcept {
+Result<Maybe<bool>> Message::is_valid(const util::ConstBinaryView& data, const IntegrityData& idata) const noexcept {
     using namespace details;
     const auto& h = idata.hash;
     const auto& password = idata.password;
-    using MaybeBool = std::optional<bool>;
-    if (!integrity_interval.has_value()) {
-        return MaybeBool{std::nullopt};
+    using MaybeBool = Maybe<bool>;
+    if (!integrity_interval.is_some()) {
+        return MaybeBool{none()};
     }
-    const auto maybe_covered = data.subview(*integrity_interval);
-    if (!maybe_covered.has_value()) {
-        return MaybeBool{std::nullopt};
+    const auto maybe_covered = data.subview(integrity_interval.unwrap());
+    if (maybe_covered.is_none()) {
+        return MaybeBool{none()};
     }
     const auto maybe_integrity = attribute_set.integrity();
-    if (!maybe_integrity.has_value()) {
-        return MaybeBool{std::nullopt};
+    if (maybe_integrity.is_none()) {
+        return MaybeBool{none()};
     }
-    const auto& integrity = *maybe_integrity;
-    const auto& covered = *maybe_covered;
+    const auto& integrity = maybe_integrity.unwrap();
+    const auto& covered = maybe_covered.unwrap();
     const auto without_4byte_header = covered.subview(4);
-    if (!without_4byte_header.has_value()) {
-        return MaybeBool{std::nullopt};
+    if (!without_4byte_header.is_some()) {
+        return MaybeBool{none()};
     }
     const size_t integrity_message_len = covered.size() + STUN_ATTR_HEADER_SIZE + crypto::SHA1Hash::size - STUN_HEADER_SIZE;
     // Fake header for integrity checking:
@@ -209,7 +212,7 @@ Result<std::optional<bool>> Message::is_valid(const util::ConstBinaryView& data,
             uint8_t((integrity_message_len >> 8) & 0xFF),
             uint8_t(integrity_message_len & 0xFF)
         };
-    return crypto::hmac::digest({util::ConstBinaryView(header), *without_4byte_header}, password.opad(), password.ipad(), h)
+    return crypto::hmac::digest({util::ConstBinaryView(header), without_4byte_header.unwrap()}, password.opad(), password.ipad(), h)
         .fmap([&](auto&& digest) {
             return MaybeBool{digest.value == integrity.get().value};
         });

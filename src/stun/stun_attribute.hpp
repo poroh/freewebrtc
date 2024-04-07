@@ -9,7 +9,6 @@
 #pragma once
 
 #include <cstdint>
-#include <optional>
 #include <variant>
 
 #include "util/util_binary_view.hpp"
@@ -108,10 +107,10 @@ struct ErrorCodeAttribute {
         StaleNonce       = 438,
         ServerError      = 500
     };
-    int code;
-    std::optional<std::string> reason_phrase;
+    unsigned code;
+    Maybe<std::string> reason_phrase;
 
-    bool operator==(const ErrorCodeAttribute&) const noexcept = default;
+    bool operator==(const ErrorCodeAttribute&) const noexcept;
     static Result<ErrorCodeAttribute> parse(const util::ConstBinaryView&, ParseStat&);
     util::ByteVec build() const;
 };

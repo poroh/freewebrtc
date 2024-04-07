@@ -9,9 +9,9 @@
 #pragma once
 
 #include <cstdint>
-#include <optional>
 #include "net/ip/ip_address.hpp"
 #include "util/util_binary_view.hpp"
+#include "util/util_maybe.hpp"
 
 namespace freewebrtc::stun {
 
@@ -25,7 +25,7 @@ public:
     };
     static Family ipv4() noexcept;
     static Family ipv6() noexcept;
-    static std::optional<Family> from_uint8(std::optional<uint8_t>);
+    static Result<Family> from_uint8(uint8_t);
 
     Type type() const noexcept;
     uint8_t to_uint8() const noexcept;

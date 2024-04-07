@@ -8,7 +8,6 @@
 
 #include <iostream>
 
-#include "util/util_fmap.hpp"
 #include "util/util_result_sugar.hpp"
 #include "stun/stun_client_udp.hpp"
 #include "node_stun_client_udp_effects.hpp"
@@ -34,7 +33,7 @@ Result<napi::Object> transaction_ok_to_napi(napi::Env& env, const stun::ClientUD
                 { "port", env.create_int32(t.result.port.value()) }
                 })},
         {"response", message(env, t.response)},
-        {"rtt_us", util::fmap(t.round_trip, [&](auto rtt) {
+        {"rtt_us", t.round_trip.fmap([&](auto rtt) {
             return env.create_int32(std::chrono::duration_cast<std::chrono::microseconds>(rtt).count());
         })}
     });

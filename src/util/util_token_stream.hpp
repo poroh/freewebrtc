@@ -10,10 +10,10 @@
 
 #include <string_view>
 #include <vector>
-#include <optional>
 #include <type_traits>
 
 #include "util/util_result.hpp"
+#include "util/util_maybe.hpp"
 
 namespace freewebrtc::util {
 
@@ -26,7 +26,7 @@ public:
     };
     using TokenType = std::string_view;
     using Container = std::vector<TokenType>;
-    using MaybToken = std::optional<TokenType>;
+    using MaybToken =  Maybe<TokenType>;
 
     TokenStream(const Container&);
     TokenStream(Container&&);

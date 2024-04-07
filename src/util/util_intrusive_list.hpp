@@ -12,7 +12,8 @@
 
 #include <cstdlib>
 #include <functional>
-#include <optional>
+
+#include "util/util_maybe.hpp"
 
 namespace freewebrtc::util {
 
@@ -44,10 +45,10 @@ public:
     void pop_front() noexcept;
 
     // Access O(1)
-    std::optional<Ref> front() noexcept;
-    std::optional<CRef> front() const noexcept;
-    std::optional<Ref> back() noexcept;
-    std::optional<CRef> back() const noexcept;
+    Maybe<Ref> front() noexcept;
+    Maybe<CRef> front() const noexcept;
+    Maybe<Ref> back() noexcept;
+    Maybe<CRef> back() const noexcept;
 
     // Emptiness O(1)
     bool empty() const noexcept;
@@ -89,9 +90,9 @@ private:
     Link(const Link&) = default;
     void place_after(Link&) noexcept;
     void place_before(Link&) noexcept;
-    std::optional<Ref> m_owner;
-    std::optional<LinkRef> m_next;
-    std::optional<LinkRef> m_prev;
+    Maybe<Ref> m_owner = None{};
+    Maybe<LinkRef> m_next = None{};
+    Maybe<LinkRef> m_prev = None{};
 };
 
 //
@@ -108,14 +109,14 @@ IntrusiveList<T>::Link::Link(T& t, Link&& other)
     , m_next(other.m_next)
     , m_prev(other.m_prev)
 {
-    if (m_prev.has_value()) {
-        m_prev.value().get().m_next = *this;
+    if (m_prev.is_some()) {
+        m_prev.unwrap().get().m_next = LinkRef{*this};
     }
-    if (m_next.has_value()) {
-        m_next.value().get().m_prev = *this;
+    if (m_next.is_some()) {
+        m_next.unwrap().get().m_prev = LinkRef{*this};
     }
-    other.m_next.reset();
-    other.m_prev.reset();
+    other.m_next = none();
+    other.m_prev = none();
 }
 
 template<typename T>
@@ -125,10 +126,10 @@ IntrusiveList<T>::Link::~Link() {
 
 template<typename T>
 T& IntrusiveList<T>::Link::get() noexcept {
-    if (!m_owner.has_value()) {
+    if (!m_owner.is_some()) {
         std::abort();
     }
-    return m_owner.value();
+    return m_owner.unwrap();
 }
 
 template<typename T>
@@ -141,41 +142,41 @@ const T& IntrusiveList<T>::Link::get() const noexcept {
 
 template<typename T>
 void IntrusiveList<T>::Link::remove() noexcept {
-    if (m_prev.has_value()) {
-        m_prev.value().get().m_next = m_next;
+    if (m_prev.is_some()) {
+        m_prev.unwrap().get().m_next = m_next;
     }
-    if (m_next.has_value()) {
-        m_next.value().get().m_prev = m_prev;
+    if (m_next.is_some()) {
+        m_next.unwrap().get().m_prev = m_prev;
     }
-    m_prev.reset();
-    m_next.reset();
+    m_prev = none();
+    m_next = none();
 }
 
 template<typename T>
 void IntrusiveList<T>::Link::place_after(Link& t) noexcept {
     remove();
     m_next = t.m_next;
-    m_prev = t;
-    if (m_next.has_value()) {
-        m_next.value().get().m_prev = *this;
+    m_prev = LinkRef{t};
+    if (m_next.is_some()) {
+        m_next.unwrap().get().m_prev = LinkRef{*this};
     }
-    m_prev.value().get().m_next = *this;
+    m_prev.unwrap().get().m_next = LinkRef{*this};
 }
 
 template<typename T>
 void IntrusiveList<T>::Link::place_before(Link& t) noexcept {
     remove();
-    m_next = t;
+    m_next = LinkRef{t};
     m_prev = t.m_prev;
-    m_next.value().get().m_prev = *this;
-    if (m_prev.has_value()) {
-        m_prev.value().get().m_next = *this;
+    m_next.unwrap().get().m_prev = LinkRef{*this};
+    if (m_prev.is_some()) {
+        m_prev.unwrap().get().m_next = LinkRef{*this};
     }
 }
 
 template<typename T>
 bool IntrusiveList<T>::Link::in_list() const noexcept {
-    return m_next.has_value() && m_prev.has_value();
+    return m_next.is_some() && m_prev.is_some();
 }
 
 template<typename T>
@@ -229,7 +230,7 @@ void IntrusiveList<T>::pop_front() noexcept {
     if (empty()) {
         std::abort();
     }
-    m_head.m_next.value().get().remove();
+    m_head.m_next.unwrap().get().remove();
 }
 
 template<typename T>
@@ -237,25 +238,25 @@ void IntrusiveList<T>::pop_back() noexcept {
     if (empty()) {
         std::abort();
     }
-    m_tail.m_prev.value().get().remove();
+    m_tail.m_prev.unwrap().get().remove();
 }
 
 template<typename T>
-std::optional<typename IntrusiveList<T>::Ref>
+Maybe<typename IntrusiveList<T>::Ref>
 IntrusiveList<T>::front() noexcept {
     if (empty()) {
-        return std::nullopt;
+        return None{};
     }
-    return m_head.m_next.value().get().get();
+    return std::ref(m_head.m_next.unwrap().get().get());
 }
 
 template<typename T>
-std::optional<typename IntrusiveList<T>::CRef>
+Maybe<typename IntrusiveList<T>::CRef>
 IntrusiveList<T>::front() const noexcept {
     if (empty()) {
-        return std::nullopt;
+        return None{};
     }
-    return m_head.m_next.value().get().get();
+    return std::cref(m_head.m_next.unwrap().get().get());
 }
 
 template<typename T>
@@ -266,39 +267,39 @@ void IntrusiveList<T>::clear() noexcept {
 }
 
 template<typename T>
-std::optional<typename IntrusiveList<T>::Ref>
+Maybe<typename IntrusiveList<T>::Ref>
 IntrusiveList<T>::back() noexcept {
     if (empty()) {
-        return std::nullopt;
+        return None{};
     }
-    return m_tail.m_prev.value().get().get();
+    return std::ref(m_tail.m_prev.unwrap().get().get());
 }
 
 template<typename T>
-std::optional<typename IntrusiveList<T>::CRef>
+Maybe<typename IntrusiveList<T>::CRef>
 IntrusiveList<T>::back() const noexcept {
     if (empty()) {
-        return std::nullopt;
+        return None{};
     }
-    return m_tail.m_prev.value().get().get();
+    return std::cref(m_tail.m_prev.value().get().get());
 }
 
 template<typename T>
 bool IntrusiveList<T>::empty() const noexcept {
-    if (!m_head.m_next.has_value() || !m_tail.m_prev.has_value()) {
+    if (!m_head.m_next.is_some() || !m_tail.m_prev.is_some()) {
         std::abort();
     }
-    return &m_head.m_next.value().get() == &m_tail;
+    return &m_head.m_next.unwrap().get() == &m_tail;
 }
 
 template<typename T>
 void IntrusiveList<T>::do_move(IntrusiveList<T>& other) noexcept {
     m_head.m_next = other.m_head.m_next;
-    m_head.m_next.value().get().m_prev = m_head;
+    m_head.m_next.unwrap().get().m_prev = LinkRef{m_head};
     m_tail.m_prev = other.m_tail.m_prev;
-    m_tail.m_prev.value().get().m_next = m_tail;
-    other.m_head.m_next.reset();
-    other.m_tail.m_prev.reset();
+    m_tail.m_prev.unwrap().get().m_next = LinkRef{m_tail};
+    other.m_head.m_next = none();
+    other.m_tail.m_prev = none();
     other.m_tail.place_after(other.m_head);
 }
 

@@ -23,15 +23,15 @@ TEST_F(IceCandidateSDPAttrTests, parse_tests_rfc8839_example_host) {
     const auto& supported = std::get<ice::candidate::Supported>(result);
     const auto& candidate = supported.candidate;
     EXPECT_EQ(candidate.foundation, ice::candidate::Foundation::from_string("1").unwrap());
-    ASSERT_TRUE(candidate.address.as_ip_address().has_value());
-    EXPECT_EQ(candidate.address.as_ip_address()->get(), net::ip::Address::from_string("203.0.113.141").unwrap());
+    ASSERT_TRUE(candidate.address.as_ip_address().is_some());
+    EXPECT_EQ(candidate.address.as_ip_address().unwrap().get(), net::ip::Address::from_string("203.0.113.141").unwrap());
     EXPECT_EQ(candidate.port, net::Port::from_uint16(8998));
     EXPECT_EQ(candidate.transport_type, ice::candidate::TransportType::udp());
     EXPECT_EQ(candidate.type, ice::candidate::Type::host());
     EXPECT_EQ(candidate.priority, ice::candidate::Priority::from_uint32(2130706431).unwrap());
     EXPECT_EQ(candidate.component, ice::candidate::ComponentId::from_unsigned(1).unwrap());
-    EXPECT_FALSE(candidate.maybe_related_address.has_value());
-    EXPECT_FALSE(candidate.maybe_related_port.has_value());
+    EXPECT_FALSE(candidate.maybe_related_address.is_some());
+    EXPECT_FALSE(candidate.maybe_related_port.is_some());
 }
 
 TEST_F(IceCandidateSDPAttrTests, parse_tests_rfc8839_example_srflx) {
@@ -42,19 +42,19 @@ TEST_F(IceCandidateSDPAttrTests, parse_tests_rfc8839_example_srflx) {
     const auto& supported = std::get<ice::candidate::Supported>(result);
     const auto& candidate = supported.candidate;
     EXPECT_EQ(candidate.foundation, ice::candidate::Foundation::from_string("2").unwrap());
-    ASSERT_TRUE(candidate.address.as_ip_address().has_value());
-    EXPECT_EQ(candidate.address.as_ip_address()->get(), net::ip::Address::from_string("192.0.2.3").unwrap());
+    ASSERT_TRUE(candidate.address.as_ip_address().is_some());
+    EXPECT_EQ(candidate.address.as_ip_address().unwrap().get(), net::ip::Address::from_string("192.0.2.3").unwrap());
     EXPECT_EQ(candidate.port, net::Port::from_uint16(45664));
     EXPECT_EQ(candidate.transport_type, ice::candidate::TransportType::udp());
     EXPECT_EQ(candidate.type, ice::candidate::Type::server_reflexive());
     EXPECT_EQ(candidate.priority, ice::candidate::Priority::from_uint32(1694498815).unwrap());
     EXPECT_EQ(candidate.component, ice::candidate::ComponentId::from_unsigned(1).unwrap());
-    ASSERT_TRUE(candidate.maybe_related_address.has_value());
-    ASSERT_TRUE(candidate.maybe_related_port.has_value());
-    ASSERT_TRUE(candidate.maybe_related_address->as_ip_address().has_value());
-    auto& raddr = candidate.maybe_related_address->as_ip_address()->get();
+    ASSERT_TRUE(candidate.maybe_related_address.is_some());
+    ASSERT_TRUE(candidate.maybe_related_port.is_some());
+    ASSERT_TRUE(candidate.maybe_related_address.unwrap().as_ip_address().is_some());
+    auto& raddr = candidate.maybe_related_address.unwrap().as_ip_address().unwrap().get();
     EXPECT_EQ(raddr, net::ip::Address::from_string("203.0.113.141").unwrap());
-    EXPECT_EQ(candidate.maybe_related_port.value(), net::Port::from_uint16(8998));
+    EXPECT_EQ(candidate.maybe_related_port.unwrap(), net::Port::from_uint16(8998));
 }
 
 TEST_F(IceCandidateSDPAttrTests, parse_tests_rfc8839_example_host_ipv6) {
@@ -65,15 +65,15 @@ TEST_F(IceCandidateSDPAttrTests, parse_tests_rfc8839_example_host_ipv6) {
     const auto& supported = std::get<ice::candidate::Supported>(result);
     const auto& candidate = supported.candidate;
     EXPECT_EQ(candidate.foundation, ice::candidate::Foundation::from_string("1").unwrap());
-    ASSERT_TRUE(candidate.address.as_ip_address().has_value());
-    EXPECT_EQ(candidate.address.as_ip_address()->get(), net::ip::Address::from_string("fe80::6676:baff:fe9c:ee4a").unwrap());
+    ASSERT_TRUE(candidate.address.as_ip_address().is_some());
+    EXPECT_EQ(candidate.address.as_ip_address().unwrap().get(), net::ip::Address::from_string("fe80::6676:baff:fe9c:ee4a").unwrap());
     EXPECT_EQ(candidate.port, net::Port::from_uint16(8998));
     EXPECT_EQ(candidate.transport_type, ice::candidate::TransportType::udp());
     EXPECT_EQ(candidate.type, ice::candidate::Type::host());
     EXPECT_EQ(candidate.priority, ice::candidate::Priority::from_uint32(2130706431).unwrap());
     EXPECT_EQ(candidate.component, ice::candidate::ComponentId::from_unsigned(1).unwrap());
-    EXPECT_FALSE(candidate.maybe_related_address.has_value());
-    EXPECT_FALSE(candidate.maybe_related_port.has_value());
+    EXPECT_FALSE(candidate.maybe_related_address.is_some());
+    EXPECT_FALSE(candidate.maybe_related_port.is_some());
 }
 
 TEST_F(IceCandidateSDPAttrTests, parse_tests_rfc8839_example_srflx_ipv6) {
@@ -84,19 +84,19 @@ TEST_F(IceCandidateSDPAttrTests, parse_tests_rfc8839_example_srflx_ipv6) {
     const auto& supported = std::get<ice::candidate::Supported>(result);
     const auto& candidate = supported.candidate;
     EXPECT_EQ(candidate.foundation, ice::candidate::Foundation::from_string("2").unwrap());
-    ASSERT_TRUE(candidate.address.as_ip_address().has_value());
-    EXPECT_EQ(candidate.address.as_ip_address()->get(), net::ip::Address::from_string("2001:db8:8101:3a55:4858:a2a9:22ff:99b9").unwrap());
+    ASSERT_TRUE(candidate.address.as_ip_address().is_some());
+    EXPECT_EQ(candidate.address.as_ip_address().unwrap().get(), net::ip::Address::from_string("2001:db8:8101:3a55:4858:a2a9:22ff:99b9").unwrap());
     EXPECT_EQ(candidate.port, net::Port::from_uint16(45664));
     EXPECT_EQ(candidate.transport_type, ice::candidate::TransportType::udp());
     EXPECT_EQ(candidate.type, ice::candidate::Type::server_reflexive());
     EXPECT_EQ(candidate.priority, ice::candidate::Priority::from_uint32(1694498815).unwrap());
     EXPECT_EQ(candidate.component, ice::candidate::ComponentId::from_unsigned(1).unwrap());
-    ASSERT_TRUE(candidate.maybe_related_address.has_value());
-    ASSERT_TRUE(candidate.maybe_related_port.has_value());
-    ASSERT_TRUE(candidate.maybe_related_address->as_ip_address().has_value());
-    auto& raddr = candidate.maybe_related_address->as_ip_address()->get();
+    ASSERT_TRUE(candidate.maybe_related_address.is_some());
+    ASSERT_TRUE(candidate.maybe_related_port.is_some());
+    ASSERT_TRUE(candidate.maybe_related_address.unwrap().as_ip_address().is_some());
+    auto& raddr = candidate.maybe_related_address.unwrap().as_ip_address().unwrap().get();
     EXPECT_EQ(raddr, net::ip::Address::from_string("fe80::6676:baff:fe9c:ee4a").unwrap());
-    EXPECT_EQ(candidate.maybe_related_port.value(), net::Port::from_uint16(8998));
+    EXPECT_EQ(candidate.maybe_related_port.unwrap(), net::Port::from_uint16(8998));
 }
 
 }

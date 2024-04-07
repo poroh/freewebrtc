@@ -69,13 +69,13 @@ TEST_F(STUNMessageParserTest, rfc5769_2_1_sample_request) {
     ASSERT_TRUE(password.is_ok());
     auto is_valid_rv = msg.is_valid(util::ConstBinaryView(request), stun::IntegrityData{password.unwrap(), crypto::openssl::sha1});
     ASSERT_TRUE(!is_valid_rv.is_err());
-    EXPECT_TRUE(is_valid_rv.is_ok() && is_valid_rv.unwrap().has_value() && *is_valid_rv.unwrap());
+    EXPECT_TRUE(is_valid_rv.is_ok() && is_valid_rv.unwrap().is_some() && is_valid_rv.unwrap().unwrap());
     auto username = msg.attribute_set.username();
-    ASSERT_TRUE(username.has_value());
-    EXPECT_EQ(username->get().value, "evtj:h6vY");
+    ASSERT_TRUE(username.is_some());
+    EXPECT_EQ(username.unwrap().get().value, "evtj:h6vY");
     auto software = msg.attribute_set.software();
-    ASSERT_TRUE(software.has_value());
-    EXPECT_EQ(software->get(), "STUN test client");
+    ASSERT_TRUE(software.is_some());
+    EXPECT_EQ(software.unwrap().get(), "STUN test client");
 }
 
 TEST_F(STUNMessageParserTest, rfc5769_2_2_sample_response) {
@@ -123,16 +123,16 @@ TEST_F(STUNMessageParserTest, rfc5769_2_2_sample_response) {
     ASSERT_TRUE(password.is_ok());
     auto is_valid_rv = msg.is_valid(util::ConstBinaryView(response), stun::IntegrityData{password.unwrap(), crypto::openssl::sha1});
     ASSERT_TRUE(!is_valid_rv.is_err());
-    EXPECT_TRUE(is_valid_rv.is_ok() && is_valid_rv.unwrap().has_value() && *is_valid_rv.unwrap());
+    EXPECT_TRUE(is_valid_rv.is_ok() && is_valid_rv.unwrap().is_some() && is_valid_rv.unwrap().unwrap());
 
     auto software = msg.attribute_set.software();
-    ASSERT_TRUE(software.has_value());
-    EXPECT_EQ(software->get(), "test vector");
+    ASSERT_TRUE(software.is_some());
+    EXPECT_EQ(software.unwrap().get(), "test vector");
 
     auto xor_mapped = msg.attribute_set.xor_mapped();
-    ASSERT_TRUE(xor_mapped.has_value());
-    EXPECT_EQ(xor_mapped->get().port.value(), 32853);
-    EXPECT_EQ(xor_mapped->get().addr.to_address(msg.header.transaction_id),
+    ASSERT_TRUE(xor_mapped.is_some());
+    EXPECT_EQ(xor_mapped.unwrap().get().port.value(), 32853);
+    EXPECT_EQ(xor_mapped.unwrap().get().addr.to_address(msg.header.transaction_id),
               net::ip::Address::from_string("192.0.2.1").unwrap());
 }
 
@@ -181,16 +181,16 @@ TEST_F(STUNMessageParserTest, rfc5769_2_3_sample_ipv6_response) {
     ASSERT_TRUE(password.is_ok());
     auto is_valid_rv = msg.is_valid(util::ConstBinaryView(response), stun::IntegrityData{password.unwrap(), crypto::openssl::sha1});
     ASSERT_TRUE(!is_valid_rv.is_err());
-    EXPECT_TRUE(is_valid_rv.is_ok() && is_valid_rv.unwrap().has_value() && *is_valid_rv.unwrap());
+    EXPECT_TRUE(is_valid_rv.is_ok() && is_valid_rv.unwrap().is_some() && is_valid_rv.unwrap().unwrap());
 
     auto software = msg.attribute_set.software();
-    ASSERT_TRUE(software.has_value());
-    EXPECT_EQ(software->get(), "test vector");
+    ASSERT_TRUE(software.is_some());
+    EXPECT_EQ(software.unwrap().get(), "test vector");
 
     auto xor_mapped = msg.attribute_set.xor_mapped();
-    ASSERT_TRUE(xor_mapped.has_value());
-    EXPECT_EQ(xor_mapped->get().port.value(), 32853);
-    EXPECT_EQ(xor_mapped->get().addr.to_address(msg.header.transaction_id),
+    ASSERT_TRUE(xor_mapped.is_some());
+    EXPECT_EQ(xor_mapped.unwrap().get().port.value(), 32853);
+    EXPECT_EQ(xor_mapped.unwrap().get().addr.to_address(msg.header.transaction_id),
               net::ip::Address::from_string("2001:db8:1234:5678:11:2233:4455:6677").unwrap());
 }
 
@@ -233,8 +233,8 @@ TEST_F(STUNMessageParserTest, rfc8445_priority_attribute) {
     EXPECT_EQ(stat.success.count(), 1);
     ASSERT_TRUE(msg_rv.is_ok());
     const auto& msg = msg_rv.unwrap();
-    ASSERT_TRUE(msg.attribute_set.priority().has_value());
-    EXPECT_EQ(msg.attribute_set.priority()->get(), 0x12345678);
+    ASSERT_TRUE(msg.attribute_set.priority().is_some());
+    EXPECT_EQ(msg.attribute_set.priority().unwrap().get(), 0x12345678);
 }
 
 TEST_F(STUNMessageParserTest, rfc8445_use_candidate_attribute) {
@@ -270,8 +270,8 @@ TEST_F(STUNMessageParserTest, rfc8445_ice_controlling_attribute) {
     EXPECT_EQ(stat.success.count(), 1);
     ASSERT_TRUE(msg_rv.is_ok());
     const auto& msg = msg_rv.unwrap();
-    ASSERT_TRUE(msg.attribute_set.ice_controlling().has_value());
-    EXPECT_EQ(msg.attribute_set.ice_controlling()->get(), 0x123456789ABCDEF0LL);
+    ASSERT_TRUE(msg.attribute_set.ice_controlling().is_some());
+    EXPECT_EQ(msg.attribute_set.ice_controlling().unwrap().get(), 0x123456789ABCDEF0LL);
 }
 
 TEST_F(STUNMessageParserTest, rfc8445_ice_controlled_attribute) {
@@ -290,8 +290,8 @@ TEST_F(STUNMessageParserTest, rfc8445_ice_controlled_attribute) {
     EXPECT_EQ(stat.success.count(), 1);
     ASSERT_TRUE(msg_rv.is_ok());
     const auto& msg = msg_rv.unwrap();
-    ASSERT_TRUE(msg.attribute_set.ice_controlled().has_value());
-    EXPECT_EQ(msg.attribute_set.ice_controlled()->get(), 0x123456789ABCDEF0LL);
+    ASSERT_TRUE(msg.attribute_set.ice_controlled().is_some());
+    EXPECT_EQ(msg.attribute_set.ice_controlled().unwrap().get(), 0x123456789ABCDEF0LL);
 }
 
 TEST_F(STUNMessageParserTest, unknown_attribute_that_does_not_require_comprehension) {
@@ -535,8 +535,8 @@ TEST_F(STUNMessageParserTest, invalid_integrity_sha1_hmac) {
     ASSERT_TRUE(password.is_ok());
     auto is_valid_rv = msg.is_valid(util::ConstBinaryView(response), stun::IntegrityData{password.unwrap(), crypto::openssl::sha1});
     ASSERT_TRUE(!is_valid_rv.is_err());
-    ASSERT_TRUE(is_valid_rv.is_ok() && is_valid_rv.unwrap().has_value());
-    EXPECT_FALSE(*is_valid_rv.unwrap());
+    ASSERT_TRUE(is_valid_rv.is_ok() && is_valid_rv.unwrap().is_some());
+    EXPECT_FALSE(is_valid_rv.unwrap().unwrap());
 }
 
 TEST_F(STUNMessageParserTest, rfc8445_priority_attribute_not_32bit) {

@@ -11,11 +11,11 @@
 #include <string_view>
 #include <cstdint>
 #include <cstring>
-#include <optional>
 #include <vector>
 #include <array>
 
 #include "util/util_endian.hpp"
+#include "util/util_maybe.hpp"
 
 namespace freewebrtc::util {
 
@@ -46,13 +46,13 @@ public:
     uint64_t assured_read_u64be(size_t offset) const;
     ConstBinaryView assured_subview(size_t offset, size_t size) const;
 
-    std::optional<uint8_t> read_u8(size_t offset) const;
-    std::optional<uint16_t> read_u16be(size_t offset) const;
-    std::optional<uint32_t> read_u32be(size_t offset) const;
-    std::optional<uint64_t> read_u64be(size_t offset) const;
-    std::optional<ConstBinaryView> subview(size_t offset) const;
-    std::optional<ConstBinaryView> subview(size_t offset, size_t size) const;
-    std::optional<ConstBinaryView> subview(const Interval&) const;
+    Maybe<uint8_t> read_u8(size_t offset) const;
+    Maybe<uint16_t> read_u16be(size_t offset) const;
+    Maybe<uint32_t> read_u32be(size_t offset) const;
+    Maybe<uint64_t> read_u64be(size_t offset) const;
+    Maybe<ConstBinaryView> subview(size_t offset) const;
+    Maybe<ConstBinaryView> subview(size_t offset, size_t size) const;
+    Maybe<ConstBinaryView> subview(const Interval&) const;
 
     static ByteVec concat(const std::vector<ConstBinaryView>&);
 
@@ -104,30 +104,30 @@ inline ConstBinaryView ConstBinaryView::assured_subview(size_t offset, size_t co
     return ConstBinaryView(data() + offset, count);
 }
 
-inline std::optional<uint8_t> ConstBinaryView::read_u8(size_t offset) const {
+inline Maybe<uint8_t> ConstBinaryView::read_u8(size_t offset) const {
     if (offset + sizeof(uint8_t) > size()) {
-        return std::nullopt;
+        return none();
     }
     return assured_read_u8(offset);
 }
 
-inline std::optional<uint16_t> ConstBinaryView::read_u16be(size_t offset) const {
+inline Maybe<uint16_t> ConstBinaryView::read_u16be(size_t offset) const {
     if (offset + sizeof(uint16_t) > size() ) {
-        return std::nullopt;
+        return none();
     }
     return assured_read_u16be(offset);
 }
 
-inline std::optional<uint32_t> ConstBinaryView::read_u32be(size_t offset) const {
+inline Maybe<uint32_t> ConstBinaryView::read_u32be(size_t offset) const {
     if (offset + sizeof(uint32_t) > size() ) {
-        return std::nullopt;
+        return none();
     }
     return assured_read_u32be(offset);
 }
 
-inline std::optional<uint64_t> ConstBinaryView::read_u64be(size_t offset) const {
+inline Maybe<uint64_t> ConstBinaryView::read_u64be(size_t offset) const {
     if (offset + sizeof(uint64_t) > size() ) {
-        return std::nullopt;
+        return none();
     }
     return assured_read_u64be(offset);
 }
@@ -136,21 +136,21 @@ inline bool ConstBinaryView::contains(const Interval& i) const {
     return i.offset + i.count <= size();
 }
 
-inline std::optional<ConstBinaryView> ConstBinaryView::subview(size_t offset) const {
+inline Maybe<ConstBinaryView> ConstBinaryView::subview(size_t offset) const {
     if (offset > size()) {
-        return std::nullopt;
+        return none();
     }
     return subview(offset, size() - offset);
 }
 
-inline std::optional<ConstBinaryView> ConstBinaryView::subview(size_t offset, size_t count) const {
+inline Maybe<ConstBinaryView> ConstBinaryView::subview(size_t offset, size_t count) const {
     if (offset + count > size()) {
-        return std::nullopt;
+        return none();
     }
     return assured_subview(offset, count);
 }
 
-inline std::optional<ConstBinaryView> ConstBinaryView::subview(const Interval& i) const {
+inline Maybe<ConstBinaryView> ConstBinaryView::subview(const Interval& i) const {
     return subview(i.offset, i.count);
 }
 

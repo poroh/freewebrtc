@@ -35,17 +35,17 @@ struct Message {
     // Mode for compatibility to RFC3489 (no magic cookie in request).
     IsRFC3489 is_rfc3489;
     // Data interval that is covered by MESSAGE-INTEGRITY attribute (if any).
-    std::optional<util::ConstBinaryView::Interval> integrity_interval;
+    Maybe<util::ConstBinaryView::Interval> integrity_interval;
     // Parse message from binary view
     static Result<Message> parse(const util::ConstBinaryView&, ParseStat&);
     // Check that MESSAGE-INTEGRITY is valid (if present).
     // If MESSAGE-INTEGRITY is not present then function returns std::nullopt
     // Error may occue if hash function returns error. Otherwise return_value.value()
     // is always not nullptr
-    Result<std::optional<bool>> is_valid(const util::ConstBinaryView&, const IntegrityData&) const noexcept;
+    Result<Maybe<bool>> is_valid(const util::ConstBinaryView&, const IntegrityData&) const noexcept;
 
     // Build message as bytes
-    Result<util::ByteVec> build(const MaybeIntegrity& maybe_integrity = std::nullopt) const noexcept;
+    Result<util::ByteVec> build(const MaybeIntegrity& maybe_integrity = None{}) const noexcept;
 
     // Check if message is alternate server response
     bool is_alternate_server() const noexcept;
@@ -58,9 +58,11 @@ inline bool Message::is_alternate_server() const noexcept {
     if (header.cls != Class::error_response()) {
         return false;
     }
-    auto maybe_error = attribute_set.error_code();
-    return maybe_error.has_value()
-        && maybe_error.value().get().code == ErrorCodeAttribute::TryAlternate;
+    return attribute_set.error_code()
+        .fmap([](auto&& ecref) {
+            return ecref.get().code == ErrorCodeAttribute::TryAlternate;
+        })
+        .value_or(false);
 }
 
 }

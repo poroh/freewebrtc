@@ -10,6 +10,7 @@
 
 #include <unordered_map>
 
+#include "util/util_maybe.hpp"
 #include "stun/stun_attribute.hpp"
 #include "stun/stun_integrity.hpp"
 #include "stun/details/stun_attr_registry.hpp"
@@ -23,7 +24,7 @@ public:
     void emplace(Attribute&&);
     void emplace(UnknownAttribute&&);
     template<typename Attr>
-    using MaybeAttr = std::optional<std::reference_wrapper<const Attr>>;
+    using MaybeAttr = Maybe<std::reference_wrapper<const Attr>>;
     MaybeAttr<MessageIntegityAttribute::Digest> integrity() const noexcept;
     MaybeAttr<precis::OpaqueString> username() const noexcept;
     MaybeAttr<std::string> software() const noexcept;

@@ -12,7 +12,6 @@
 #include <tuple>
 #include <system_error>
 #include <type_traits>
-#include <optional>
 #include <utility>
 
 #include "util/util_error.hpp"
@@ -26,9 +25,6 @@ public:
     using Self = Result<V>;
     using Value = V;
     using Error = ::freewebrtc::Error;
-
-    using MaybeValue = std::optional<std::reference_wrapper<Value>>;
-    using MaybeConstValue = std::optional<std::reference_wrapper<const Value>>;
 
     Result(Value&&);
     Result(const Value&);
@@ -45,8 +41,6 @@ public:
     const Error& unwrap_err() const noexcept;
 
     bool is_ok() const noexcept;
-    MaybeValue maybe_value() noexcept;
-    MaybeConstValue maybe_value() const noexcept;
     Value& unwrap() noexcept;
     const Value& unwrap() const noexcept;
     const Value& unwrap_or(const Value&) const noexcept;
@@ -87,6 +81,9 @@ private:
     std::variant<Value, Error> m_result;
 };
 
+template<typename T>
+Result<T> success(T&&) noexcept;
+
 using MaybeError = Result<Unit>;
 MaybeError success() noexcept;
 
@@ -102,7 +99,7 @@ Result<T> return_value(T&& t) noexcept;
 //   Result<double> v3 = std::make_error_code(std::errc::invalid_argument);
 //   assert(any_is_err(v1, v2, v3));
 template<typename T, typename... Ts>
-std::optional<Error> any_is_err(const Result<T>& first, const Result<Ts>&... rest);
+MaybeError any_is_err(const Result<T>& first, const Result<Ts>&... rest);
 
 // Combine Result s with function
 // Example:
@@ -167,20 +164,6 @@ Result<V>::unwrap_err() const noexcept {
 template<typename V>
 inline bool Result<V>::is_ok() const noexcept {
     return std::holds_alternative<Value>(m_result);
-}
-
-template<typename V>
-inline typename Result<V>::MaybeConstValue
-Result<V>::maybe_value() const noexcept {
-    auto v = std::get_if<V>(&m_result);
-    return v != nullptr ? MaybeConstValue{*v} : std::nullopt;
-}
-
-template<typename V>
-inline typename Result<V>::MaybeValue
-Result<V>::maybe_value() noexcept {
-    auto v = std::get_if<V>(&m_result);
-    return v != nullptr ? MaybeValue{*v} : std::nullopt;
 }
 
 template<typename V>
@@ -297,14 +280,14 @@ Result<V>& Result<V>::add_context(Ts&&... v) {
 }
 
 template<typename T, typename... Ts>
-std::optional<Error> any_is_err(const Result<T>& first, const Result<Ts>&... rest) {
+MaybeError any_is_err(const Result<T>& first, const Result<Ts>&... rest) {
     if (first.is_err()) {
         return first.unwrap_err();
     }
     if constexpr (sizeof...(rest) > 0) {
         return any_is_err(rest...);
     } else {
-        return std::nullopt;
+        return success();
     }
 }
 
@@ -332,8 +315,8 @@ auto combine_with_values_cref(Func func, const Result<Ts>&... rvs) {
 
 template<typename F, typename... Ts>
 auto combine(F&& f, const Result<Ts>&... rvs) -> Result<typename std::invoke_result_t<F, const Ts&...>::Value> {
-    if (auto maybe_error = any_is_err(rvs...); maybe_error.has_value()) {
-        return maybe_error.value();
+    if (auto maybe_error = any_is_err(rvs...); maybe_error.is_err()) {
+        return maybe_error.unwrap_err();
     }
     auto result = combine_with_values_cref(f, std::forward<const Result<Ts>&>(rvs)...);
     if (result.is_err()) {
@@ -366,8 +349,8 @@ auto combine_with_values_ref(Func func, Result<Ts>&... rvs) {
 
 template<typename F, typename... Ts>
 auto combine(F&& f, Result<Ts>&... rvs) -> Result<typename std::invoke_result_t<F, Ts&...>::Value> {
-    if (auto maybe_error = any_is_err(rvs...); maybe_error.has_value()) {
-        return maybe_error.value();
+    if (auto maybe_error = any_is_err(rvs...); maybe_error.is_err()) {
+        return maybe_error.unwrap_err();
     }
     auto result = combine_with_values_ref(f, std::forward<Result<Ts>&>(rvs)...);
     if (result.is_err()) {
@@ -400,14 +383,19 @@ auto combine_rv_with_values(F&& func, Result<Ts>&&... rvs) {
 
 template<typename F, typename... Ts>
 auto combine(F&& f, Result<Ts>&&... rvs) -> Result<typename std::invoke_result_t<F, Ts&&...>::Value>  {
-    if (auto maybe_error = any_is_err(rvs...); maybe_error.has_value()) {
-        return maybe_error.value();
+    if (auto maybe_error = any_is_err(rvs...); maybe_error.is_err()) {
+        return maybe_error.unwrap_err();
     }
     auto result = combine_rv_with_values(std::move(f), std::forward<Result<Ts>>(rvs)...);
     if (result.is_err()) {
         return result.unwrap_err();
     }
     return std::move(result.unwrap());
+}
+
+template<typename T>
+Result<T> success(T&& v) noexcept {
+    return Result<T>(std::move(v));
 }
 
 inline MaybeError success() noexcept {

@@ -50,7 +50,7 @@ TokenStream::TokenStream(Container&& d)
 
 TokenStream::MaybToken TokenStream::optional() noexcept {
     if (m_pos == m_data.cend()) {
-        return std::nullopt;
+        return None{};
     }
     return *(m_pos++);
 }

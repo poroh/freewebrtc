@@ -21,17 +21,14 @@ const uint32_t net_magic = util::host_to_network_u32(details::MAGIC_COOKIE);
 
 }
 
-std::optional<Family> Family::from_uint8(std::optional<uint8_t> maybe_v) {
-    if (!maybe_v.has_value()) {
-        return std::nullopt;
-    }
-    switch (*maybe_v) {
+Result<Family> Family::from_uint8(uint8_t v) {
+    switch (v) {
         case attr_registry::FAMILY_IPV4:
             return Family(Family::IPv4);
         case attr_registry::FAMILY_IPV6:
             return Family(Family::IPv6);
     }
-    return std::nullopt;
+    return make_error_code(ParseError::unknown_addr_family);
 }
 
 uint8_t Family::to_uint8() const noexcept {

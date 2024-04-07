@@ -8,10 +8,10 @@
 
 #pragma once
 
-#include <optional>
 #include <variant>
 #include <chrono>
 #include "util/util_typed_bool.hpp"
+#include "util/util_maybe.hpp"
 #include "clock/clock_timepoint.hpp"
 #include "precis/precis_opaque_string.hpp"
 #include "stun/stun_transaction_id_hash.hpp"
@@ -34,14 +34,14 @@ struct Settings {
     struct RetransmitDefault {
         // Maximum of retransmission interval.
         // In libwebrtc this parameter is set to 8s
-        std::optional<Duration> max_rto = std::nullopt;
+        Maybe<Duration> max_rto = None{};
         // Request count (Rc)
         unsigned request_count = 7;
         // Retransmission multiplier for last request (Rm)
         unsigned retransmission_multiplier = 16;
         // 5xx handling. If not defined then transaction
         // is failed instantly
-        std::optional<Duration> server_error_timeout;
+        Maybe<Duration> server_error_timeout = None{};
         // Maximum number of retransmits in case of 5xx
         // RFC 8490: 6.3.4.  Processing an Error Response
         // If the error code is 500 through 599, the client MAY resend the
@@ -70,7 +70,7 @@ struct Settings {
 
     // Hash of transaction ID. By default murmur hash without
     // seed randomization.
-    std::optional<TransactionIdHash> maybe_tid_hash;
+    Maybe<TransactionIdHash> maybe_tid_hash = None{};
 };
 
 }

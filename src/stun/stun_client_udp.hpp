@@ -17,6 +17,7 @@
 #include "clock/clock_timepoint.hpp"
 #include "precis/precis_opaque_string.hpp"
 #include "util/util_result.hpp"
+#include "util/util_maybe.hpp"
 #include "util/util_hash_dynamic.hpp"
 #include "stun/stun_message.hpp"
 #include "stun/stun_attribute_set.hpp"
@@ -35,7 +36,7 @@ using namespace std::literals::chrono_literals;
 class ClientUDP {
 public:
     using Timepoint = clock::Timepoint;
-    using MaybeTimepoint = std::optional<Timepoint>;
+    using MaybeTimepoint = Maybe<Timepoint>;
     using Settings   = client_udp::Settings;
     using Handle     = client_udp::Handle;
     using HandleHash = client_udp::HandleHash;
@@ -79,12 +80,12 @@ public:
         precis::OpaqueString username;
         IntegrityData integrity;
     };
-    using MaybeAuth = std::optional<Auth>;
+    using MaybeAuth = Maybe<Auth>;
     struct Request {
         net::Path path;
         AttributeSet::AttrVec attrs;
         AttributeSet::UnknownAttrVec unknown_attrs;
-        MaybeAuth maybe_auth;
+        MaybeAuth maybe_auth = None{};
     };
     // Create transaction with unique identifier. Random device
     // may be override with cryptographic random if needed.
@@ -95,7 +96,7 @@ public:
     // then caller may provide parsed message. It optimizes performance by
     // prventing another parse. However if auth is defined integrity will be checked
     // in any case by binary view.
-    MaybeError response(Timepoint, util::ConstBinaryView, std::optional<stun::Message>&& = {});
+    MaybeError response(Timepoint, util::ConstBinaryView, Maybe<stun::Message>&& = None{});
 
     // Do next step of the client processing
     Effect next(Timepoint);

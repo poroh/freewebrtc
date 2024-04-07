@@ -99,17 +99,17 @@ Result<Value> Object::named_property(const std::string& k) const noexcept {
     return Value(m_env, result);
 }
 
-Result<std::optional<Value>> Object::maybe_named_property(const std::string& k) const noexcept {
+Result<Maybe<Value>> Object::maybe_named_property(const std::string& k) const noexcept {
     bool has_property = false;
     if (auto status = napi_has_named_property(m_env, m_value, k.c_str(), &has_property); status != napi_ok) {
         return make_error_code(status);
     }
     if (!has_property) {
-        return std::optional<Value>{std::nullopt};
+        return Maybe<Value>{none()};
     }
     return named_property(k)
         .fmap([](Value&& val) {
-            return std::optional<Value>{std::move(val)};
+            return Maybe<Value>{std::move(val)};
         });
 }
 
@@ -166,26 +166,25 @@ Result<Object> Env::create_object(const ObjectSpec& spec) const noexcept {
     for (const auto& p: spec) {
         const auto& k = p.first;
         const auto& v = p.second;
-        using MaybeRVV = std::optional<Result<Value>>;
-        using MaybeRVO = std::optional<Result<Object>>;
+        using MaybeRVV = Maybe<Result<Value>>;
+        using MaybeRVO = Maybe<Result<Object>>;
         auto mrvv = std::visit(
             util::overloaded {
                 [](const Result<Value>& rv) -> MaybeRVV { return rv; },
-                [](const Value& vv)  -> MaybeRVV { return vv; },
+                [](const Value& vv) -> MaybeRVV { return Result<Value>{vv}; },
                 [](const MaybeRVV& mrvv) { return mrvv; },
-                [](const Object& vv)  -> MaybeRVV { return vv.to_value(); },
+                [](const Object& vv)  -> MaybeRVV { return Result<Value>{vv.to_value()}; },
                 [](const RVO& rv) -> MaybeRVV { return rv.fmap([](const auto& obj) { return obj.to_value(); }); },
                 [](const MaybeRVO& mrvo) -> MaybeRVV {
-                    if (!mrvo.has_value()) {
-                        return std::nullopt;
-                    }
-                    return mrvo->fmap(Object::fmap_to_value);
-                },
+                    return mrvo.fmap([](auto&& rv) {
+                        return rv.fmap(Object::fmap_to_value);
+                    });
+                }
             }, v);
-        if (!mrvv.has_value()) {
+        if (!mrvv.is_some()) {
             continue;
         }
-        auto maybe_err = mrvv.value()
+        auto maybe_err = mrvv.unwrap()
             .bind([&](auto&& vv) { return object.set_named_property(k, vv); });
         if (maybe_err.is_err()) {
             maybe_err.add_context(k + " attribute");
@@ -291,11 +290,11 @@ static napi_value function_wrapper(napi_env inenv, napi_callback_info info) {
     return ret_rvv.unwrap().to_napi();
 }
 
-Result<Value> Env::create_function(Function f, std::optional<std::string_view> maybename) {
+Result<Value> Env::create_function(Function f, Maybe<std::string_view> maybename) {
     napi_value result;
     auto data = std::make_unique<Function>(std::move(f));
-    if (maybename.has_value()) {
-        const auto& name = maybename.value();
+    if (maybename.is_some()) {
+        const auto& name = maybename.unwrap();
         if (auto status = napi_create_function(m_env, name.data(), name.size(), function_wrapper, data.get(), &result); status != napi_ok) {
             return make_error_code(status);
         }
@@ -322,10 +321,10 @@ static napi_value function_getter(napi_env inenv, napi_callback_info info) {
         return nullptr;
     }
     auto& attr = *static_cast<Env::ClassAttr *>(data);
-    if (!attr.getter.has_value()) {
+    if (attr.getter.is_none()) {
         return nullptr;
     }
-    auto ret_rvv = (*attr.getter)(env, ci_info_rvv.unwrap());
+    auto ret_rvv = attr.getter.unwrap()(env, ci_info_rvv.unwrap());
     if (env.maybe_throw_error(ret_rvv)) {
         return nullptr;
     }
@@ -340,10 +339,10 @@ static napi_value function_setter(napi_env inenv, napi_callback_info info) {
         return nullptr;
     }
     auto& attr = *static_cast<Env::ClassAttr *>(data);
-    if (!attr.setter.has_value()) {
+    if (attr.setter.is_none()) {
         return nullptr;
     }
-    auto ret_rvv = (*attr.setter)(env, ci_info_rvv.unwrap());
+    auto ret_rvv = attr.setter.unwrap()(env, ci_info_rvv.unwrap());
     if (env.maybe_throw_error(ret_rvv)) {
         return nullptr;
     }

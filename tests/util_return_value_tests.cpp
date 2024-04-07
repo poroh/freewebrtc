@@ -25,8 +25,6 @@ TEST_F(UtilResultTest, check_value) {
     Result<int> rv(1);
     ASSERT_TRUE(rv.is_ok());
     EXPECT_EQ(rv.unwrap(), 1);
-    ASSERT_TRUE(rv.maybe_value().has_value());
-    EXPECT_EQ(rv.maybe_value().value(), 1);
     EXPECT_FALSE(rv.is_err());
 }
 
@@ -36,7 +34,6 @@ TEST_F(UtilResultTest, check_error) {
     ASSERT_TRUE(rv.is_err());
     EXPECT_EQ(rv.unwrap_err(), ec);
     EXPECT_FALSE(rv.is_ok());
-    EXPECT_FALSE(rv.maybe_value().has_value());
 }
 
 TEST_F(UtilResultTest, rvalue_constructor) {

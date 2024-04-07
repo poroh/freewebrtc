@@ -10,11 +10,11 @@
 
 #include <node_api.h>
 #include <vector>
-#include <optional>
 #include <functional>
 #include <memory>
 #include "util/util_result.hpp"
 #include "util/util_binary_view.hpp"
+#include "util/util_maybe.hpp"
 #include "napi_error.hpp"
 
 namespace freewebrtc::napi {
@@ -29,7 +29,7 @@ public:
     MaybeError set_named_property(const std::string&, const Value&) noexcept;
     Value to_value() const noexcept;
     Result<Value> named_property(const std::string& name) const noexcept;
-    Result<std::optional<Value>> maybe_named_property(const std::string& name) const noexcept;
+    Result<Maybe<Value>> maybe_named_property(const std::string& name) const noexcept;
 
     template<typename T>
     Result<Value> wrap(std::unique_ptr<T> native_obj) const noexcept;
@@ -100,7 +100,7 @@ public:
     using RVO = Result<Object>;
     using RVA = Result<Array>;
 
-    using ValueInit = std::variant<Value, RVV, std::optional<RVV>, Object, RVO, std::optional<RVO>>;
+    using ValueInit = std::variant<Value, RVV, Maybe<RVV>, Object, RVO, Maybe<RVO>>;
     using ObjectSpec = std::vector<std::pair<std::string, ValueInit>>;
     using Function = std::function<RVV(Env& env, const CallbackInfo&)>;
 
@@ -120,12 +120,12 @@ public:
     RVV create_int32(int32_t value) const noexcept;
     RVV create_uint32(int32_t value) const noexcept;
     RVV create_bigint_uint64(uint64_t value) const noexcept;
-    RVV create_function(Function, std::optional<std::string_view> name = std::nullopt);
+    RVV create_function(Function, Maybe<std::string_view> name = None{});
     RVV throw_error(const std::string& message) const noexcept;
 
     struct ClassAttr {
-        std::optional<Function> getter;
-        std::optional<Function> setter;
+        Maybe<Function> getter;
+        Maybe<Function> setter;
     };
     using ClassProperty = std::variant<Function, RVV, ClassAttr>;
     using ClassPropertySpec = std::vector<std::pair<std::string, ClassProperty>>;

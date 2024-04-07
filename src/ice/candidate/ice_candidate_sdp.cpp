@@ -40,25 +40,25 @@ namespace freewebrtc::ice::candidate {
 // ice-char              = ALPHA / DIGIT / "+" / "/"
 Result<SDPAttrParseResult> parse_sdp_attr(std::string_view inv) {
     using SV = std::string_view;
-    using MaybeSV = std::optional<std::string_view>;
+    using MaybeSV = Maybe<std::string_view>;
     auto advance = [](const MaybeSV& v, size_t sz) -> MaybeSV {
-        if (!v.has_value()) {
-            return std::nullopt;
+        if (!v.is_some()) {
+            return none();
         }
-        if (sz > v->size()) {
-            return std::nullopt;
+        if (sz > v.unwrap().size()) {
+            return none();
         }
-        return SV{v->data() + sz, v->size() - sz};
+        return SV{v.unwrap().data() + sz, v.unwrap().size() - sz};
     };
     static constexpr SV prefix("candidate:");
     if (!inv.starts_with(prefix)) {
         return make_error_code(Error::invalid_attr_prefix);
     }
     auto maybev = advance(inv, prefix.size());
-    if (!maybev.has_value()) {
+    if (!maybev.is_some()) {
         return make_error_code(Error::invalid_attr_prefix);
     }
-    auto& v = maybev.value();
+    auto& v = maybev.unwrap();
     auto tstr = util::TokenStream{util::string_view::split_all(v, ' ')};
 
     auto foundation_rv      = tstr.required_bind(Foundation::from_string).add_context("foundation");
@@ -70,15 +70,15 @@ Result<SDPAttrParseResult> parse_sdp_attr(std::string_view inv) {
     auto type_rv = tstr.required("typ")
         .bind([&](auto&&) { return tstr.required_bind(Type::from_string); });
 
-    std::optional<Result<Address>> maybe_raddr;
-    std::optional<Result<net::Port>> maybe_rport;
+    Maybe<Result<Address>> maybe_raddr = none();
+    Maybe<Result<net::Port>> maybe_rport = none();
     Supported::ExtensionVec extensions;
     while (true) {
         auto maybe_att_name = tstr.optional();
-        if (!maybe_att_name.has_value()) {
+        if (maybe_att_name.is_none()) {
             break;
         }
-        auto att_name = maybe_att_name.value();
+        auto att_name = maybe_att_name.unwrap();
         if (att_name == "raddr") {
             maybe_raddr = tstr.required_bind(Address::from_string).add_context("raddr");
         } else if (att_name == "rport") {
@@ -100,8 +100,8 @@ Result<SDPAttrParseResult> parse_sdp_attr(std::string_view inv) {
     // lines that include candidates with FQDNs or IP address versions
     // that are not supported or recognized.
     const auto unsupported = any_is_err(connection_addr_rv, type_rv, transport_rv);
-    if (unsupported.has_value()) {
-        auto error = unsupported.value();
+    if (unsupported.is_err()) {
+        auto error = unsupported.unwrap_err();
         if (connection_addr_rv.is_err()
             || error == make_error_code(Error::unknown_candidate_type)
             || error == make_error_code(Error::unknown_transport_type)) {
@@ -109,17 +109,17 @@ Result<SDPAttrParseResult> parse_sdp_attr(std::string_view inv) {
         }
     }
 
-    using MaybeAddr = std::optional<Address>;
+    using MaybeAddr = Maybe<Address>;
     using MaybeAddrRV = Result<MaybeAddr>;
-    MaybeAddrRV maybe_raddr_rv =  maybe_raddr.has_value()
-        ? std::move(maybe_raddr.value()).fmap([](auto&& addr) { return MaybeAddr{std::move(addr)}; })
-        : MaybeAddrRV{std::nullopt};
+    MaybeAddrRV maybe_raddr_rv =  maybe_raddr.is_some()
+        ? std::move(maybe_raddr.unwrap()).fmap([](auto&& addr) { return MaybeAddr{addr}; })
+        : MaybeAddrRV{none()};
 
-    using MaybePort = std::optional<net::Port>;
+    using MaybePort = Maybe<net::Port>;
     using MaybePortRV = Result<MaybePort>;
-    MaybePortRV maybe_rport_rv =  maybe_rport.has_value()
-        ? maybe_rport.value().fmap([](auto&& port) { return MaybePort{port}; })
-        : MaybePortRV{std::nullopt};
+    MaybePortRV maybe_rport_rv =  maybe_rport.is_some()
+        ? maybe_rport.unwrap().fmap([](auto&& port) { return MaybePort{port}; })
+        : MaybePortRV{none()};
 
     return combine([](
             auto&& f, auto&& cid, auto& t, auto&& p,
