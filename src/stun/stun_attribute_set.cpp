@@ -162,95 +162,130 @@ Result<util::ByteVec> AttributeSet::build(const Header& header, const MaybeInteg
     Maybe<util::ByteVec> unknown_attributes_data = none();
     Maybe<util::ByteVec> altenate_server_data = none();
 
+    using ByteVecRef = std::reference_wrapper<Maybe<util::ByteVec>>;
+
     for (const auto& p: m_map) {
         const auto type = p.first.value();
+        using VisitorResult = Maybe<ByteVecRef>;
         std::visit(
             util::overloaded {
-                [&](const UsernameAttribute& a) {
+                [&](const UsernameAttribute& a) -> VisitorResult {
                     const auto& username = a.name.value;
                     add_attr(type, util::ConstBinaryView(username.data(), username.size()));
+                    return none();
                 },
-                [&](const SoftwareAttribute& a) {
+                [&](const SoftwareAttribute& a) -> VisitorResult {
                     add_attr(type, util::ConstBinaryView(a.name.data(), a.name.size()));
+                    return none();
                 },
-                [&](const XorMappedAddressAttribute& a) {
+                [&](const XorMappedAddressAttribute& a) -> VisitorResult {
                     xor_mapped_data = a.build();
-                    add_attr(type, util::ConstBinaryView(xor_mapped_data.unwrap()));
+                    return std::ref(xor_mapped_data);
                 },
-                [&](const MappedAddressAttribute& a) {
+                [&](const MappedAddressAttribute& a) -> VisitorResult  {
                     mapped_data = a.build();
-                    add_attr(type, util::ConstBinaryView(mapped_data.unwrap()));
+                    return std::ref(mapped_data);
                 },
-                [&](const PriorityAttribute& a) {
+                [&](const PriorityAttribute& a) -> VisitorResult {
                     prio = util::host_to_network_u32(a.priority);
                     add_attr(type, util::ConstBinaryView(&prio, sizeof(prio)));
+                    return none();
                 },
-                [&](const IceControllingAttribute& a) {
+                [&](const IceControllingAttribute& a) -> VisitorResult {
                     ice_controlling = util::host_to_network_u64(a.tiebreaker);
                     add_attr(type, util::ConstBinaryView(&ice_controlling, sizeof(ice_controlling)));
+                    return none();
                 },
-                [&](const IceControlledAttribute& a) {
+                [&](const IceControlledAttribute& a) -> VisitorResult {
                     ice_controlled = util::host_to_network_u64(a.tiebreaker);
                     add_attr(type, util::ConstBinaryView(&ice_controlled, sizeof(ice_controlled)));
+                    return none();
                 },
-                [&](const UseCandidateAttribute&) {
+                [&](const UseCandidateAttribute&) -> VisitorResult {
                     add_attr(type, util::ConstBinaryView(&padding, 0));
+                    return none();
                 },
-                [&](const ErrorCodeAttribute& ec) {
+                [&](const ErrorCodeAttribute& ec) -> VisitorResult {
                     error_code_data = ec.build();
-                    add_attr(type, util::ConstBinaryView(error_code_data.unwrap()));
+                    return std::ref(error_code_data);
                 },
-                [&](const UnknownAttributesAttribute& a) {
+                [&](const UnknownAttributesAttribute& a) -> VisitorResult {
                     unknown_attributes_data = a.build();
-                    add_attr(type, util::ConstBinaryView(unknown_attributes_data.unwrap()));
+                    return std::ref(unknown_attributes_data);
                 },
-                [&](const AlternateServerAttribute& a) {
+                [&](const AlternateServerAttribute& a) -> VisitorResult {
                     altenate_server_data = a.build();
-                    add_attr(type, util::ConstBinaryView(altenate_server_data.unwrap()));
+                    return std::ref(altenate_server_data);
                 },
-                [&](const MessageIntegityAttribute&) { /* Do not add integrity here */ },
-                [&](const FingerprintAttribute&) { /* Do not add fingerprint here */ }
+                [&](const MessageIntegityAttribute&) -> VisitorResult {
+                    // Do not add integrity here
+                    return none();
+                },
+                [&](const FingerprintAttribute&) -> VisitorResult {
+                    // Do not add fingerprint here
+                    return none();
+                }
             },
-            p.second.value());
+            p.second.value())
+            .fmap([&](const ByteVecRef& bvref) {
+                return bvref.get()
+                    .fmap([&](const util::ByteVec& vec) {
+                        add_attr(type, util::ConstBinaryView(vec));
+                        return Unit{};
+                    })
+                    .value_or(Unit{});
+            });
     }
 
     for (const auto& unknown: m_unknown) {
         add_attr(unknown.type.value(), util::ConstBinaryView(unknown.data));
     }
 
-    // Add message integrity with dummy content (if exist in m_map);
+
     Maybe<Result<MessageIntegityAttribute::Digest>> maybe_integrity_digest_rv = none();
-    if (maybe_integrity.is_some()) {
-        const auto& h = maybe_integrity.unwrap().hash;
-        const auto& p = maybe_integrity.unwrap().password;
+    auto add_integrity = [&](auto&& integrity) -> MaybeError {
+        const auto& h = integrity.hash;
+        const auto& p = integrity.password;
         auto fake_header = header.build(total_size + details::STUN_ATTR_HEADER_SIZE + crypto::SHA1Hash::size);
         result[0] = util::ConstBinaryView(fake_header);
         maybe_integrity_digest_rv = crypto::hmac::digest(result, p.opad(), p.ipad(), h);
-        auto maybe_err = maybe_integrity_digest_rv.unwrap()
-            .fmap([&](auto&& integrity_digest) {
-                add_attr(attr_registry::MESSAGE_INTEGRITY, util::ConstBinaryView(integrity_digest.value.value()));
-                return Unit{};
-            });
-        if (maybe_err.is_err()) {
-            // Just adjust return type (fmap function never called);
-            return maybe_err.fmap([](auto&&) { return util::ByteVec{}; });
-        }
-    }
+        return maybe_integrity_digest_rv
+            .fmap([&](auto&& integrity_digest_rv) -> MaybeError {
+                return integrity_digest_rv.
+                    fmap([&](auto&& integrity_digest) {
+                        add_attr(attr_registry::MESSAGE_INTEGRITY, util::ConstBinaryView(integrity_digest.value.value()));
+                        return Unit{};
+                    });
+            })
+            .value_or(success());
+    };
 
     util::ByteVec real_header;
     uint32_t fingerprint_data = 0;
-    if (m_map.find(AttributeType::from_uint16(attr_registry::FINGERPRINT)) != m_map.end()) {
+    auto add_fingerprint = [&]() {
         static_assert(sizeof(fingerprint_data) == details::FINGERPRINT_CRC_SIZE);
         real_header = header.build(total_size + details::FINGERPRINT_CRC_SIZE + details::STUN_ATTR_HEADER_SIZE);
         result[0] = util::ConstBinaryView(real_header);
         const auto fp = crc32(result) ^ FINGERPRINT_XOR;
         fingerprint_data = util::host_to_network_u32(fp);
         add_attr(attr_registry::FINGERPRINT, util::ConstBinaryView(&fingerprint_data, sizeof(fingerprint_data)));
-    } else {
+    };
+    auto no_fingerprint = [&]() {
         real_header = header.build(total_size);
         result[0] = util::ConstBinaryView(real_header);
-    }
-    return util::ConstBinaryView::concat(result);
+    };
+
+    return maybe_integrity
+        .fmap(add_integrity)
+        .value_or(success())
+        .bind([&](auto&&) -> Result<util::ByteVec> {
+            if (m_map.find(AttributeType::from_uint16(attr_registry::FINGERPRINT)) != m_map.end()) {
+                add_fingerprint();
+            } else {
+                no_fingerprint();
+            }
+            return util::ConstBinaryView::concat(result);
+        });
 }
 
 }

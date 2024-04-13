@@ -26,6 +26,7 @@ public:
     Process5xxResult process_5xx(Timepoint, int code);
     Duration last_timeout() const;
 private:
+    std::pair<MaybeTimepoint, Duration> calc_next(Timepoint now) const noexcept;
     const Duration m_initial_rto;
     const Settings::RetransmitDefault m_settings;
     MaybeTimepoint m_maybe_next;
@@ -83,15 +84,15 @@ ClientUDP::Effect ClientUDP::next(Timepoint now) {
         m_tid_timeline.pop();
         if (auto it = m_tmap.find(hnd); it != m_tmap.end()) {
             auto& t = it->second;
-            if (auto next = t.rtx_algo->next(now); next.is_some()) {
-                m_stat.retransmits.inc();
-                t.rtx_count++;
-                m_tid_timeline.emplace(std::make_pair(next.unwrap(), hnd));
-                m_effects.emplace(SendData{hnd, util::ConstBinaryView(t.msg_data)});
-            } else {
-                auto reason = TransactionFailed::Timeout{};
-                m_effects.emplace(TransactionFailed{hnd, reason});
-            }
+            auto se = t.rtx_algo->next(now)
+                .fmap([&](auto&& next) -> Effect {
+                    m_stat.retransmits.inc();
+                    t.rtx_count++;
+                    m_tid_timeline.emplace(std::make_pair(next, hnd));
+                    return SendData{hnd, util::ConstBinaryView(t.msg_data)};
+                })
+                .value_or(TransactionFailed{hnd, TransactionFailed::Timeout{}});
+            m_effects.emplace(std::move(se));
         } // When not found transaction were cleaned before.
     }
     if (!m_effects.empty()) {
@@ -168,12 +169,11 @@ Result<ClientUDP::Handle> ClientUDP::do_create(Timepoint now, TransactionId&& ti
         none()
     };
 
-    MaybeIntegrity maybe_integrity = none();
-    if (rq.maybe_auth.is_some()) {
-        const auto& auth = rq.maybe_auth.unwrap();
-        request.attribute_set.emplace(Attribute::create(UsernameAttribute{auth.username}));
-        maybe_integrity = auth.integrity;
-    }
+    MaybeIntegrity maybe_integrity = rq.maybe_auth
+        .fmap([&](auto&& auth) {
+            request.attribute_set.emplace(Attribute::create(UsernameAttribute{auth.username}));
+            return auth.integrity;
+        });
 
     if (m_settings.use_fingerprint) {
         request.attribute_set.emplace(Attribute::create(FingerprintAttribute{0}));
@@ -196,9 +196,11 @@ Result<ClientUDP::Handle> ClientUDP::do_create(Timepoint now, TransactionId&& ti
             auto [it, _] = m_tmap.emplace(handle, std::move(transaction));
             auto& t = it->second;
             m_effects.emplace(SendData{handle, util::ConstBinaryView(t.msg_data)});
-            if (auto maybe_timepoint = t.rtx_algo->init(now); maybe_timepoint.is_some()) {
-                m_tid_timeline.emplace(maybe_timepoint.unwrap(), handle);
-            }
+            t.rtx_algo->init(now)
+                .fmap([&](auto&& timepoint) {
+                    m_tid_timeline.emplace(timepoint, handle);
+                    return Unit{};
+                });
             m_stat.started.inc();
             return handle;
         });
@@ -226,31 +228,36 @@ MaybeError ClientUDP::handle_success_response(Timepoint now, Transaction& t, Mes
         // TLDR; Two ideas:
         //   1. Don't use RTT calculated based on retransmit
         //   2. Maintain back-off RTO when send next packet
-        maybe_rtt = now - t.create_time;
-        m_rto_calc->new_rtt(now, t.path, maybe_rtt.unwrap());
+        auto rtt = now - t.create_time;
+        maybe_rtt = rtt;
+        m_rto_calc->new_rtt(now, t.path, rtt);
     } else {
         m_rto_calc->backoff(now, t.path, t.rtx_algo->last_timeout());
     }
 
-    if (const auto& maybe_xor_mapped = msg.attribute_set.xor_mapped(); maybe_xor_mapped.is_some()) {
-        m_stat.success.inc();
-        auto& xor_mapped = maybe_xor_mapped.unwrap().get();
-        net::UdpEndpoint ep{xor_mapped.addr.to_address(msg.header.transaction_id), xor_mapped.port};
-        m_effects.emplace(TransactionOk{t.hnd, std::move(ep), std::move(msg), maybe_rtt});
-        return success();
-    }
+    auto effect = msg.attribute_set.xor_mapped()
+        .fmap([&](auto&& xor_mapped_ref) -> Effect {
+            m_stat.success.inc();
+            auto& xor_mapped = xor_mapped_ref.get();
+            net::UdpEndpoint ep{xor_mapped.addr.to_address(msg.header.transaction_id), xor_mapped.port};
+            return TransactionOk{t.hnd, std::move(ep), std::move(msg), maybe_rtt};
+        })
+        .value_or_call([&] {
+            return msg.attribute_set.mapped()
+                .fmap([&](auto&& mapped_ref) -> Effect {
+                    m_stat.success.inc();
+                    auto& mapped = mapped_ref.get();
+                    net::UdpEndpoint ep{mapped.addr, mapped.port};
+                    return TransactionOk{t.hnd, std::move(ep), std::move(msg), maybe_rtt};
+                })
+                .value_or_call([&]() -> Effect {
+                    m_stat.no_mapped_address.inc();
+                    auto reason = TransactionFailed::Error{make_error_code(ClientError::no_address_in_response)};
+                    return TransactionFailed{t.hnd, std::move(reason)};
+                });
+        });
+    m_effects.emplace(effect);
 
-    if (const auto& maybe_mapped = msg.attribute_set.mapped(); maybe_mapped.is_some()) {
-        m_stat.success.inc();
-        auto& mapped = maybe_mapped.unwrap().get();
-        net::UdpEndpoint ep{mapped.addr, mapped.port};
-        m_effects.emplace(TransactionOk{t.hnd, std::move(ep), std::move(msg), maybe_rtt});
-        return success();
-    }
-
-    m_stat.no_mapped_address.inc();
-    auto reason = TransactionFailed::Error{make_error_code(ClientError::no_address_in_response)};
-    m_effects.emplace(TransactionFailed{t.hnd, std::move(reason)});
     return success();
 }
 
@@ -412,31 +419,20 @@ ClientUDP::MaybeTimepoint ClientUDP::RetransmitAlgo::init(Timepoint now) {
 }
 
 ClientUDP::MaybeTimepoint ClientUDP::RetransmitAlgo::next(Timepoint now) {
-    if (!m_maybe_next.is_some() || now.is_before(m_maybe_next.unwrap())) {
-        return m_maybe_next;
-    }
-    if (m_rtx_count + 1 >= m_settings.request_count + m_5xx_count) {
-        m_maybe_next = none();
-        return m_maybe_next;
-    }
-    ++m_rtx_count;
-    if (m_rtx_count + 1 == m_settings.request_count) {
-        auto timeout = m_initial_rto * m_settings.retransmission_multiplier;
-        if (m_settings.max_rto.is_some()) {
-            timeout = std::max(timeout, m_settings.max_rto.unwrap());
+    bool time_for_next = m_maybe_next
+        .fmap([&](auto&& next) {
+            return !now.is_before(next);
+        })
+        .value_or(false);
+    if (time_for_next) {
+        auto [maybe_next, timeout] = calc_next(now);
+        m_maybe_next = maybe_next;
+        if (maybe_next.is_some()) {
+            ++m_rtx_count;
+            m_last_timeout = timeout;
         }
-        m_last_timeout = timeout;
-        m_maybe_next = now.advance(timeout);
-        return m_maybe_next;
-    } else {
-        auto timeout = m_last_timeout * 2;
-        if (m_settings.max_rto.is_some()) {
-            timeout = std::max(timeout, m_settings.max_rto.unwrap());
-        }
-        m_last_timeout = timeout;
-        m_maybe_next = now.advance(timeout);
-        return m_maybe_next;
     }
+    return m_maybe_next;
 }
 
 ClientUDP::RetransmitAlgo::Process5xxResult
@@ -457,6 +453,22 @@ ClientUDP::RetransmitAlgo::process_5xx(Timepoint now, int) {
 
 ClientUDP::Duration ClientUDP::RetransmitAlgo::last_timeout() const {
     return m_last_timeout;
+}
+
+std::pair<ClientUDP::MaybeTimepoint, client_udp::Duration> ClientUDP::RetransmitAlgo::calc_next(Timepoint now) const noexcept {
+    if (m_rtx_count + 1 >= m_settings.request_count + m_5xx_count) {
+        return std::make_pair(none(), Duration(0));
+    }
+    auto current = m_rtx_count + 2 == m_settings.request_count
+        ? m_initial_rto * m_settings.retransmission_multiplier
+        : m_last_timeout * 2;
+
+    auto timeout = m_settings.max_rto
+        .fmap([&](auto&& settings_max_rto) {
+            return std::max(current, settings_max_rto);
+        })
+        .value_or(current);
+    return std::make_pair(now.advance(timeout), timeout);
 }
 
 }

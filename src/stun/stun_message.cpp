@@ -186,37 +186,45 @@ Result<Maybe<bool>> Message::is_valid(const util::ConstBinaryView& data, const I
     const auto& h = idata.hash;
     const auto& password = idata.password;
     using MaybeBool = Maybe<bool>;
-    if (!integrity_interval.is_some()) {
-        return MaybeBool{none()};
-    }
-    const auto maybe_covered = data.subview(integrity_interval.unwrap());
-    if (maybe_covered.is_none()) {
-        return MaybeBool{none()};
-    }
+
+    using View = util::ConstBinaryView;
+    using DigestRef = std::reference_wrapper<const MessageIntegityAttribute::Digest>;
+    struct Data {
+        DigestRef digest;
+        View without_4byte_header;
+        size_t integrity_message_len;
+    };
     const auto maybe_integrity = attribute_set.integrity();
-    if (maybe_integrity.is_none()) {
-        return MaybeBool{none()};
-    }
-    const auto& integrity = maybe_integrity.unwrap();
-    const auto& covered = maybe_covered.unwrap();
-    const auto without_4byte_header = covered.subview(4);
-    if (!without_4byte_header.is_some()) {
-        return MaybeBool{none()};
-    }
-    const size_t integrity_message_len = covered.size() + STUN_ATTR_HEADER_SIZE + crypto::SHA1Hash::size - STUN_HEADER_SIZE;
-    // Fake header for integrity checking:
-    std::array<uint8_t, 4> header =
-        {
-            data.data()[0],
-            data.data()[1],
-            uint8_t((integrity_message_len >> 8) & 0xFF),
-            uint8_t(integrity_message_len & 0xFF)
-        };
-    return crypto::hmac::digest({util::ConstBinaryView(header), without_4byte_header.unwrap()}, password.opad(), password.ipad(), h)
-        .fmap([&](auto&& digest) {
-            return MaybeBool{digest.value == integrity.get().value};
-        });
+    size_t integrity_message_len = 0;
+    return integrity_interval
+        .bind([&](auto&& ii) {
+            return data.subview(ii);
+        })
+        .bind([&](util::ConstBinaryView c) {
+            integrity_message_len = c.size() + STUN_ATTR_HEADER_SIZE + crypto::SHA1Hash::size - STUN_HEADER_SIZE;
+            return c.subview(4);
+        })
+        .bind([&](auto&& w) {
+            return maybe_integrity.fmap([&](const DigestRef& i) {
+                return Data{i, w, integrity_message_len};
+            });
+        })
+        .fmap([&](const Data& d) -> Result<Maybe<bool>> {
+            // Fake header for integrity checking:
+            std::array<uint8_t, 4> header = {
+                data.data()[0],
+                data.data()[1],
+                uint8_t((d.integrity_message_len >> 8) & 0xFF),
+                uint8_t(d.integrity_message_len & 0xFF)
+            };
+            return crypto::hmac::digest({util::ConstBinaryView(header), d.without_4byte_header}, password.opad(), password.ipad(), h)
+                .fmap([&](auto&& digest) {
+                    return MaybeBool{digest.value == d.digest.get().value};
+                });
+        })
+        .value_or(Result<MaybeBool>{none()});
 }
+
 
 Result<util::ByteVec> Message::build(const MaybeIntegrity& maybeintegrity) const noexcept {
     return attribute_set.build(header, maybeintegrity);
