@@ -89,8 +89,8 @@ Stateless::ProcessResult Stateless::process_request(const net::Endpoint& ep, Mes
     }
 
     MaybeIntegrity maybe_integrity_data = none();
-    if (maybe_username.is_some()) {
-        const auto& username = maybe_username.unwrap().get();
+    using R = Stateless::ProcessResult;
+    auto check_auth = [&](auto&& username) -> Maybe<R> {
         const auto user_password_pair_it = m_users.find(username);
         if (user_password_pair_it == m_users.end()) {
             // If the USERNAME does not contain a username value currently valid
@@ -99,7 +99,7 @@ Stateless::ProcessResult Stateless::process_request(const net::Endpoint& ep, Mes
             // *  If the message is a request, the server MUST reject the request
             //    with an error response.  This response MUST use an error code
             //    of 401 (Unauthorized).
-            return Respond{create_error(msg, ErrorCodeAttribute::Code::Unauthorized), std::move(msg), none()};
+            return R{Respond{create_error(msg, ErrorCodeAttribute::Code::Unauthorized), std::move(msg), none()}};
         }
         // Using the password associated with the username, compute the value
         // for the message integrity as described in Section 15.4.  If the
@@ -109,51 +109,60 @@ Stateless::ProcessResult Stateless::process_request(const net::Endpoint& ep, Mes
         // *  If the message is a request, the server MUST reject the request
         //    with an error response.  This response MUST use an error code
         //    of 401 (Unauthorized).
-        maybe_integrity_data = IntegrityData{user_password_pair_it->second, m_sha1};
-        const auto maybe_is_valid_rv = msg.is_valid(view, maybe_integrity_data.unwrap());
-        if (maybe_is_valid_rv.is_err()) {
-            return Error{maybe_is_valid_rv.unwrap_err()};
-        }
-        const auto maybe_is_valid = maybe_is_valid_rv.unwrap();
-        if (maybe_is_valid.is_some() && !maybe_is_valid.unwrap()) {
-            return Respond{create_error(msg, ErrorCodeAttribute::Code::Unauthorized), std::move(msg), none()};
-        }
-    }
+        IntegrityData idata{user_password_pair_it->second, m_sha1};
+        return msg.is_valid(view, idata).fmap(
+            [&](Maybe<bool> maybe_is_valid) -> Maybe<R> {
+                return maybe_is_valid
+                    .bind([&](bool is_valid) -> Maybe<R> {
+                        if (!is_valid) {
+                            return R{Respond{create_error(msg, ErrorCodeAttribute::Code::Unauthorized), std::move(msg), none()}};
+                        }
+                        maybe_integrity_data = std::move(idata);
+                        return none();
+                    });
+            }).bind_err([&](auto&& err) -> Result<Maybe<R>> {
+                return Result<Maybe<R>>{R{Error{std::move(err)}}};
+            }).unwrap_or(none());
+    };
 
-    if (msg.header.method == Method::binding()) {
-        Header header {
-            Class::success_response(),
-            msg.header.method,
-            TransactionId(msg.header.transaction_id.view())
-        };
-        AttributeSet attrset;
-        if (!msg.is_rfc3489 && m_settings.use_fingerprint) {
-            attrset.emplace(Attribute::create(FingerprintAttribute{0}));
-        }
-        if (!msg.is_rfc3489) {
-            auto xored_addr = XoredAddress::from_address(ep.address(), msg.header.transaction_id);
-            attrset.emplace(Attribute::create(XorMappedAddressAttribute{xored_addr, ep.port()}));
-        } else {
-            // Normative:
-            // When the server detects an RFC 3489 client, it SHOULD
-            // copy the value seen in the magic cookie field in the
-            // Binding request to the magic cookie field in the
-            // Binding response message, and1 insert a MAPPED-ADDRESS
-            // attribute instead of an XOR-MAPPED-ADDRESS attribute.
-            attrset.emplace(Attribute::create(MappedAddressAttribute{ep.address(), ep.port()}));
-        }
-        return Respond{
-            Message {
-                std::move(header),
-                attrset,
-                msg.is_rfc3489,
-                none()
-            },
-            std::move(msg),
-            maybe_integrity_data
-        };
-    }
-    return Ignore{.message = std::move(msg)};
+    return maybe_username
+        .bind(check_auth)
+        .value_or_call([&]() -> Stateless::ProcessResult {
+            if (msg.header.method != Method::binding()) {
+                return Ignore{.message = std::move(msg)};
+            }
+            Header header {
+                Class::success_response(),
+                msg.header.method,
+                TransactionId(msg.header.transaction_id.view())
+            };
+            AttributeSet attrset;
+            if (!msg.is_rfc3489 && m_settings.use_fingerprint) {
+                attrset.emplace(Attribute::create(FingerprintAttribute{0}));
+            }
+            if (!msg.is_rfc3489) {
+                auto xored_addr = XoredAddress::from_address(ep.address(), msg.header.transaction_id);
+                attrset.emplace(Attribute::create(XorMappedAddressAttribute{xored_addr, ep.port()}));
+            } else {
+                // Normative:
+                // When the server detects an RFC 3489 client, it SHOULD
+                // copy the value seen in the magic cookie field in the
+                // Binding request to the magic cookie field in the
+                // Binding response message, and1 insert a MAPPED-ADDRESS
+                // attribute instead of an XOR-MAPPED-ADDRESS attribute.
+                attrset.emplace(Attribute::create(MappedAddressAttribute{ep.address(), ep.port()}));
+            }
+            return Respond{
+                Message {
+                    std::move(header),
+                    attrset,
+                    msg.is_rfc3489,
+                    none()
+                },
+                std::move(msg),
+                maybe_integrity_data
+            };
+        });
 }
 
 }

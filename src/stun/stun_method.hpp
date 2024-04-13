@@ -21,6 +21,7 @@ public:
     uint16_t to_msg_type() const noexcept;
 
     bool operator==(const Method&) const noexcept = default;
+    bool operator!=(const Method&) const noexcept = default;
 private:
     explicit Method(unsigned);
     unsigned m_value;

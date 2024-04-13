@@ -11,6 +11,7 @@
 #include <memory>
 
 #include "util/util_result.hpp"
+#include "util/util_reduce.hpp"
 #include "crypto/openssl/openssl_hash.hpp"
 #include "crypto/openssl/openssl_error.hpp"
 
@@ -52,12 +53,12 @@ template<typename Hash>
 typename Hash::Result MessageDigest::calc(const typename Hash::Input& input) {
     typename Hash::Value v;
     return init()
-        .bind([&](auto&&) -> MaybeError {
-            for (const auto& chunk: input) {
-                if (auto maybe_err = update(chunk); maybe_err.is_err()) {
-                    return maybe_err.unwrap_err();
-                }
-            }
+        .bind([&](auto&&) {
+            return util::reduce(input.begin(), input.end(), [&](auto&& next) {
+                return update(next);
+            });
+        })
+        .bind([&](auto&&) {
             return finalize(v.data());
         })
         .fmap([&](auto&&) {

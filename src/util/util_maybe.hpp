@@ -35,6 +35,8 @@ using None = util::TaggedType<Unit, NoneTag>;
 template<typename T>
 class Maybe {
 public:
+    using Value = T;
+
     Maybe(T&& some);
     Maybe(const T&);
     Maybe(const None&);
@@ -63,6 +65,12 @@ public:
     template<typename F>
     auto fmap(F&& f) && -> Maybe<std::invoke_result_t<F, T&&>>;
 
+    template<typename F>
+    auto bind(F&& f) & -> Maybe<typename std::invoke_result_t<F, T&>::Value>;
+    template<typename F>
+    auto bind(F&& f) const& -> Maybe<typename std::invoke_result_t<F, const T&>::Value>;
+    template<typename F>
+    auto bind(F&& f) && -> Maybe<typename std::invoke_result_t<F, T&&>::Value>;
 
 private:
     std::variant<T, None> m_value;
@@ -166,6 +174,34 @@ auto Maybe<T>::fmap(F&& f) && -> Maybe<std::invoke_result_t<F, T&&>> {
     using ResultT = std::invoke_result_t<F, T&&>;
     return Maybe<ResultT>{f(std::get<T>(std::move(m_value)))};
 }
+
+template<typename T>
+template<typename F>
+auto Maybe<T>::bind(F&& f) & -> Maybe<typename std::invoke_result_t<F, T&>::Value> {
+    if (is_none()) {
+        return none();
+    }
+    return f(unwrap());
+}
+
+template<typename T>
+template<typename F>
+auto Maybe<T>::bind(F&& f) const& -> Maybe<typename std::invoke_result_t<F, const T&>::Value> {
+    if (is_none()) {
+        return none();
+    }
+    return f(unwrap());
+}
+
+template<typename T>
+template<typename F>
+auto Maybe<T>::bind(F&& f) && -> Maybe<typename std::invoke_result_t<F, T&&>::Value> {
+    if (is_none()) {
+        return none();
+    }
+    return f(std::get<Value>(std::move(m_value)));
+}
+
 
 inline None none() noexcept {
     return None{};
