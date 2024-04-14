@@ -22,19 +22,22 @@ Result<stun::client_udp::Settings> client_udp_settings_from_napi(napi::Object ob
     Result<MaybeBool> maybe_use_fingerprint_rv
         = (obj.maybe_named_property("use_fingerprint")
            > [](auto&& maybe_v) {
-               if (maybe_v.is_none()) {
-                   return Result<MaybeBool>{none()};
-               }
-               return maybe_v.unwrap().as_boolean()
-                   > [](const bool& v) { return MaybeBool{v}; };
+               return maybe_v
+                   .fmap([](auto&& v) {
+                       return v.as_boolean()
+                           > [](const bool& v) { return MaybeBool{v}; };
+                   })
+                   .value_or(Result<MaybeBool>{none()});
            }).add_context("use_fingerprint attibute");
 
     return combine(
         [](auto&& maybe_use_fingerprint) -> Result<stun::client_udp::Settings> {
             stun::client_udp::Settings result;
-            if (maybe_use_fingerprint.is_some()) {
-                result.use_fingerprint = Settings::UseFingerprint{maybe_use_fingerprint.unwrap()};
-            }
+            result.use_fingerprint = maybe_use_fingerprint
+                .fmap([](auto&& v) {
+                    return Settings::UseFingerprint{v};
+                })
+                .value_or(result.use_fingerprint);
             return result;
         }
         , std::move(maybe_use_fingerprint_rv))
