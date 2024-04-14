@@ -12,10 +12,33 @@
 #include "stun/details/stun_fingerprint.hpp"
 #include "stun/details/stun_constants.hpp"
 #include "util/util_variant_overloaded.hpp"
+#include "util/util_result.hpp"
+#include "util/util_reduce.hpp"
 #include <iostream>
 
 namespace freewebrtc::stun {
 
+class RawAttr {
+public:
+    static Result<RawAttr> parse(util::ConstBinaryView vv, size_t offset);
+    uint16_t type() const noexcept;
+    util::ConstBinaryView value() const noexcept;
+    size_t aligned_length() const noexcept;
+
+private:
+    RawAttr(uint16_t type, uint16_t length, util::ConstBinaryView value);
+    uint16_t m_type;
+    uint16_t m_length;
+    util::ConstBinaryView m_value;
+};
+
+struct ParseAttrsResult {
+    std::vector<Attribute::ParseResult> attrs;
+    Maybe<util::ConstBinaryView::Interval> maybe_integrity_interval;
+    Maybe<util::ConstBinaryView::Interval> maybe_fingerprint_interval;
+};
+
+Result<ParseAttrsResult> parse_attrs(util::ConstBinaryView vv, size_t attr_offset, ParseStat& stat);
 
 Result<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& stat) {
     using namespace details;
@@ -68,80 +91,39 @@ Result<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& stat)
                     : vv.assured_subview(4, TRANSACTION_ID_SIZE_RFC3489);
 
     AttributeSet attrs;
-    Maybe<util::ConstBinaryView::Interval> integrity_interval = none();
-    size_t attr_offset = STUN_HEADER_SIZE;
-    while (attr_offset < vv.size()) {
-        // 0                   1                   2                   3
-        // 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-        // |         Type                  |            Length             |
-        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-        // |                         Value (variable)                ....
-        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-        const auto type_rv = vv.read_u16be(attr_offset).require();
-        const auto length_rv = vv.read_u16be(attr_offset + 2).require();
-        // The value in the length field MUST contain the length of the Value
-        // part of the attribute, prior to padding, measured in bytes.
-        const auto attr_view_rv =
-            length_rv.bind([&](auto&& length) {
-                return vv.subview(attr_offset + sizeof(uint32_t), length).require();
-            });
-        if (any_is_err(type_rv, length_rv, attr_view_rv).is_err()) {
-            stat.error.inc();
-            stat.invalid_attr_size.inc();
-            return make_error_code(ParseError::invalid_attr_size);
-        }
-        const auto type = type_rv.unwrap();
-        const auto attr_view = attr_view_rv.unwrap();
-        const auto length = length_rv.unwrap();
-        // Since STUN aligns attributes on 32-bit boundaries, attributes whose content
-        // is not a multiple of 4 bytes are padded with 1, 2, or 3 bytes of
-        // padding so that its value contains a multiple of 4 bytes.  The
-        // padding bits are ignored, and may be any value.
-        const auto align = length % sizeof(uint32_t) == 0 ? 0 : 1;
-        const auto align_length = (length / sizeof(uint32_t) + align) * sizeof(uint32_t);
-
-        const auto attr_type = AttributeType::from_uint16(type);
-        const auto next_attr_offset = attr_offset + align_length + STUN_ATTR_HEADER_SIZE;
-        // RFC5389:
-        // 15.4.  MESSAGE-INTEGRITY
-        // With the exception of the FINGERPRINT attribute, which
-        // appears after MESSAGE-INTEGRITY, agents MUST ignore all
-        // other attributes that follow MESSAGE-INTEGRITY.
-        if (integrity_interval.is_some() && type != attr_registry::FINGERPRINT) {
-            attr_offset = next_attr_offset;
-            continue;
-        }
-        auto attr_rv = Attribute::parse(attr_view, attr_type, stat);
-        if (attr_rv.is_err()) {
-            // statisitics is increased by Attribute::parse.
-            return attr_rv.unwrap_err();
-        }
-        const auto maybe_error =
-            std::visit(
-                util::overloaded {
-                    [&](UnknownAttribute&& attr) {
-                        attrs.emplace(std::move(attr));
-                        return success();
-                    },
-                    [&](Attribute&& attr) -> MaybeError {
-                        if (attr.as<MessageIntegityAttribute>() != nullptr) {
-                            // 15.4.  MESSAGE-INTEGRITY
-                            // The text used as input to HMAC is the STUN message,
-                            // including the header, up to and including the
-                            // attribute preceding the MESSAGE-INTEGRITY
-                            // attribute.
-                            integrity_interval = util::ConstBinaryView::Interval{0, attr_offset};
-                        }
-                        if (const auto *fingerprint = attr.as<FingerprintAttribute>(); fingerprint != nullptr) {
-                            // 15.5.  FINGERPRINT
-                            // When present, the FINGERPRINT attribute MUST be the last attribute in
-                            // the message, and thus will appear after MESSAGE-INTEGRITY.
-                            if (next_attr_offset < vv.size()) {
-                                stat.error.inc();
-                                stat.fingerprint_not_last.inc();
-                                return make_error_code(ParseError::fingerprint_is_not_last);
+    Maybe<util::ConstBinaryView::Interval> maybe_integrity_interval = none();
+    Maybe<util::ConstBinaryView::Interval> maybe_fingerprint_interval = none();
+    Maybe<uint32_t> fingerprint_value = none();
+    return parse_attrs(vv, STUN_HEADER_SIZE, stat)
+        .bind([&](ParseAttrsResult&& r) {
+            maybe_integrity_interval = r.maybe_integrity_interval;
+            maybe_fingerprint_interval = r.maybe_fingerprint_interval;
+            return util::reduce(r.attrs.begin(), r.attrs.end(), [&](auto&& pr) {
+                return std::visit(
+                    util::overloaded {
+                        [&](UnknownAttribute&& attr) {
+                            attrs.emplace(std::move(attr));
+                            return success();
+                        },
+                        [&](Attribute&& attr) -> MaybeError {
+                            if (const auto *fingerprint = attr.as<FingerprintAttribute>(); fingerprint != nullptr) {
+                                fingerprint_value = fingerprint->crc32;
                             }
+                            attrs.emplace(std::move(attr));
+                            return success();
+                        }
+                 }, std::move(pr));
+            });
+        })
+        .bind([&](auto&&) -> MaybeError {
+            // check fingerprint if among attributes
+            auto fingerprint_is_valid = fingerprint_value
+                .fmap([&](auto fp) {
+                    return maybe_fingerprint_interval
+                        .bind([&](auto interval) {
+                            return vv.subview(interval);
+                        })
+                        .fmap([&](auto v) {
                             // Normative:
                             // The value of the attribute is computed as the CRC-32 of the STUN message
                             // up to (but excluding) the FINGERPRINT attribute itself, XOR'ed with
@@ -150,43 +132,35 @@ Result<Message> Message::parse(const util::ConstBinaryView& vv, ParseStat& stat)
                             //
                             // Implementation: we xored fingerprint with 0x5354554e in FingerprintAttribute so
                             // it fingerprint->crc32 must be equal to crc32 of the message without additional xor.
-                            const uint32_t v = crc32(vv.assured_subview(0, attr_offset));
-                            if (v != fingerprint->crc32) {
-                                stat.error.inc();
-                                stat.invalid_fingerprint.inc();
-                                return make_error_code(ParseError::fingerprint_not_valid);
-                            }
-                        }
-                        attrs.emplace(std::move(attr));
-                        return success();
-                    }
+                            return crc32(v) == fp;
+                        }).value_or(false);
+                })
+                .value_or(true);
+            if (!fingerprint_is_valid) {
+                stat.error.inc();
+                stat.invalid_fingerprint.inc();
+                return make_error_code(ParseError::fingerprint_not_valid);
+            }
+            return success();
+        })
+        .fmap([&](auto&&) {
+            stat.success.inc();
+            return Message {
+                Header {
+                    cls,
+                    Method::from_msg_type(msg_type),
+                    TransactionId(transaction_id)
                 },
-                std::move(attr_rv.unwrap()));
-        if (maybe_error.is_err()) {
-            return maybe_error.unwrap_err();
-        }
-        attr_offset = next_attr_offset;
-    }
-
-    stat.success.inc();
-    return Message {
-        Header {
-            cls,
-            Method::from_msg_type(msg_type),
-            TransactionId(transaction_id)
-         },
-         std::move(attrs),
-         is_rfc3489,
-         integrity_interval
-    };
+                std::move(attrs),
+                is_rfc3489,
+                maybe_integrity_interval
+            };
+        });
 }
 
 Result<Maybe<bool>> Message::is_valid(const util::ConstBinaryView& data, const IntegrityData& idata) const noexcept {
     using namespace details;
-    const auto& h = idata.hash;
-    const auto& password = idata.password;
     using MaybeBool = Maybe<bool>;
-
     using View = util::ConstBinaryView;
     using DigestRef = std::reference_wrapper<const MessageIntegityAttribute::Digest>;
     struct Data {
@@ -194,7 +168,6 @@ Result<Maybe<bool>> Message::is_valid(const util::ConstBinaryView& data, const I
         View without_4byte_header;
         size_t integrity_message_len;
     };
-    const auto maybe_integrity = attribute_set.integrity();
     size_t integrity_message_len = 0;
     return integrity_interval
         .bind([&](auto&& ii) {
@@ -204,12 +177,16 @@ Result<Maybe<bool>> Message::is_valid(const util::ConstBinaryView& data, const I
             integrity_message_len = c.size() + STUN_ATTR_HEADER_SIZE + crypto::SHA1Hash::size - STUN_HEADER_SIZE;
             return c.subview(4);
         })
-        .bind([&](auto&& w) {
-            return maybe_integrity.fmap([&](const DigestRef& i) {
-                return Data{i, w, integrity_message_len};
+        .bind([&](auto&& h) {
+            return attribute_set.integrity().fmap([&](const DigestRef& digest) {
+                return Data{
+                    .digest = digest,
+                    .without_4byte_header = h,
+                    .integrity_message_len = integrity_message_len
+                };
             });
         })
-        .fmap([&](const Data& d) -> Result<Maybe<bool>> {
+        .fmap([&](const Data& d) -> Result<MaybeBool> {
             // Fake header for integrity checking:
             std::array<uint8_t, 4> header = {
                 data.data()[0],
@@ -217,7 +194,8 @@ Result<Maybe<bool>> Message::is_valid(const util::ConstBinaryView& data, const I
                 uint8_t((d.integrity_message_len >> 8) & 0xFF),
                 uint8_t(d.integrity_message_len & 0xFF)
             };
-            return crypto::hmac::digest({util::ConstBinaryView(header), d.without_4byte_header}, password.opad(), password.ipad(), h)
+            const auto& p = idata.password;
+            return crypto::hmac::digest({View(header), d.without_4byte_header}, p.opad(), p.ipad(), idata.hash)
                 .fmap([&](auto&& digest) {
                     return MaybeBool{digest.value == d.digest.get().value};
                 });
@@ -228,6 +206,120 @@ Result<Maybe<bool>> Message::is_valid(const util::ConstBinaryView& data, const I
 
 Result<util::ByteVec> Message::build(const MaybeIntegrity& maybeintegrity) const noexcept {
     return attribute_set.build(header, maybeintegrity);
+}
+
+RawAttr::RawAttr(uint16_t type, uint16_t length, util::ConstBinaryView value)
+    : m_type(type)
+    , m_length(length)
+    , m_value(value)
+{
+}
+
+uint16_t RawAttr::type() const noexcept {
+    return m_type;
+}
+
+util::ConstBinaryView RawAttr::value() const noexcept {
+    return m_value;
+}
+
+Result<RawAttr> RawAttr::parse(util::ConstBinaryView vv, size_t offset) {
+    // 0                   1                   2                   3
+    // 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    // |         Type                  |            Length             |
+    // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    // |                         Value (variable)                ....
+    // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    const auto type_rv = vv.read_u16be(offset).require();
+    const auto length_rv = vv.read_u16be(offset + 2).require();
+    // The value in the length field MUST contain the length of the Value
+    // part of the attribute, prior to padding, measured in bytes.
+    const auto attr_view_rv =
+        length_rv.bind([&](auto&& length) {
+            return vv.subview(offset + sizeof(uint32_t), length).require();
+        });
+    return combine([](uint16_t type, uint16_t length, util::ConstBinaryView value) -> Result<RawAttr> {
+        return RawAttr(type, length, value);
+    }, type_rv, length_rv, attr_view_rv);
+}
+
+size_t RawAttr::aligned_length() const noexcept {
+    using namespace details;
+    // Since STUN aligns attributes on 32-bit boundaries, attributes whose content
+    // is not a multiple of 4 bytes are padded with 1, 2, or 3 bytes of
+    // padding so that its value contains a multiple of 4 bytes.  The
+    // padding bits are ignored, and may be any value.
+    const auto align = m_length % sizeof(uint32_t) == 0 ? 0 : 1;
+    const auto align_length = (m_length / sizeof(uint32_t) + align) * sizeof(uint32_t);
+    return align_length + STUN_ATTR_HEADER_SIZE;
+}
+
+Result<ParseAttrsResult> parse_attrs(util::ConstBinaryView vv, size_t attr_offset, ParseStat& stat) {
+    std::vector<RawAttr> raw_attrs;
+    Maybe<util::ConstBinaryView::Interval> maybe_integrity_interval = none();
+    Maybe<util::ConstBinaryView::Interval> maybe_fingerprint_interval = none();
+    while (attr_offset < vv.size()) {
+        auto rawattr_rv = RawAttr::parse(vv, attr_offset);
+        if (rawattr_rv.is_err()) {
+            stat.error.inc();
+            stat.invalid_attr_size.inc();
+            return make_error_code(ParseError::invalid_attr_size);
+        }
+        const auto raw_attr = rawattr_rv.unwrap();
+        switch (raw_attr.type()) {
+        case attr_registry::FINGERPRINT:
+            raw_attrs.emplace_back(raw_attr);
+            maybe_fingerprint_interval = util::ConstBinaryView::Interval{0, attr_offset};
+            // 15.5.  FINGERPRINT
+            // When present, the FINGERPRINT attribute MUST be the last attribute in
+            // the message, and thus will appear after MESSAGE-INTEGRITY.
+            if (attr_offset + raw_attr.aligned_length() < vv.size()) {
+                stat.error.inc();
+                stat.fingerprint_not_last.inc();
+                return make_error_code(ParseError::fingerprint_is_not_last);
+            }
+            break;
+        case attr_registry::MESSAGE_INTEGRITY:
+            // 15.4.  MESSAGE-INTEGRITY
+            // The text used as input to HMAC is the STUN message,
+            // including the header, up to and including the attribute
+            // preceding the MESSAGE-INTEGRITY attribute.
+            raw_attrs.emplace_back(raw_attr);
+            maybe_integrity_interval = util::ConstBinaryView::Interval{0, attr_offset};
+            break;
+        default:
+            if (!maybe_integrity_interval.is_some()) {
+                // RFC5389:
+                // 15.4.  MESSAGE-INTEGRITY
+                // With the exception of the FINGERPRINT attribute,
+                // which appears after MESSAGE-INTEGRITY, agents MUST
+                // ignore all other attributes that follow
+                // MESSAGE-INTEGRITY.
+                raw_attrs.emplace_back(raw_attr);
+            }
+            break;
+        }
+        attr_offset += raw_attr.aligned_length();
+    }
+    using Result = std::vector<Attribute::ParseResult>;
+    Result result;
+    result.reserve(raw_attrs.size());
+    return util::reduce(raw_attrs.begin(), raw_attrs.end(), result, [&](Result&& result, const RawAttr& raw_attr) {
+        const auto attr_view = raw_attr.value();
+        const auto attr_type = AttributeType::from_uint16(raw_attr.type());
+        return Attribute::parse(attr_view, attr_type, stat)
+            .fmap([&](Attribute::ParseResult&& attr) {
+                result.emplace_back(std::move(attr));
+                return result;
+            });
+    }).fmap([&](Result&& attrs) {
+        return ParseAttrsResult {
+            .attrs = std::move(attrs),
+            .maybe_integrity_interval = maybe_integrity_interval,
+            .maybe_fingerprint_interval = maybe_fingerprint_interval,
+        };
+    });
 }
 
 }
