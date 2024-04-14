@@ -109,12 +109,14 @@ IntrusiveList<T>::Link::Link(T& t, Link&& other)
     , m_next(other.m_next)
     , m_prev(other.m_prev)
 {
-    if (m_prev.is_some()) {
-        m_prev.unwrap().get().m_next = LinkRef{*this};
-    }
-    if (m_next.is_some()) {
-        m_next.unwrap().get().m_prev = LinkRef{*this};
-    }
+    m_prev.fmap([&](auto&& prev) {
+        prev.get().m_next = LinkRef{*this};
+        return Unit{};
+    });
+    m_next.fmap([&](auto&& next) {
+        next.get().m_prev = LinkRef{*this};
+        return Unit{};
+    });
     other.m_next = none();
     other.m_prev = none();
 }
@@ -142,12 +144,14 @@ const T& IntrusiveList<T>::Link::get() const noexcept {
 
 template<typename T>
 void IntrusiveList<T>::Link::remove() noexcept {
-    if (m_prev.is_some()) {
-        m_prev.unwrap().get().m_next = m_next;
-    }
-    if (m_next.is_some()) {
-        m_next.unwrap().get().m_prev = m_prev;
-    }
+    m_prev.fmap([&](auto&& prev) {
+        prev.get().m_next = m_next;
+        return Unit{};
+    });
+    m_next.fmap([&](auto&& next) {
+        next.get().m_prev = m_prev;
+        return Unit{};
+    });
     m_prev = none();
     m_next = none();
 }
@@ -156,11 +160,12 @@ template<typename T>
 void IntrusiveList<T>::Link::place_after(Link& t) noexcept {
     remove();
     m_next = t.m_next;
+    t.m_next = LinkRef{*this};
     m_prev = LinkRef{t};
-    if (m_next.is_some()) {
-        m_next.unwrap().get().m_prev = LinkRef{*this};
-    }
-    m_prev.unwrap().get().m_next = LinkRef{*this};
+    m_next.fmap([&](auto&& next) {
+        next.get().m_prev = LinkRef{*this};
+        return Unit{};
+    });
 }
 
 template<typename T>
@@ -168,10 +173,11 @@ void IntrusiveList<T>::Link::place_before(Link& t) noexcept {
     remove();
     m_next = LinkRef{t};
     m_prev = t.m_prev;
-    m_next.unwrap().get().m_prev = LinkRef{*this};
-    if (m_prev.is_some()) {
-        m_prev.unwrap().get().m_next = LinkRef{*this};
-    }
+    t.m_prev = LinkRef{*this};
+    m_prev.fmap([&](auto&& prev) {
+        prev.get().m_next = LinkRef{*this};
+        return Unit{};
+    });
 }
 
 template<typename T>
@@ -230,7 +236,10 @@ void IntrusiveList<T>::pop_front() noexcept {
     if (empty()) {
         std::abort();
     }
-    m_head.m_next.unwrap().get().remove();
+    m_head.m_next.fmap([](auto&& next) {
+        next.get().remove();
+        return Unit{};
+    });
 }
 
 template<typename T>
@@ -238,25 +247,34 @@ void IntrusiveList<T>::pop_back() noexcept {
     if (empty()) {
         std::abort();
     }
-    m_tail.m_prev.unwrap().get().remove();
+    m_tail.m_prev.fmap([](auto&& prev) {
+        prev.get().remove();
+        return Unit{};
+    });
 }
 
 template<typename T>
 Maybe<typename IntrusiveList<T>::Ref>
 IntrusiveList<T>::front() noexcept {
     if (empty()) {
-        return None{};
+        return none();
     }
-    return std::ref(m_head.m_next.unwrap().get().get());
+    return m_head.m_next
+        .fmap([&](auto&& next) {
+            return std::ref(next.get().get());
+        });
 }
 
 template<typename T>
 Maybe<typename IntrusiveList<T>::CRef>
 IntrusiveList<T>::front() const noexcept {
     if (empty()) {
-        return None{};
+        return none();
     }
-    return std::cref(m_head.m_next.unwrap().get().get());
+    return m_head.m_next
+        .fmap([&](auto&& next) {
+            return std::cref(next.get().get());
+        });
 }
 
 template<typename T>
@@ -270,34 +288,48 @@ template<typename T>
 Maybe<typename IntrusiveList<T>::Ref>
 IntrusiveList<T>::back() noexcept {
     if (empty()) {
-        return None{};
+        return none();
     }
-    return std::ref(m_tail.m_prev.unwrap().get().get());
+    return m_tail.m_prev
+        .fmap([&](auto&& prev) {
+            return std::ref(prev.get().get());
+        });
 }
 
 template<typename T>
 Maybe<typename IntrusiveList<T>::CRef>
 IntrusiveList<T>::back() const noexcept {
     if (empty()) {
-        return None{};
+        return none();
     }
-    return std::cref(m_tail.m_prev.value().get().get());
+    return m_tail.m_prev
+        .fmap([&](auto&& prev) {
+            return std::cref(prev.get().get());
+        });
 }
 
 template<typename T>
 bool IntrusiveList<T>::empty() const noexcept {
-    if (!m_head.m_next.is_some() || !m_tail.m_prev.is_some()) {
+    return m_head.m_next.fmap([&](auto&& next) {
+        return &next.get() == &m_tail;
+    }).value_or_call([] {
         std::abort();
-    }
-    return &m_head.m_next.unwrap().get() == &m_tail;
+        return false;
+    });
 }
 
 template<typename T>
 void IntrusiveList<T>::do_move(IntrusiveList<T>& other) noexcept {
     m_head.m_next = other.m_head.m_next;
-    m_head.m_next.unwrap().get().m_prev = LinkRef{m_head};
+    m_head.m_next.fmap([&](auto&& next) {
+        next.get().m_prev = LinkRef{m_head};
+        return Unit{};
+    });
     m_tail.m_prev = other.m_tail.m_prev;
-    m_tail.m_prev.unwrap().get().m_next = LinkRef{m_tail};
+    m_tail.m_prev.fmap([&](auto&& prev) {
+        prev.get().m_next = LinkRef{m_tail};
+        return Unit{};
+    });
     other.m_head.m_next = none();
     other.m_tail.m_prev = none();
     other.m_tail.place_after(other.m_head);
