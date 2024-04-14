@@ -27,7 +27,8 @@ public:
 private:
     MaybeError init();
     MaybeError update(const util::ConstBinaryView& view);
-    MaybeError finalize(uint8_t *result);
+    template<typename Hash>
+    typename Hash::Result finalize();
 
     using EVPMDContextPtr = std::unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)>;
     EVPMDContextPtr m_ctx;
@@ -51,7 +52,6 @@ MessageDigest::MessageDigest(const EVP_MD *md)
 
 template<typename Hash>
 typename Hash::Result MessageDigest::calc(const typename Hash::Input& input) {
-    typename Hash::Value v;
     return init()
         .bind([&](auto&&) {
             return util::reduce(input.begin(), input.end(), [&](auto&& next) {
@@ -59,10 +59,7 @@ typename Hash::Result MessageDigest::calc(const typename Hash::Input& input) {
             });
         })
         .bind([&](auto&&) {
-            return finalize(v.data());
-        })
-        .fmap([&](auto&&) {
-            return Hash{std::move(v)};
+            return finalize<Hash>();
         });
 }
 
@@ -85,15 +82,14 @@ MaybeError MessageDigest::update(const util::ConstBinaryView& view) {
     return success();
 }
 
-MaybeError MessageDigest::finalize(uint8_t *result) {
+template<typename Hash>
+typename Hash::Result MessageDigest::finalize() {
+    typename Hash::Value v;
     ERR_clear_error();
-    if (EVP_DigestFinal_ex(m_ctx.get(), result, NULL) != 1) {
+    if (EVP_DigestFinal_ex(m_ctx.get(), v.data(), NULL) != 1) {
         return make_error_code(ERR_get_error());
     }
-    return success();
+    return Hash::move_from(std::move(v));
 }
 
 }
-
-
-

@@ -20,10 +20,10 @@ class Address {
 public:
     using Value = std::array<uint8_t, SIZE>;
 
-    static constexpr size_t size();
-    static Result<Address> from_view(const util::ConstBinaryView&);
+    static constexpr size_t size() noexcept;
+    static Result<Address> from_view(const util::ConstBinaryView&) noexcept;
 
-    Address(Value&&);
+    Address(Value&&) noexcept;
     util::ConstBinaryView view() const noexcept;
 
     bool operator==(const Address&) const noexcept = default;
@@ -35,12 +35,12 @@ private:
 // implementation
 //
 template<size_t SIZE>
-inline Address<SIZE>::Address(Value&& v)
+inline Address<SIZE>::Address(Value&& v) noexcept
     : m_value(std::move(v))
 {}
 
 template<size_t SIZE>
-constexpr size_t Address<SIZE>::size() {
+constexpr size_t Address<SIZE>::size() noexcept {
     return SIZE;
 }
 
@@ -50,7 +50,7 @@ inline util::ConstBinaryView Address<SIZE>::view() const noexcept {
 }
 
 template<size_t SIZE>
-inline Result<Address<SIZE>> Address<SIZE>::from_view(const util::ConstBinaryView& vv) {
+inline Result<Address<SIZE>> Address<SIZE>::from_view(const util::ConstBinaryView& vv) noexcept {
     if (vv.size() != std::tuple_size<Value>::value) {
         return make_error_code(Error::invalid_address_size);
     }

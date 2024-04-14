@@ -42,13 +42,12 @@ Result<SDPAttrParseResult> parse_sdp_attr(std::string_view inv) {
     using SV = std::string_view;
     using MaybeSV = Maybe<std::string_view>;
     auto advance = [](const MaybeSV& v, size_t sz) -> MaybeSV {
-        if (!v.is_some()) {
-            return none();
-        }
-        if (sz > v.unwrap().size()) {
-            return none();
-        }
-        return SV{v.unwrap().data() + sz, v.unwrap().size() - sz};
+        return v.bind([&](auto&& v) -> MaybeSV {
+            if (sz > v.size()) {
+                return none();
+            }
+            return SV{v.data() + sz, v.size() - sz};
+        });
     };
     static constexpr SV prefix("candidate:");
     if (!inv.starts_with(prefix)) {
@@ -84,14 +83,18 @@ Result<SDPAttrParseResult> parse_sdp_attr(std::string_view inv) {
         } else if (att_name == "rport") {
             maybe_rport = tstr.required_bind(net::Port::from_string).add_context("rport");
         } else {
-            tstr.required()
+            auto maybe_err =
+                tstr.required()
                 .fmap([&](auto&& att_value) {
                     extensions.emplace_back(Supported::Extension{
                         .att_name = std::string{std::move(att_name)},
                         .att_value = std::string{std::move(att_value)}
                     });
-                    return Unit{};
+                    return Unit::create();
                 });
+            if (maybe_err.is_err()) {
+                return maybe_err.unwrap_err();
+            }
         }
     }
 
@@ -111,15 +114,19 @@ Result<SDPAttrParseResult> parse_sdp_attr(std::string_view inv) {
 
     using MaybeAddr = Maybe<Address>;
     using MaybeAddrRV = Result<MaybeAddr>;
-    MaybeAddrRV maybe_raddr_rv =  maybe_raddr.is_some()
-        ? std::move(maybe_raddr.unwrap()).fmap([](auto&& addr) { return MaybeAddr{addr}; })
-        : MaybeAddrRV{none()};
+    MaybeAddrRV maybe_raddr_rv =  std::move(maybe_raddr)
+        .fmap([](Result<Address>&& addr_rv) {
+            return std::move(addr_rv).fmap(MaybeAddr::move_from);
+        })
+        .value_or(MaybeAddr::none());
 
     using MaybePort = Maybe<net::Port>;
     using MaybePortRV = Result<MaybePort>;
-    MaybePortRV maybe_rport_rv =  maybe_rport.is_some()
-        ? maybe_rport.unwrap().fmap([](auto&& port) { return MaybePort{port}; })
-        : MaybePortRV{none()};
+    MaybePortRV maybe_rport_rv =  maybe_rport
+        .fmap([](const Result<net::Port>& rport_rv) {
+            return rport_rv.fmap(MaybePort::copy_from);
+        })
+        .value_or(MaybePort::none());
 
     return combine([](
             auto&& f, auto&& cid, auto& t, auto&& p,

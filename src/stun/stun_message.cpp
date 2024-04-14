@@ -173,7 +173,7 @@ Result<Maybe<bool>> Message::is_valid(const util::ConstBinaryView& data, const I
         .bind([&](auto&& ii) {
             return data.subview(ii);
         })
-        .bind([&](util::ConstBinaryView c) {
+        .bind([&](util::ConstBinaryView&& c) {
             integrity_message_len = c.size() + STUN_ATTR_HEADER_SIZE + crypto::SHA1Hash::size - STUN_HEADER_SIZE;
             return c.subview(4);
         })

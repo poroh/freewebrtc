@@ -23,10 +23,15 @@ class Address {
 public:
     using Value = std::variant<AddressV4, AddressV6>;
 
-    Address(const AddressV4&);
-    Address(const AddressV6&);
-    Address(AddressV4&&);
-    Address(AddressV6&&);
+    Address(const AddressV4&) noexcept;
+    Address(const AddressV6&) noexcept;
+    Address(AddressV4&&) noexcept;
+    Address(AddressV6&&) noexcept;
+
+    static Address move_from_v4(AddressV4&&) noexcept;
+    static Address move_from_v6(AddressV6&&) noexcept;
+    static Address copy_from_v4(const AddressV4&) noexcept;
+    static Address copy_from_v6(const AddressV6&) noexcept;
 
     static Result<Address> from_string(const std::string_view&);
 
@@ -44,21 +49,37 @@ private:
 // implementation
 //
 
-inline Address::Address(const AddressV4& v)
+inline Address::Address(const AddressV4& v) noexcept
     : m_value(v)
 {}
 
-inline Address::Address(const AddressV6& v)
+inline Address::Address(const AddressV6& v) noexcept
     : m_value(v)
 {}
 
-inline Address::Address(AddressV4&& v)
+inline Address::Address(AddressV4&& v) noexcept
     : m_value(std::move(v))
 {}
 
-inline Address::Address(AddressV6&& v)
+inline Address::Address(AddressV6&& v) noexcept
     : m_value(std::move(v))
 {}
+
+inline Address Address::move_from_v4(AddressV4&& addr) noexcept {
+    return Address{std::move(addr)};
+}
+
+inline Address Address::move_from_v6(AddressV6&& addr) noexcept {
+    return Address{std::move(addr)};
+}
+
+inline Address Address::copy_from_v4(const AddressV4& addr) noexcept {
+    return Address{std::move(addr)};
+}
+
+inline Address Address::copy_from_v6(const AddressV6& addr) noexcept {
+    return Address{std::move(addr)};
+}
 
 inline const Address::Value& Address::value() const noexcept {
     return m_value;

@@ -77,8 +77,9 @@ Result<MappedAddressAttribute> MappedAddressAttribute::parse(const util::ConstBi
     // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     //
     auto family_rv = vv.read_u8(1).require();
-    auto port_rv = vv.read_u16be(2).require()
-        .fmap([](auto& v) { return net::Port(v); });
+    auto port_rv = vv.read_u16be(2)
+        .require()
+        .fmap(net::Port::from_uint16);
     const auto addr_view_rv = vv.subview(4).require();
     return combine(
         [&](auto&& family, auto&& port, auto&& addr_view) {
@@ -87,10 +88,10 @@ Result<MappedAddressAttribute> MappedAddressAttribute::parse(const util::ConstBi
                     switch (family) {
                     case attr_registry::FAMILY_IPV4:
                         return net::ip::AddressV4::from_view(addr_view)
-                            .fmap([](auto&& addr) { return net::ip::Address(std::move(addr)); });
+                            .fmap(net::ip::Address::move_from_v4);
                     case attr_registry::FAMILY_IPV6:
                         return net::ip::AddressV6::from_view(addr_view)
-                            .fmap([](auto&& addr) { return net::ip::Address(std::move(addr)); });
+                            .fmap(net::ip::Address::move_from_v6);
                     }
                     return make_error_code(ParseError::unknown_addr_family);
                 })()
@@ -135,7 +136,7 @@ Result<XorMappedAddressAttribute> XorMappedAddressAttribute::parse(const util::C
     // |                X-Address (Variable)
     // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     const auto family_rv = vv.read_u8(1).require().bind(Family::from_uint8);
-    const auto port_rv = vv.read_u16be(2).require()
+    auto port_rv = vv.read_u16be(2).require()
         .bind_err([&](auto&& err) {
             stat.error.inc();
             stat.invalid_xor_mapped_address.inc();
@@ -144,13 +145,14 @@ Result<XorMappedAddressAttribute> XorMappedAddressAttribute::parse(const util::C
         .fmap([](auto xport) {
             // X-Port is computed by XOR'ing the mapped port with the most
             // significant 16 bits of the magic cookie.
-            return net::Port(xport ^ (details::MAGIC_COOKIE >> 16));
-        });
+            return xport ^ (details::MAGIC_COOKIE >> 16);
+        })
+        .fmap(net::Port::from_uint16);
     if (port_rv.is_err()) {
         return port_rv.unwrap_err();
     }
     const auto xaddr_view_rv = vv.subview(4).require();
-    const auto xaddr_rv =
+    auto xaddr_rv =
         combine([&](auto&& family, auto&& xaddr_view) {
             return XoredAddress::from_view(family, xaddr_view);
         }, std::move(family_rv), std::move(xaddr_view_rv))
@@ -160,7 +162,7 @@ Result<XorMappedAddressAttribute> XorMappedAddressAttribute::parse(const util::C
             return err;
         });
     return
-        combine([&](auto&& xaddr, auto&& port) {
+        combine([&](XoredAddress&& xaddr, net::Port&& port) {
             return success(XorMappedAddressAttribute{std::move(xaddr), port});
         }, std::move(xaddr_rv), std::move(port_rv));
 }
@@ -191,9 +193,8 @@ Result<MessageIntegityAttribute> MessageIntegityAttribute::parse(const util::Con
             stat.invalid_message_integrity.inc();
             return make_error_code(ParseError::integrity_digest_size);
         })
-        .fmap([](auto&& v) {
-            return MessageIntegityAttribute{Digest(std::move(v))};
-        });
+        .fmap(Digest::move_from)
+        .fmap(MessageIntegityAttribute::move_from);
 }
 
 Result<FingerprintAttribute> FingerprintAttribute::parse(const util::ConstBinaryView& vv, ParseStat& stat) {

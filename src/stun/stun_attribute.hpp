@@ -64,6 +64,8 @@ struct SoftwareAttribute {
 struct MessageIntegityAttribute {
     using Digest = crypto::hmac::Digest<crypto::SHA1Hash>;
     Digest digest;
+
+    static MessageIntegityAttribute move_from(Digest&&) noexcept;
     static Result<MessageIntegityAttribute> parse(const util::ConstBinaryView&, ParseStat&);
 };
 
@@ -172,5 +174,10 @@ inline const AttrType *Attribute::as() const noexcept {
 inline const Attribute::Value& Attribute::value() const noexcept {
     return m_value;
 }
+
+inline MessageIntegityAttribute MessageIntegityAttribute::move_from(Digest&& d) noexcept {
+    return MessageIntegityAttribute{std::move(d)};
+}
+
 
 }

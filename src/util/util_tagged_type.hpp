@@ -27,6 +27,9 @@ struct TaggedType {
     explicit TaggedType(const T&);
     explicit TaggedType(T&&);
 
+    static TaggedType move_from(T&&);
+    static TaggedType copy_from(const T&);
+
     TaggedType& operator=(const TaggedType&) = default;
     TaggedType& operator=(TaggedType&&) = default;
 
@@ -45,6 +48,15 @@ template<typename T, typename Tag>
 inline TaggedType<T, Tag>::TaggedType(T&& v)
     : value(std::move(v))
 {}
+
+template<typename T, typename Tag>
+inline TaggedType<T, Tag> TaggedType<T, Tag>::move_from(T&& t) {
+    return TaggedType{std::move(t)};
+}
+template<typename T, typename Tag>
+inline TaggedType<T, Tag> TaggedType<T, Tag>::copy_from(const T& t) {
+    return TaggedType{t};
+}
 
 }
 

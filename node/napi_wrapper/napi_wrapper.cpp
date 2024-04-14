@@ -276,15 +276,15 @@ static napi_value function_wrapper(napi_env inenv, napi_callback_info info) {
     Env env(inenv);
     void *data;
     auto ci_info_rvv = env.create_callback_info(info, &data);
-    if (env.maybe_throw_error(ci_info_rvv)) {
-        return nullptr;
-    }
-    auto& f = *static_cast<Env::Function *>(data);
-    auto ret_rvv = f(env, ci_info_rvv.unwrap());
-    if (env.maybe_throw_error(ret_rvv)) {
-        return nullptr;
-    }
-    return ret_rvv.unwrap().to_napi();
+    return env.maybe_throw_error(ci_info_rvv)
+        .bind([&](auto&& ci_info) {
+            auto& f = *static_cast<Env::Function *>(data);
+            return env.maybe_throw_error(f(env, ci_info));
+        })
+        .fmap([](auto&& ret) {
+            return ret.to_napi();
+        })
+        .value_or(nullptr);
 }
 
 Result<Value> Env::create_function(Function f, Maybe<std::string_view> maybename) {
@@ -314,113 +314,117 @@ static napi_value function_getter(napi_env inenv, napi_callback_info info) {
     Env env(inenv);
     void *data;
     auto ci_info_rvv = env.create_callback_info(info, &data);
-    if (env.maybe_throw_error(ci_info_rvv)) {
-        return nullptr;
-    }
-    auto& attr = *static_cast<Env::ClassAttr *>(data);
-    if (attr.getter.is_none()) {
-        return nullptr;
-    }
-    auto ret_rvv = attr.getter.unwrap()(env, ci_info_rvv.unwrap());
-    if (env.maybe_throw_error(ret_rvv)) {
-        return nullptr;
-    }
-    return ret_rvv.unwrap().to_napi();
+    return env.maybe_throw_error(ci_info_rvv)
+        .bind([&](auto&& ci_info) {
+            auto& attr = *static_cast<Env::ClassAttr *>(data);
+            return attr.getter
+                .fmap([&](auto&& getter) {
+                    return getter(env, ci_info);
+                });
+        })
+        .bind([&](auto&& rv) {
+            return env.maybe_throw_error(rv);
+        })
+        .fmap(Value::fmap_to_napi)
+        .value_or(nullptr);
 }
 
 static napi_value function_setter(napi_env inenv, napi_callback_info info) {
     Env env(inenv);
     void *data;
     auto ci_info_rvv = env.create_callback_info(info, &data);
-    if (env.maybe_throw_error(ci_info_rvv)) {
-        return nullptr;
-    }
-    auto& attr = *static_cast<Env::ClassAttr *>(data);
-    if (attr.setter.is_none()) {
-        return nullptr;
-    }
-    auto ret_rvv = attr.setter.unwrap()(env, ci_info_rvv.unwrap());
-    if (env.maybe_throw_error(ret_rvv)) {
-        return nullptr;
-    }
-    return ret_rvv.unwrap().to_napi();
+    return env.maybe_throw_error(ci_info_rvv)
+        .bind([&](auto&& ci_info) {
+            auto& attr = *static_cast<Env::ClassAttr *>(data);
+            return attr.setter
+                .fmap([&](auto&& setter) {
+                    return setter(env, ci_info);
+                });
+        })
+        .bind([&](auto&& rv) {
+            return env.maybe_throw_error(rv);
+        })
+        .fmap(Value::fmap_to_napi)
+        .value_or(nullptr);
 }
 
-Result<Value> Env::create_class(std::string_view name, Function ctor, const ClassPropertySpec& spec) const noexcept {
+struct DescrRVVisitor {
     using DescrRV = Result<napi_property_descriptor>;
-    std::vector<napi_property_descriptor> descriptors;
-    descriptors.reserve(spec.size());
-    for (auto& p: spec) {
-        auto rvv =
-            std::visit(
-                util::overloaded {
-                    [&](const Function& f) -> DescrRV {
-                        return napi_property_descriptor{
-                                p.first.c_str(),
-                                nullptr, // name
-                                function_wrapper, // method
-                                nullptr, // getter
-                                nullptr, // setter
-                                nullptr, // value
-                                napi_default, // attributes
-                                new Function(f) // data
-                            };
-                    },
-                    [&](const Result<Value>& rvv) -> DescrRV {
-                        return rvv.fmap([&](auto&& v) {
-                            return napi_property_descriptor{
-                                p.first.c_str(),
-                                nullptr, // name
-                                function_wrapper, // method
-                                nullptr, // getter
-                                nullptr, // setter
-                                v.to_napi(), // value
-                                napi_default, // attributes
-                                nullptr  // data
-                            };
-                        });
-                    },
-                    [&](const ClassAttr& attr) -> DescrRV {
-                        return napi_property_descriptor{
-                            p.first.c_str(),
-                            nullptr, // name
-                            nullptr, // method
-                            function_getter, // getter
-                            function_setter, // setter
-                            nullptr, // value
-                            napi_default, // attributes
-                            new ClassAttr(attr)  // data
-                        };
-                    }
-                },
-                p.second)
-            .add_context("attribute create", p.first)
-            .fmap([&](auto&& v) {
-                descriptors.emplace_back(std::move(v));
-                return Unit{};
-            });
-        if (rvv.is_err()) {
-            return rvv.unwrap_err();
-        }
+
+    const Env::ClassPropertySpec::value_type& p;
+
+    auto operator()(const Env::Function& f) -> DescrRV {
+        return napi_property_descriptor{
+            p.first.c_str(),
+            nullptr, // name
+            function_wrapper, // method
+            nullptr, // getter
+            nullptr, // setter
+            nullptr, // value
+            napi_default, // attributes
+            new Env::Function(f) // data
+        };
     }
-    napi_value result;
-    auto status =
-        napi_define_class(
-            m_env,
-            name.data(),
-            name.size(),
-            function_wrapper,
-            new Function(ctor),
-            descriptors.size(),
-            descriptors.data(),
-            &result);
-    if (status != napi_ok) {
-        return make_error_code(status);
+    auto operator()(const Result<Value>& rvv) -> DescrRV {
+        return rvv.fmap([&](auto&& v) {
+            return napi_property_descriptor{
+                p.first.c_str(),
+                nullptr, // name
+                function_wrapper, // method
+                nullptr, // getter
+                nullptr, // setter
+                v.to_napi(), // value
+                napi_default, // attributes
+                nullptr  // data
+            };
+        });
     }
-    // Note that data in property descriptions data will leak
-    // if module can be uploaded. We can add napi_add_finalizer to
-    // class definition as well but it is not practal thing.
-    return Value(m_env, result);
+    auto operator()(const Env::ClassAttr& attr) -> DescrRV {
+        return napi_property_descriptor{
+            p.first.c_str(),
+            nullptr, // name
+            nullptr, // method
+            function_getter, // getter
+            function_setter, // setter
+            nullptr, // value
+            napi_default, // attributes
+            new Env::ClassAttr(attr)  // data
+        };
+    }
+};
+
+
+Result<Value> Env::create_class(std::string_view name, Function ctor, const ClassPropertySpec& spec) const noexcept {
+    using DescVec = std::vector<napi_property_descriptor>;
+    return
+        util::reduce(spec.begin(), spec.end(), DescVec{}, [](DescVec&& dv, const auto& p) {
+            return std::visit(DescrRVVisitor{p}, p.second)
+                .add_context("attribute create", p.first)
+                .fmap([&](auto&& v) {
+                    dv.emplace_back(std::move(v));
+                    return std::move(dv);
+                });
+        })
+        .bind([&](DescVec&& dv) -> Result<Value> {
+            napi_value result;
+            auto status =
+                napi_define_class(
+                    m_env,
+                    name.data(),
+                    name.size(),
+                    function_wrapper,
+                    new Function(ctor),
+                    dv.size(),
+                    dv.data(),
+                    &result);
+            if (status != napi_ok) {
+                return make_error_code(status);
+            }
+            // Note that data in property descriptions data will leak
+            // if module can be uploaded. We can add napi_add_finalizer to
+            // class definition as well but it is not practal thing.
+            return Value(m_env, result);
+        });
 }
 
 CallbackInfo::CallbackInfo(Value self_arg, std::vector<Value>&& values)

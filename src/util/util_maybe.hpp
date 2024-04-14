@@ -45,8 +45,13 @@ public:
     Maybe& operator=(const Maybe&) = default;
     Maybe& operator=(Maybe&&) = default;
 
-    T& unwrap();
-    const T& unwrap() const;
+    static Maybe<T> none();
+    static Maybe<T> move_from(T&& some);
+    static Maybe<T> copy_from(const T& some);
+
+    T& unwrap() &;
+    const T& unwrap() const&;
+    T&& unwrap() &&;
 
     const T& value_or(const T&) const;
 
@@ -64,6 +69,13 @@ public:
     auto fmap(F&& f) const& -> Maybe<std::invoke_result_t<F, const T&>>;
     template<typename F>
     auto fmap(F&& f) && -> Maybe<std::invoke_result_t<F, T&&>>;
+
+    template<typename F>
+    void with_inner(F&& f) &;
+    template<typename F>
+    void with_inner(F&& f) const&;
+    template<typename F>
+    void with_inner(F&& f) &&;
 
     template<typename F>
     auto bind(F&& f) & -> Maybe<typename std::invoke_result_t<F, T&>::Value>;
@@ -96,14 +108,33 @@ inline Maybe<T>::Maybe(const None& n)
     : m_value(n)
 {}
 
+template<typename T>
+inline Maybe<T> Maybe<T>::move_from(T&& some) {
+    return Maybe<T>{std::move(some)};
+}
 
 template<typename T>
-inline T& Maybe<T>::unwrap() {
+inline Maybe<T> Maybe<T>::copy_from(const T& some) {
+    return Maybe<T>{some};
+}
+
+template<typename T>
+Maybe<T> Maybe<T>::none() {
+    return None{};
+}
+
+template<typename T>
+inline T& Maybe<T>::unwrap() & {
     return std::get<T>(m_value);
 }
 
 template<typename T>
-const T& Maybe<T>::unwrap() const {
+inline T&& Maybe<T>::unwrap() && {
+    return std::get<T>(std::move(m_value));
+}
+
+template<typename T>
+const T& Maybe<T>::unwrap() const & {
     return std::get<T>(m_value);
 }
 
@@ -141,45 +172,73 @@ Result<T> Maybe<T>::require() {
         return make_error_code(util::ErrorCode::value_required_in_maybe);
     }
     auto v = std::move(unwrap());
-    m_value = none();
+    m_value = None{};
     return v;
 }
 
 template<typename T>
 template<typename F>
 auto Maybe<T>::fmap(F&& f) & -> Maybe<std::invoke_result_t<F, T&>> {
+    using ResultT = Maybe<std::invoke_result_t<F, T&&>>;
     if (is_none()) {
-        return none();
+        return ResultT::none();
     }
-    using ResultT = std::invoke_result_t<F, T&&>;
-    return Maybe<ResultT>{f(unwrap())};
+    return ResultT::move_from(f(unwrap()));
 }
 
 template<typename T>
 template<typename F>
 auto Maybe<T>::fmap(F&& f) const& -> Maybe<std::invoke_result_t<F, const T&>> {
+    using ResultT = Maybe<std::invoke_result_t<F, T&&>>;
     if (is_none()) {
-        return none();
+        return ResultT::none();
     }
-    using ResultT = std::invoke_result_t<F, T&&>;
-    return Maybe<ResultT>{f(unwrap())};
+    return ResultT::move_from(f(unwrap()));
 }
 
 template<typename T>
 template<typename F>
 auto Maybe<T>::fmap(F&& f) && -> Maybe<std::invoke_result_t<F, T&&>> {
+    using ResultT = Maybe<std::invoke_result_t<F, T&&>>;
     if (is_none()) {
-        return none();
+        return ResultT::none();
     }
-    using ResultT = std::invoke_result_t<F, T&&>;
-    return Maybe<ResultT>{f(std::get<T>(std::move(m_value)))};
+    return ResultT::move_from(f(std::get<T>(std::move(m_value))));
+}
+
+template<typename T>
+template<typename F>
+inline void Maybe<T>::with_inner(F&& f) & {
+    if (is_none()) {
+        return;
+    }
+    f(unwrap());
+}
+
+template<typename T>
+template<typename F>
+void Maybe<T>::with_inner(F&& f) const& {
+    if (is_none()) {
+        return;
+    }
+    f(unwrap());
+}
+
+template<typename T>
+template<typename F>
+void Maybe<T>::with_inner(F&& f) && {
+    if (is_none()) {
+        return;
+    }
+    f(std::get<Value>(std::move(m_value)));
 }
 
 template<typename T>
 template<typename F>
 auto Maybe<T>::bind(F&& f) & -> Maybe<typename std::invoke_result_t<F, T&>::Value> {
+    using ResultT = Maybe<typename std::invoke_result_t<F, T&>::Value>;
     if (is_none()) {
-        return none();
+        return ResultT::none();
     }
     return f(unwrap());
 }
@@ -187,8 +246,9 @@ auto Maybe<T>::bind(F&& f) & -> Maybe<typename std::invoke_result_t<F, T&>::Valu
 template<typename T>
 template<typename F>
 auto Maybe<T>::bind(F&& f) const& -> Maybe<typename std::invoke_result_t<F, const T&>::Value> {
+    using ResultT = Maybe<typename std::invoke_result_t<F, const T&>::Value>;
     if (is_none()) {
-        return none();
+        return ResultT::none();
     }
     return f(unwrap());
 }
@@ -196,8 +256,9 @@ auto Maybe<T>::bind(F&& f) const& -> Maybe<typename std::invoke_result_t<F, cons
 template<typename T>
 template<typename F>
 auto Maybe<T>::bind(F&& f) && -> Maybe<typename std::invoke_result_t<F, T&&>::Value> {
+    using ResultT = Maybe<typename std::invoke_result_t<F, T&&>::Value>;
     if (is_none()) {
-        return none();
+        return ResultT::none();
     }
     return f(std::get<Value>(std::move(m_value)));
 }

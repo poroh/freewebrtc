@@ -33,6 +33,7 @@ public:
     static constexpr auto size = SIZE;
 
     static Maybe<Hash> from_view(const util::ConstBinaryView&);
+    static Hash move_from(Value&&) noexcept;
 
     explicit Hash(Value&&);
 
@@ -68,6 +69,11 @@ Maybe<Hash<TagType, SIZE>> Hash<TagType, SIZE>::from_view(const util::ConstBinar
     Value v;
     std::copy(vv.begin(), vv.end(), v.begin());
     return Hash(std::move(v));
+}
+
+template<typename TagType, size_t SIZE>
+inline Hash<TagType, SIZE> Hash<TagType, SIZE>::move_from(Value&& value) noexcept {
+    return Hash(std::move(value));
 }
 
 template<typename TagType, size_t SIZE>

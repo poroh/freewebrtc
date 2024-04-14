@@ -169,61 +169,61 @@ Result<util::ByteVec> AttributeSet::build(const Header& header, const MaybeInteg
         using VisitorResult = Maybe<ByteVecRef>;
         std::visit(
             util::overloaded {
-                [&](const UsernameAttribute& a) -> VisitorResult {
+                [&](const UsernameAttribute& a) {
                     const auto& username = a.name.value;
                     add_attr(type, util::ConstBinaryView(username.data(), username.size()));
-                    return none();
+                    return VisitorResult::none();
                 },
-                [&](const SoftwareAttribute& a) -> VisitorResult {
+                [&](const SoftwareAttribute& a) {
                     add_attr(type, util::ConstBinaryView(a.name.data(), a.name.size()));
-                    return none();
+                    return VisitorResult::none();
                 },
-                [&](const XorMappedAddressAttribute& a) -> VisitorResult {
+                [&](const XorMappedAddressAttribute& a) {
                     xor_mapped_data = a.build();
-                    return std::ref(xor_mapped_data);
+                    return VisitorResult::move_from(std::ref(xor_mapped_data));
                 },
-                [&](const MappedAddressAttribute& a) -> VisitorResult  {
+                [&](const MappedAddressAttribute& a) {
                     mapped_data = a.build();
-                    return std::ref(mapped_data);
+                    return VisitorResult::move_from(std::ref(mapped_data));
                 },
                 [&](const PriorityAttribute& a) -> VisitorResult {
                     prio = util::host_to_network_u32(a.priority);
                     add_attr(type, util::ConstBinaryView(&prio, sizeof(prio)));
-                    return none();
+                    return VisitorResult::none();
                 },
-                [&](const IceControllingAttribute& a) -> VisitorResult {
+                [&](const IceControllingAttribute& a) {
                     ice_controlling = util::host_to_network_u64(a.tiebreaker);
                     add_attr(type, util::ConstBinaryView(&ice_controlling, sizeof(ice_controlling)));
-                    return none();
+                    return VisitorResult::none();
                 },
-                [&](const IceControlledAttribute& a) -> VisitorResult {
+                [&](const IceControlledAttribute& a) {
                     ice_controlled = util::host_to_network_u64(a.tiebreaker);
                     add_attr(type, util::ConstBinaryView(&ice_controlled, sizeof(ice_controlled)));
-                    return none();
+                    return VisitorResult::none();
                 },
-                [&](const UseCandidateAttribute&) -> VisitorResult {
+                [&](const UseCandidateAttribute&) {
                     add_attr(type, util::ConstBinaryView(&padding, 0));
-                    return none();
+                    return VisitorResult::none();
                 },
-                [&](const ErrorCodeAttribute& ec) -> VisitorResult {
+                [&](const ErrorCodeAttribute& ec) {
                     error_code_data = ec.build();
-                    return std::ref(error_code_data);
+                    return VisitorResult::move_from(std::ref(error_code_data));
                 },
-                [&](const UnknownAttributesAttribute& a) -> VisitorResult {
+                [&](const UnknownAttributesAttribute& a) {
                     unknown_attributes_data = a.build();
-                    return std::ref(unknown_attributes_data);
+                    return VisitorResult::move_from(std::ref(unknown_attributes_data));
                 },
-                [&](const AlternateServerAttribute& a) -> VisitorResult {
+                [&](const AlternateServerAttribute& a) {
                     altenate_server_data = a.build();
-                    return std::ref(altenate_server_data);
+                    return VisitorResult::move_from(std::ref(altenate_server_data));
                 },
-                [&](const MessageIntegityAttribute&) -> VisitorResult {
+                [&](const MessageIntegityAttribute&) {
                     // Do not add integrity here
-                    return none();
+                    return VisitorResult::none();
                 },
-                [&](const FingerprintAttribute&) -> VisitorResult {
+                [&](const FingerprintAttribute&) {
                     // Do not add fingerprint here
-                    return none();
+                    return VisitorResult::none();
                 }
             },
             p.second.value())
@@ -231,9 +231,9 @@ Result<util::ByteVec> AttributeSet::build(const Header& header, const MaybeInteg
                 return bvref.get()
                     .fmap([&](const util::ByteVec& vec) {
                         add_attr(type, util::ConstBinaryView(vec));
-                        return Unit{};
+                        return Unit::create();
                     })
-                    .value_or(Unit{});
+                    .value_or(Unit::create());
             });
     }
 
@@ -254,7 +254,7 @@ Result<util::ByteVec> AttributeSet::build(const Header& header, const MaybeInteg
                 return integrity_digest_rv.
                     fmap([&](auto&& integrity_digest) {
                         add_attr(attr_registry::MESSAGE_INTEGRITY, util::ConstBinaryView(integrity_digest.value.value()));
-                        return Unit{};
+                        return Unit::create();
                     });
             })
             .value_or(success());
