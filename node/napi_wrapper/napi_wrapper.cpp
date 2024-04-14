@@ -9,6 +9,7 @@
 #include "napi_wrapper.hpp"
 #include "napi_error.hpp"
 #include "util/util_variant_overloaded.hpp"
+#include "util/util_reduce.hpp"
 
 namespace freewebrtc::napi {
 
@@ -158,40 +159,36 @@ Result<Object> Env::create_object() const noexcept {
 }
 
 Result<Object> Env::create_object(const ObjectSpec& spec) const noexcept {
-    auto object_result = create_object();
-    if (object_result.is_err()) {
-        return object_result;
-    }
-    auto& object = object_result.unwrap();
-    for (const auto& p: spec) {
-        const auto& k = p.first;
-        const auto& v = p.second;
-        using MaybeRVV = Maybe<Result<Value>>;
-        using MaybeRVO = Maybe<Result<Object>>;
-        auto mrvv = std::visit(
-            util::overloaded {
-                [](const Result<Value>& rv) -> MaybeRVV { return rv; },
-                [](const Value& vv) -> MaybeRVV { return Result<Value>{vv}; },
-                [](const MaybeRVV& mrvv) { return mrvv; },
-                [](const Object& vv)  -> MaybeRVV { return Result<Value>{vv.to_value()}; },
-                [](const RVO& rv) -> MaybeRVV { return rv.fmap([](const auto& obj) { return obj.to_value(); }); },
-                [](const MaybeRVO& mrvo) -> MaybeRVV {
-                    return mrvo.fmap([](auto&& rv) {
-                        return rv.fmap(Object::fmap_to_value);
-                    });
-                }
-            }, v);
-        if (!mrvv.is_some()) {
-            continue;
-        }
-        auto maybe_err = mrvv.unwrap()
-            .bind([&](auto&& vv) { return object.set_named_property(k, vv); });
-        if (maybe_err.is_err()) {
-            maybe_err.add_context(k + " attribute");
-            return maybe_err.unwrap_err();
-        }
-    }
-    return object_result;
+    return create_object()
+        .bind([&](Object&& object) {
+            return util::reduce(spec.begin(), spec.end(), object, [](Object&& object, auto&& p) {
+                const auto& k = p.first;
+                const auto& v = p.second;
+                using MaybeRVV = Maybe<Result<Value>>;
+                using MaybeRVO = Maybe<Result<Object>>;
+                auto mrvv = std::visit(
+                    util::overloaded {
+                        [](const Result<Value>& rv) -> MaybeRVV { return rv; },
+                        [](const Value& vv) -> MaybeRVV { return Result<Value>{vv}; },
+                        [](const MaybeRVV& mrvv) { return mrvv; },
+                        [](const Object& vv)  -> MaybeRVV { return Result<Value>{vv.to_value()}; },
+                        [](const RVO& rv) -> MaybeRVV { return rv.fmap([](const auto& obj) { return obj.to_value(); }); },
+                        [](const MaybeRVO& mrvo) -> MaybeRVV {
+                             return mrvo.fmap([](auto&& rv) {
+                                return rv.fmap(Object::fmap_to_value);
+                             });
+                        }
+                    }, v);
+                return std::move(mrvv)
+                    .fmap([&](Result<Value>&& rvv) -> Result<Object> {
+                        return std::move(rvv)
+                            .bind([&](Value&& vv) { return object.set_named_property(k, vv); })
+                            .fmap([&](auto&&) { return object; })
+                            .add_context(k + " attribute");
+                    })
+                    .value_or(Result<Object>{object});
+            });
+        });
 }
 
 Result<Array> Env::create_array() const noexcept {

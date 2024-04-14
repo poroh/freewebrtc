@@ -50,12 +50,13 @@ Result<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj) {
         = (obj.maybe_named_property("auth")
            > [](auto&& maybe_val) { return maybe_val.fmap(napi::Value::to_object); }
            > [](auto&& maybe_obj) {
-               if (maybe_obj.is_none()) {
-                   return Result<MaybeAuth>{none()};
-               }
-               return maybe_obj.unwrap()
-                    > parse_auth
-                    > [](Auth&& auth) { return MaybeAuth{auth}; };
+               return maybe_obj
+                   .fmap([](auto&& obj) {
+                       return obj
+                           > parse_auth
+                           > [](Auth&& auth) { return MaybeAuth{auth}; };
+                   })
+                   .value_or(Result<MaybeAuth>{none()});
            }).add_context("auth field");
 
     return combine(
