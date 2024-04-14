@@ -64,6 +64,7 @@ public:
     Result<bool> as_boolean() const noexcept;
 
     napi_value to_napi() const noexcept;
+    static napi_value fmap_to_napi(const Value&) noexcept;
 
     template<typename T>
     Result<std::reference_wrapper<T>> unwrap() const noexcept;
@@ -132,7 +133,7 @@ public:
     RVV create_class(std::string_view name, Function ctor, const ClassPropertySpec&) const noexcept;
 
     template<typename T>
-    bool maybe_throw_error(const Result<T>& v) const noexcept;
+    Maybe<T> maybe_throw_error(const Result<T>& v) const noexcept;
 private:
     napi_env m_env;
 };
@@ -156,6 +157,10 @@ inline napi_value Value::to_napi() const noexcept {
     return m_value;
 }
 
+inline napi_value Value::fmap_to_napi(const Value& v) noexcept {
+    return v.to_napi();
+}
+
 template<typename T>
 Result<std::reference_wrapper<T>> Value::unwrap() const noexcept {
     T *t;
@@ -166,12 +171,15 @@ Result<std::reference_wrapper<T>> Value::unwrap() const noexcept {
 }
 
 template<typename T>
-bool Env::maybe_throw_error(const Result<T>& v) const noexcept {
-    if (v.is_err()) {
-        throw_error(v.unwrap_err().message());
-        return true;
-    }
-    return false;
+Maybe<T> Env::maybe_throw_error(const Result<T>& v) const noexcept {
+    return v
+        .fmap([](auto&& v) {
+            return Maybe<T>{v};
+        })
+        .value_or_call([&](auto&& err) {
+            throw_error(err.message());
+            return Maybe<T>::none();
+        });
 }
 
 inline Value Object::to_value() const noexcept {

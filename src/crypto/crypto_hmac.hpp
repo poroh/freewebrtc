@@ -91,16 +91,19 @@ inline util::ConstBinaryView PadKey<xorv>::view() const noexcept {
 
 template<typename HashFunc>
 HMACResult<HashFunc> digest(const std::vector<util::ConstBinaryView>& data, const OPadKey& opad, const IPadKey& ipad, HashFunc h) {
-    std::vector<util::ConstBinaryView> inner_data = {ipad.view()};
+    using HashFuncInput = std::vector<util::ConstBinaryView>;
+    HashFuncInput inner_data = {ipad.view()};
+    inner_data.reserve(data.size() + 1);
     std::copy(data.begin(), data.end(), std::back_inserter(inner_data));
+    using HashFuncResult = std::invoke_result_t<HashFunc, HashFuncInput>;
+    using HashValue = typename HashFuncResult::Value;
+    using ResultT = typename HMACResult<HashFunc>::Value;
     return h(inner_data)
-        .bind([&](auto&& inner) {
+        .bind([&](HashValue&& inner) {
             // TODO: is result of inner.view is valid after exit from this function?
             return h({opad.view(), inner.view()});
         })
-        .fmap([](auto&& outer) {
-            return (typename HMACResult<HashFunc>::Value)(std::move(outer));
-        });
+        .fmap(ResultT::move_from);
 }
 
 }

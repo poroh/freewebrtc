@@ -197,9 +197,8 @@ Result<ClientUDP::Handle> ClientUDP::do_create(Timepoint now, TransactionId&& ti
             auto& t = it->second;
             m_effects.emplace(SendData{handle, util::ConstBinaryView(t.msg_data)});
             t.rtx_algo->init(now)
-                .fmap([&](auto&& timepoint) {
+                .with_inner([&](Timepoint&& timepoint) {
                     m_tid_timeline.emplace(timepoint, handle);
-                    return Unit{};
                 });
             m_stat.started.inc();
             return handle;

@@ -40,12 +40,10 @@ Result<AddressV6> from_string_v6(const std::string_view& v) {
 
 Result<Address> Address::from_string(const std::string_view& v) {
     return from_string_v4(v)
-        .fmap([](auto&& addr) {
-            return Address{std::move(addr)};
-        })
+        .fmap(Address::move_from_v4)
         .bind_err([&](auto&&) {
             return from_string_v6(v)
-                .fmap([](AddressV6&& v) { return Address{std::move(v)}; });
+                .fmap(Address::move_from_v6);
         });
 }
 

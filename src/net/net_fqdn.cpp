@@ -129,6 +129,5 @@ Result<Fqdn> Fqdn::from_string(std::string_view v) {
         });
 }
 
-
 }
 

@@ -45,6 +45,9 @@ public:
     const Value& unwrap() const noexcept;
     const Value& unwrap_or(const Value&) const noexcept;
 
+    template<typename F>
+    auto value_or_call(F&& f) -> std::invoke_result_t<F, const Error&>;
+
     // Functor's fmap
     // Apply function to Value if it Result is value
     // and return result as Result of result of the function.
@@ -268,6 +271,15 @@ Result<V> Result<V>::bind_err(F&& f) && {
     return *this;
 }
 
+template<typename T>
+template<typename F>
+auto Result<T>::value_or_call(F&& f) -> std::invoke_result_t<F, const Error&> {
+    static_assert(std::is_same_v<T, std::remove_cvref_t<std::invoke_result_t<F, const Error&>>>);
+    if (is_err()) {
+        return f(unwrap_err());
+    }
+    return unwrap();
+}
 
 template<typename V>
 template<typename... Ts>
@@ -399,7 +411,7 @@ Result<T> success(T&& v) noexcept {
 }
 
 inline MaybeError success() noexcept {
-    return MaybeError{Unit{}};
+    return MaybeError{Unit::create()};
 }
 
 template<typename T>

@@ -111,11 +111,11 @@ IntrusiveList<T>::Link::Link(T& t, Link&& other)
 {
     m_prev.fmap([&](auto&& prev) {
         prev.get().m_next = LinkRef{*this};
-        return Unit{};
+        return Unit::create();
     });
     m_next.fmap([&](auto&& next) {
         next.get().m_prev = LinkRef{*this};
-        return Unit{};
+        return Unit::create();
     });
     other.m_next = none();
     other.m_prev = none();
@@ -146,11 +146,11 @@ template<typename T>
 void IntrusiveList<T>::Link::remove() noexcept {
     m_prev.fmap([&](auto&& prev) {
         prev.get().m_next = m_next;
-        return Unit{};
+        return Unit::create();
     });
     m_next.fmap([&](auto&& next) {
         next.get().m_prev = m_prev;
-        return Unit{};
+        return Unit::create();
     });
     m_prev = none();
     m_next = none();
@@ -164,7 +164,7 @@ void IntrusiveList<T>::Link::place_after(Link& t) noexcept {
     m_prev = LinkRef{t};
     m_next.fmap([&](auto&& next) {
         next.get().m_prev = LinkRef{*this};
-        return Unit{};
+        return Unit::create();
     });
 }
 
@@ -176,7 +176,7 @@ void IntrusiveList<T>::Link::place_before(Link& t) noexcept {
     t.m_prev = LinkRef{*this};
     m_prev.fmap([&](auto&& prev) {
         prev.get().m_next = LinkRef{*this};
-        return Unit{};
+        return Unit::create();
     });
 }
 
@@ -238,7 +238,7 @@ void IntrusiveList<T>::pop_front() noexcept {
     }
     m_head.m_next.fmap([](auto&& next) {
         next.get().remove();
-        return Unit{};
+        return Unit::create();
     });
 }
 
@@ -249,7 +249,7 @@ void IntrusiveList<T>::pop_back() noexcept {
     }
     m_tail.m_prev.fmap([](auto&& prev) {
         prev.get().remove();
-        return Unit{};
+        return Unit::create();
     });
 }
 
@@ -321,14 +321,12 @@ bool IntrusiveList<T>::empty() const noexcept {
 template<typename T>
 void IntrusiveList<T>::do_move(IntrusiveList<T>& other) noexcept {
     m_head.m_next = other.m_head.m_next;
-    m_head.m_next.fmap([&](auto&& next) {
+    m_head.m_next.with_inner([&](auto&& next) {
         next.get().m_prev = LinkRef{m_head};
-        return Unit{};
     });
     m_tail.m_prev = other.m_tail.m_prev;
-    m_tail.m_prev.fmap([&](auto&& prev) {
+    m_tail.m_prev.with_inner([&](auto&& prev) {
         prev.get().m_next = LinkRef{m_tail};
-        return Unit{};
     });
     other.m_head.m_next = none();
     other.m_tail.m_prev = none();

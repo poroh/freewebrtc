@@ -50,7 +50,7 @@ Result<Packet> Packet::parse(const util::ConstBinaryView& vv, const PayloadMap& 
             })
             .fmap([&](auto&& csrc) {
                 csrcs.emplace_back(SSRC::from_uint32(csrc));
-                return Unit{};
+                return Unit::create();
             });
         if (maybe_err.is_err()) {
             return maybe_err.unwrap_err();
@@ -110,7 +110,7 @@ Result<Packet> Packet::parse(const util::ConstBinaryView& vv, const PayloadMap& 
                     .require()
                     .fmap([&](auto&& len) {
                         maybe_extension = Header::Extension{len, ext_interval};
-                        return Unit{};
+                        return Unit::create();
                     });
             });
         if (maybe_err.is_err()) {
@@ -148,7 +148,7 @@ Result<Packet> Packet::parse(const util::ConstBinaryView& vv, const PayloadMap& 
                     stat.error.inc();
                     return make_error_code(Error::invalid_packet_padding);
                 }
-                return Unit{};
+                return Unit::create();
             });
         if (maybe_err.is_err()) {
             return maybe_err.unwrap_err();
