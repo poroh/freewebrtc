@@ -58,15 +58,13 @@ template<template <typename...> class Result>
 Result<SV> split_all(SV sv, char sep) {
     Result<SV> result;
     while (!sv.empty()) {
-        auto maybe_pair = split(sv, sep);
-        if (maybe_pair.is_some()) {
-            auto& pair = maybe_pair.unwrap();
+        sv = split(sv, sep).fmap([&](auto&& pair) {
             result.emplace_back(std::move(pair.first));
-            sv = pair.second;
-        } else {
+            return pair.second;
+        }).value_or_call([&] {
             result.emplace_back(std::move(sv));
-            sv = SV{};
-        }
+            return SV{};
+        });
     }
     return result;
 }
