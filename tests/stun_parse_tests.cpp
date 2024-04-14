@@ -491,7 +491,7 @@ TEST_F(STUNMessageParserTest, truncated_xor_mapped_address_truncated_ipv6_addres
         0x74, 0x65, 0x73, 0x74, // }
         0x20, 0x76, 0x65, 0x63, // }  UTF-8 server name
         0x74, 0x6f, 0x72, 0x20, // }
-        0x00, 0x20, 0x00, 0x04, //    XOR-MAPPED-ADDRESS attribute header
+        0x00, 0x20, 0x00, 0x08, //    XOR-MAPPED-ADDRESS attribute header
         0x00, 0x02, 0xa1, 0x47, //    Address family (IPv6) and xor'd mapped port number
         0x01, 0x13, 0xa9, 0xfa  // }
     };
@@ -625,7 +625,7 @@ TEST_F(STUNMessageParserTest, unknown_attribute_that_requires_comprehension) {
     const auto msg_rv = stun::Message::parse(util::ConstBinaryView(request), stat);
     ASSERT_TRUE(msg_rv.is_ok());
     const auto& msg = msg_rv.unwrap();
-    EXPECT_EQ(msg.attribute_set.unknown_comprehension_required().size(), 1);
+    ASSERT_EQ(msg.attribute_set.unknown_comprehension_required().size(), 1);
     EXPECT_EQ(msg.attribute_set.unknown_comprehension_required()[0].value(), 0x7fff);
 }
 
