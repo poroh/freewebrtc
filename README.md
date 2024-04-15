@@ -11,7 +11,7 @@ stack exist in this world but this implementation is different:
   - If you want secure random for STUN transaction identifiers you can replace it
   - etc.
 - Code highly relies on strong typing
-- Thorough unit testing (175 tests and counting)
+- Thorough unit testing (177 tests and counting)
 - No quirky practicies with raw pointers and type casts.
 - Test coverage
 - Address sanitizer

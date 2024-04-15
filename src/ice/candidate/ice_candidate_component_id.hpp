@@ -49,3 +49,12 @@ inline unsigned ComponentId::value() const noexcept {
 }
 
 }
+
+namespace std {
+    template<>
+    struct hash<freewebrtc::ice::candidate::ComponentId> {
+        size_t operator()(const freewebrtc::ice::candidate::ComponentId& id) const {
+            return hash<unsigned>()(id.value());
+        }
+    };
+}

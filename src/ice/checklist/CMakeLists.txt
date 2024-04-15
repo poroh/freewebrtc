@@ -4,11 +4,8 @@
 # Distributed under the terms of the MIT License. See the LICENSE file.
 #
 
-add_subdirectory(candidate)
-add_subdirectory(pair)
-add_subdirectory(checklist)
-
 set(SOURCES
+  ice_checklist.cpp
 )
 file(GLOB HEADERS "*.hpp")
 
@@ -16,5 +13,5 @@ list(TRANSFORM SOURCES PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/)
 
 target_sources(freewebrtc PRIVATE ${SOURCES} ${HEADERS})
 
-install(FILES ${HEADERS} DESTINATION include/freewebrtc/ice)
+install(FILES ${HEADERS} DESTINATION include/freewebrtc/ice/checklist)
 
