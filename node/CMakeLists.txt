@@ -42,7 +42,6 @@ endif()
 if(NODE_JS_FOUND)
   message(STATUS "Use node.js found at ${NODE_JS_ROOT_DIR}")
   set(SUBLIBS
-    napi_wrapper
     node_stun
     node_ice
     openssl

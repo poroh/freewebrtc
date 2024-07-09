@@ -9,6 +9,7 @@
 #pragma once
 
 #include "util/util_maybe.hpp"
+#include "util/util_error.hpp"
 #include "stun/stun_message.hpp"
 #include "stun/stun_integrity.hpp"
 #include "net/net_endpoint.hpp"

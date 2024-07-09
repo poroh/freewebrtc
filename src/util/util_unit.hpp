@@ -8,25 +8,11 @@
 
 #pragma once
 
+#include <craftpp/types/unit.hpp>
+
 namespace freewebrtc {
 
-struct Unit {
-    using Self = Unit;
-    static Self create() noexcept;
-};
-
-Unit unit() noexcept;
-
-//
-// implementation
-//
-inline Unit Unit::create() noexcept {
-    return Self{};
-}
-
-inline Unit unit() noexcept {
-    return Unit::create();
-}
+using craftpp::types::Unit;
 
 }
 

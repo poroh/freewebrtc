@@ -9,16 +9,16 @@
 #include "util/util_result_sugar.hpp"
 #include "stun/stun_server_stateless.hpp"
 #include "node/openssl/node_openssl_hash.hpp"
-#include "node/napi_wrapper/napi_error.hpp"
 #include "node_stun_server_stateless.hpp"
 #include "node_stun_message.hpp"
+#include <craftnapi/error.hpp>
 
 namespace freewebrtc::node_stun {
 
-using Value = napi::Value;
-using Object = napi::Object;
-using Env = napi::Env;
-using CallbackInfo = napi::CallbackInfo;
+using Value = craftnapi::Value;
+using Object = craftnapi::Object;
+using Env = craftnapi::Env;
+using CallbackInfo = craftnapi::CallbackInfo;
 
 namespace {
 

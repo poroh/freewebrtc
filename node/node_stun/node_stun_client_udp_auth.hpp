@@ -9,11 +9,11 @@
 
 #include "util/util_result.hpp"
 #include "stun/stun_client_udp.hpp"
-#include "node/napi_wrapper/napi_wrapper.hpp"
+#include <craftnapi/env.hpp>
 
 namespace freewebrtc::node_stun {
 
-Result<stun::ClientUDP::Auth> parse_auth(napi::Object obj);
+Result<stun::ClientUDP::Auth> parse_auth(craftnapi::Object obj);
 
 }
 

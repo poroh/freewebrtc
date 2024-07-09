@@ -13,10 +13,10 @@
 
 namespace freewebrtc::node_stun {
 
-using Value = napi::Value;
-using Object = napi::Object;
-using Env = napi::Env;
-using CallbackInfo = napi::CallbackInfo;
+using Value = craftnapi::Value;
+using Object = craftnapi::Object;
+using Env = craftnapi::Env;
+using CallbackInfo = craftnapi::CallbackInfo;
 
 Result<Object> stun_attributes(const Env& env, const stun::TransactionId& tid, const stun::AttributeSet& attrs) {
     using MaybeRVV = Maybe<Result<Value>>;

@@ -12,6 +12,7 @@
 #include "stun/details/stun_attr_registry.hpp"
 #include "stun/details/stun_constants.hpp"
 #include "util/util_variant_overloaded.hpp"
+#include "util/util_endian.hpp"
 
 namespace freewebrtc::stun {
 

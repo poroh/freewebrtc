@@ -23,8 +23,8 @@ namespace freewebrtc::node_stun {
 
 namespace {
 
-Result<napi::Value> constructor(napi::Env&, const napi::CallbackInfo& info) {
-    auto settings_rv = info[0] > napi::Value::to_object > client_udp_settings_from_napi;
+Result<craftnapi::Value> constructor(craftnapi::Env&, const craftnapi::CallbackInfo& info) {
+    auto settings_rv = info[0] > craftnapi::Value::to_object > client_udp_settings_from_craftnapi;
     return
         combine([](auto&& obj, auto&& settings) {
                 return obj.wrap(std::make_unique<stun::ClientUDP>(settings));
@@ -33,13 +33,13 @@ Result<napi::Value> constructor(napi::Env&, const napi::CallbackInfo& info) {
             settings_rv);
 }
 
-Result<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj) {
+Result<stun::ClientUDP::Request> request_from_craftnapi(const craftnapi::Object& obj) {
     auto source_rv = (obj.named_property("source")
-        > napi::Value::to_string
+        > craftnapi::Value::to_string
         > net::ip::Address::from_string
         ).add_context("source field");
     auto target_rv = (obj.named_property("target")
-        > napi::Value::to_string
+        > craftnapi::Value::to_string
         > net::ip::Address::from_string
         ).add_context("target field");
 
@@ -48,7 +48,7 @@ Result<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj) {
 
     Result<MaybeAuth> maybe_auth_rv
         = (obj.maybe_named_property("auth")
-           > [](auto&& maybe_val) { return maybe_val.fmap(napi::Value::to_object); }
+           > [](auto&& maybe_val) { return maybe_val.fmap(craftnapi::Value::to_object); }
            > [](auto&& maybe_obj) {
                return maybe_obj
                    .fmap([](auto&& obj) {
@@ -75,8 +75,8 @@ Result<stun::ClientUDP::Request> request_from_napi(const napi::Object& obj) {
         .add_context("request");
 }
 
-Result<napi::Value> create(napi::Env& env, const napi::CallbackInfo& info) {
-    auto request_rv = info[0] > napi::Value::to_object > request_from_napi;
+Result<craftnapi::Value> create(craftnapi::Env& env, const craftnapi::CallbackInfo& info) {
+    auto request_rv = info[0] > craftnapi::Value::to_object > request_from_craftnapi;
     auto client_rv = info.this_arg.unwrap<stun::ClientUDP>();
     return combine(
         [](auto&& client, stun::ClientUDP::Request&& req) {
@@ -84,22 +84,22 @@ Result<napi::Value> create(napi::Env& env, const napi::CallbackInfo& info) {
         }
         , std::move(client_rv)
         , std::move(request_rv))
-        .bind([&](auto&& hnd) { return client_udp_handle_to_napi(env, hnd); })
+        .bind([&](auto&& hnd) { return client_udp_handle_to_craftnapi(env, hnd); })
         .add_context("create request");
 }
 
-Result<napi::Value> next(napi::Env& env, const napi::CallbackInfo& info) {
+Result<craftnapi::Value> next(craftnapi::Env& env, const craftnapi::CallbackInfo& info) {
     return info.this_arg.unwrap<stun::ClientUDP>()
         > [&](auto&& client) {
             auto effect = client.get().next(clock::steady_clock_now());
-            return client_udp_effect_to_napi(env, effect);
+            return client_udp_effect_to_craftnapi(env, effect);
         }
-        > napi::Object::fmap_to_value;
+        > craftnapi::Object::fmap_to_value;
 }
 
-Result<napi::Value> response(napi::Env& env, const napi::CallbackInfo& info) {
+Result<craftnapi::Value> response(craftnapi::Env& env, const craftnapi::CallbackInfo& info) {
     auto this_rv = info.this_arg.unwrap<stun::ClientUDP>();
-    auto resp_rv = info[0] > napi::Value::to_buffer;
+    auto resp_rv = info[0] > craftnapi::Value::to_buffer;
     return combine(
         [&](auto& client, auto& resp) {
             client.get().response(clock::steady_clock_now(), resp);
@@ -111,7 +111,7 @@ Result<napi::Value> response(napi::Env& env, const napi::CallbackInfo& info) {
 
 }
 
-Result<napi::Value> client_udp_class(napi::Env& env, std::string_view name) {
+Result<craftnapi::Value> client_udp_class(craftnapi::Env& env, std::string_view name) {
     return
         env.create_class(
             name,

@@ -12,14 +12,14 @@
 
 namespace freewebrtc::node_ice {
 
-Result<napi::Object> ice_candidate_to_object(napi::Env& env, const ice::candidate::Supported& v) {
+Result<craftnapi::Object> ice_candidate_to_object(craftnapi::Env& env, const ice::candidate::Supported& v) {
     const auto& c = v.candidate;
     auto ice_addr_to_string = [&](auto&& addr) { return addr.to_string() > [&](auto&& str) { return env.create_string(str); }; };
     auto ext_to_obj = [&](auto&& ext) {
         return env.create_object({
             {"name", env.create_string(ext.att_name)},
             {"value", env.create_string(ext.att_value)}})
-            > napi::Object::fmap_to_value;
+            > craftnapi::Object::fmap_to_value;
     };
     return env.create_object({
         { "result", env.create_object({
@@ -36,20 +36,20 @@ Result<napi::Object> ice_candidate_to_object(napi::Env& env, const ice::candidat
     });
 }
 
-Result<napi::Value> ice_candidate_parse(napi::Env& env, const napi::CallbackInfo& ci) {
+Result<craftnapi::Value> ice_candidate_parse(craftnapi::Env& env, const craftnapi::CallbackInfo& ci) {
     return ci[0]
-        > napi::Value::to_string
+        > craftnapi::Value::to_string
         > ice::candidate::parse_sdp_attr
         > [&](auto&& c) { return std::visit(
             [&](auto&& result) {
                 if constexpr (std::is_same_v<ice::candidate::Supported&&, decltype(result)>) {
                     return ice_candidate_to_object(env, result)
-                        > napi::Object::fmap_to_value;
+                        > craftnapi::Object::fmap_to_value;
                 } else if constexpr (std::is_same_v<ice::candidate::Unsupported&&, decltype(result)>) {
                     return env.create_object({
                         { "result", env.create_null() },
                         { "error", env.create_string(result.value) }})
-                        > napi::Object::fmap_to_value;
+                        > craftnapi::Object::fmap_to_value;
                 }
             },
             std::move(c));

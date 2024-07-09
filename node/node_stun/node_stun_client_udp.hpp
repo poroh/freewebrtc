@@ -9,10 +9,10 @@
 #pragma once
 
 #include <string_view>
-#include "node/napi_wrapper/napi_wrapper.hpp"
+#include <craftnapi/env.hpp>
 
 namespace freewebrtc::node_stun {
 
-Result<napi::Value> client_udp_class(napi::Env& env, std::string_view name);
+Result<craftnapi::Value> client_udp_class(craftnapi::Env& env, std::string_view name);
 
 }

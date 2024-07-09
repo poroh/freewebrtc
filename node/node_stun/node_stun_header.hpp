@@ -8,11 +8,12 @@
 
 #pragma once
 
+#include <craftnapi/env.hpp>
 #include "stun/stun_header.hpp"
-#include "node/napi_wrapper/napi_wrapper.hpp"
+#include "util/util_result.hpp"
 
 namespace freewebrtc::node_stun {
 
-Result<napi::Object> header(const napi::Env& env, const stun::Header& hdr) noexcept;
+Result<craftnapi::Object> header(const craftnapi::Env& env, const stun::Header& hdr) noexcept;
 
 }

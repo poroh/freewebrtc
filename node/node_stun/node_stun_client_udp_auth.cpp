@@ -11,7 +11,7 @@
 
 namespace freewebrtc::node_stun {
 
-Result<stun::ClientUDP::Auth> parse_auth(napi::Object obj) {
+Result<stun::ClientUDP::Auth> parse_auth(craftnapi::Object obj) {
     const auto sha1 = freewebrtc::crypto::node_openssl::sha1;
     auto username_rv = (obj.named_property("username")
         > [](auto&& val) { return val.as_string(); }

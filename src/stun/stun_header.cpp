@@ -8,6 +8,7 @@
 
 #include "stun/stun_header.hpp"
 #include "stun/details/stun_constants.hpp"
+#include "util/util_endian.hpp"
 
 namespace freewebrtc::stun {
 

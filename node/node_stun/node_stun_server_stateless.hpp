@@ -9,10 +9,10 @@
 #pragma once
 
 #include <string_view>
-#include "node/napi_wrapper/napi_wrapper.hpp"
+#include <craftnapi/env.hpp>
 
 namespace freewebrtc::node_stun {
 
-Result<napi::Value> server_stateless_class(napi::Env& env, std::string_view name);
+Result<craftnapi::Value> server_stateless_class(craftnapi::Env& env, std::string_view name);
 
 }

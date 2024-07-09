@@ -6,14 +6,15 @@
 // Mapping of STUN to node.js type
 //
 
+#include <craftnapi/error.hpp>
+
 #include "stun/stun_header.hpp"
-#include "node/napi_wrapper/napi_error.hpp"
 #include "node/node_stun/node_stun_header.hpp"
 #include "node/node_stun/node_stun_error.hpp"
 
 namespace freewebrtc::node_stun {
 
-Result<napi::Value> stun_class(const napi::Env& env, const stun::Class& cls) {
+Result<craftnapi::Value> stun_class(const craftnapi::Env& env, const stun::Class& cls) {
     switch (cls.value()) {
     case stun::Class::REQUEST:          return env.create_string("request");
     case stun::Class::INDICATION:       return env.create_string("indication");
@@ -23,18 +24,18 @@ Result<napi::Value> stun_class(const napi::Env& env, const stun::Class& cls) {
     return make_error_code(Error::unknown_stun_class);
 }
 
-Result<napi::Value> stun_method(const napi::Env& env, const stun::Method& method) {
+Result<craftnapi::Value> stun_method(const craftnapi::Env& env, const stun::Method& method) {
     if (method == stun::Method::binding()) {
         return env.create_string("binding");
     }
     return make_error_code(Error::unknown_stun_method);
 }
 
-Result<napi::Value> stun_transcation_id(const napi::Env& env, const stun::TransactionId& id) {
+Result<craftnapi::Value> stun_transcation_id(const craftnapi::Env& env, const stun::TransactionId& id) {
     return env.create_buffer(id.view());
 }
 
-Result<napi::Object> header(const napi::Env& env, const stun::Header& hdr) noexcept {
+Result<craftnapi::Object> header(const craftnapi::Env& env, const stun::Header& hdr) noexcept {
     return
         env.create_object({
                 { "class", stun_class(env, hdr.cls) },

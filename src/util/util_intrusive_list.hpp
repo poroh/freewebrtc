@@ -14,6 +14,7 @@
 #include <functional>
 
 #include "util/util_maybe.hpp"
+#include "util/util_unit.hpp"
 
 namespace freewebrtc::util {
 

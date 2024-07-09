@@ -18,7 +18,7 @@ using Settings = stun::client_udp::Settings;
 
 }
 
-Result<stun::client_udp::Settings> client_udp_settings_from_napi(napi::Object obj) {
+Result<stun::client_udp::Settings> client_udp_settings_from_craftnapi(craftnapi::Object obj) {
     Result<MaybeBool> maybe_use_fingerprint_rv
         = (obj.maybe_named_property("use_fingerprint")
            > [](auto&& maybe_v) {

@@ -14,6 +14,8 @@ add_library(freewebrtc_node_ice STATIC ${SOURCES} ${HEADERS})
 target_include_directories(freewebrtc_node_ice PUBLIC ${NODE_JS_ROOT_DIR}/include/node)
 target_include_directories(freewebrtc_node_ice PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_include_directories(freewebrtc_node_ice PRIVATE ${CMAKE_SOURCE_DIR})
+target_include_directories(freewebrtc_node_ice PRIVATE ${CMAKE_BINARY_DIR}/craftpp/include)
+target_include_directories(freewebrtc_node_ice PRIVATE ${CMAKE_BINARY_DIR}/craftnapi/include)
 
 install(TARGETS freewebrtc_node_ice
   ARCHIVE DESTINATION lib

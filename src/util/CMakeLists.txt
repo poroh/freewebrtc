@@ -6,15 +6,13 @@
 
 set(SOURCES
     util_hash_murmur.cpp
-    util_binary_view.cpp
     util_token_stream.cpp
-    util_error.cpp
-    util_error_code.cpp
 )
 file(GLOB HEADERS "*.hpp")
 
 list(TRANSFORM SOURCES PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/)
 
 target_sources(freewebrtc PRIVATE ${SOURCES} ${HEADERS})
+target_include_directories(freewebrtc PRIVATE ${CMAKE_BINARY_DIR}/craftpp/include)
 
 install(FILES ${HEADERS} DESTINATION include/freewebrtc/util)

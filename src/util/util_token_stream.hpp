@@ -13,6 +13,7 @@
 #include <type_traits>
 
 #include "util/util_result.hpp"
+#include "util/util_error.hpp"
 #include "util/util_maybe.hpp"
 
 namespace freewebrtc::util {

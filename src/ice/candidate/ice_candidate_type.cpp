@@ -11,6 +11,7 @@
 #include "ice/candidate/ice_candidate_type.hpp"
 #include "ice/candidate/ice_candidate_error.hpp"
 #include "abnf/abnf.hpp"
+#include "util/util_error.hpp"
 
 namespace freewebrtc::ice::candidate {
 

@@ -28,6 +28,25 @@ if(CODE_COVERAGE)
   endif()
 endif()
 
+# ================================================================================
+include(ExternalProject)
+ExternalProject_Add(
+  craftpp
+  GIT_REPOSITORY https://github.com/poroh/craftpp.git
+  GIT_TAG        main
+  CMAKE_ARGS     -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/craftpp
+)
+
+include(ExternalProject)
+ExternalProject_Add(
+  craftnapi
+  GIT_REPOSITORY https://github.com/poroh/craftnapi.git
+  GIT_TAG        main
+  CMAKE_ARGS     -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/craftnapi
+)
+
+# ================================================================================
+
 add_subdirectory(src)
 add_subdirectory(node)
 

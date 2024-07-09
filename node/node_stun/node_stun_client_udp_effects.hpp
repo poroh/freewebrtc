@@ -9,10 +9,10 @@
 #pragma once
 
 #include "stun/stun_client_udp.hpp"
-#include "node/napi_wrapper/napi_wrapper.hpp"
+#include <craftnapi/env.hpp>
 
 namespace freewebrtc::node_stun {
 
-Result<napi::Object> client_udp_effect_to_napi(napi::Env&, const stun::ClientUDP::Effect& effect);
+Result<craftnapi::Object> client_udp_effect_to_craftnapi(craftnapi::Env&, const stun::ClientUDP::Effect& effect);
 
 }

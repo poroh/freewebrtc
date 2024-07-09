@@ -12,6 +12,7 @@
 #include "ice/candidate/ice_candidate_error.hpp"
 #include "util/util_string_view.hpp"
 #include "util/util_token_stream.hpp"
+#include "util/util_unit.hpp"
 
 namespace freewebrtc::ice::candidate {
 

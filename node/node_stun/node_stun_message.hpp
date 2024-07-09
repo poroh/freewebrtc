@@ -8,12 +8,14 @@
 
 #pragma once
 
+#include <craftnapi/env.hpp>
+
 #include "stun/stun_message.hpp"
-#include "node/napi_wrapper/napi_wrapper.hpp"
+#include "util/util_result.hpp"
 
 namespace freewebrtc::node_stun {
 
-Result<napi::Object> message(const napi::Env& env, const stun::Message& msg);
-Result<napi::Value> message_parse(napi::Env& env, const napi::CallbackInfo& ci);
+Result<craftnapi::Object> message(const craftnapi::Env& env, const stun::Message& msg);
+Result<craftnapi::Value> message_parse(craftnapi::Env& env, const craftnapi::CallbackInfo& ci);
 
 }

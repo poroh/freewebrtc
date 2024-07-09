@@ -13,6 +13,7 @@
 #include <variant>
 
 #include "util/util_maybe.hpp"
+#include "util/util_error.hpp"
 #include "util/util_binary_view.hpp"
 #include "net/net_endpoint.hpp"
 #include "clock/clock_timepoint.hpp"

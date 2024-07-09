@@ -18,14 +18,14 @@ namespace freewebrtc::node_stun {
 
 namespace {
 
-Result<napi::Object> send_data_to_napi(napi::Env& env, const stun::ClientUDP::SendData& d) {
+Result<craftnapi::Object> send_data_to_craftnapi(craftnapi::Env& env, const stun::ClientUDP::SendData& d) {
     return env.create_object({
         {"type", env.create_string("send_data")},
         {"message", env.create_buffer(d.message_view)}
     });
 }
 
-Result<napi::Object> transaction_ok_to_napi(napi::Env& env, const stun::ClientUDP::TransactionOk& t) {
+Result<craftnapi::Object> transaction_ok_to_craftnapi(craftnapi::Env& env, const stun::ClientUDP::TransactionOk& t) {
     return env.create_object({
         {"type", env.create_string("transaction_ok")},
         {"result", env.create_object({
@@ -40,7 +40,7 @@ Result<napi::Object> transaction_ok_to_napi(napi::Env& env, const stun::ClientUD
 }
 
 
-Result<napi::Value> transaction_failed_reason_to_napi(napi::Env& env, const stun::ClientUDP::TransactionFailed::Reason& reason) {
+Result<craftnapi::Value> transaction_failed_reason_to_craftnapi(craftnapi::Env& env, const stun::ClientUDP::TransactionFailed::Reason& reason) {
     return std::visit(
         util::overloaded {
             [&](const stun::ClientUDP::TransactionFailed::UnknownComprehensionRequiredAttribute&) {
@@ -64,15 +64,15 @@ Result<napi::Value> transaction_failed_reason_to_napi(napi::Env& env, const stun
         reason);
 }
 
-Result<napi::Object> transaction_failed_to_napi(napi::Env& env, const stun::ClientUDP::TransactionFailed& f) {
+Result<craftnapi::Object> transaction_failed_to_craftnapi(craftnapi::Env& env, const stun::ClientUDP::TransactionFailed& f) {
     return env.create_object({
         {"type", env.create_string("transaction_fail")},
-        {"handle", client_udp_handle_to_napi(env, f.handle)},
-        {"reason", transaction_failed_reason_to_napi(env, f.reason)}
+        {"handle", client_udp_handle_to_craftnapi(env, f.handle)},
+        {"reason", transaction_failed_reason_to_craftnapi(env, f.reason)}
     });
 }
 
-Result<napi::Object> sleep_to_napi(napi::Env& env, const stun::ClientUDP::Sleep& s) {
+Result<craftnapi::Object> sleep_to_craftnapi(craftnapi::Env& env, const stun::ClientUDP::Sleep& s) {
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(s.sleep);
     auto adj = s.sleep == ms ? 0 : 1; // adjust to next whole ms
     return env.create_object({
@@ -83,13 +83,13 @@ Result<napi::Object> sleep_to_napi(napi::Env& env, const stun::ClientUDP::Sleep&
 
 }
 
-Result<napi::Object> client_udp_effect_to_napi(napi::Env& env, const stun::ClientUDP::Effect& effect) {
+Result<craftnapi::Object> client_udp_effect_to_craftnapi(craftnapi::Env& env, const stun::ClientUDP::Effect& effect) {
     return std::visit(
         util::overloaded {
-            [&](const stun::ClientUDP::SendData& d)          { return send_data_to_napi(env, d); },
-            [&](const stun::ClientUDP::TransactionOk& t)     { return transaction_ok_to_napi(env, t); },
-            [&](const stun::ClientUDP::TransactionFailed& f) { return transaction_failed_to_napi(env, f); },
-            [&](const stun::ClientUDP::Sleep& s)             { return sleep_to_napi(env, s); },
+            [&](const stun::ClientUDP::SendData& d)          { return send_data_to_craftnapi(env, d); },
+            [&](const stun::ClientUDP::TransactionOk& t)     { return transaction_ok_to_craftnapi(env, t); },
+            [&](const stun::ClientUDP::TransactionFailed& f) { return transaction_failed_to_craftnapi(env, f); },
+            [&](const stun::ClientUDP::Sleep& s)             { return sleep_to_craftnapi(env, s); },
             [&](const stun::ClientUDP::Idle&)                { return env.create_object({{"type", env.create_string("idle")}}); }
             }
         , effect);

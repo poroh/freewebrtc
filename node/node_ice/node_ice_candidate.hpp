@@ -9,11 +9,12 @@
 #pragma once
 
 #include <string_view>
-#include "node/napi_wrapper/napi_wrapper.hpp"
+#include <craftnapi/env.hpp>
+#include "util/util_result.hpp"
 
 namespace freewebrtc::node_ice {
 
-Result<napi::Value> ice_candidate_parse(napi::Env& env, const napi::CallbackInfo& ci);
+Result<craftnapi::Value> ice_candidate_parse(craftnapi::Env& env, const craftnapi::CallbackInfo& ci);
 
 }
 

@@ -10,6 +10,8 @@
 #include "stun/stun_header.hpp"
 #include "stun/details/stun_fingerprint.hpp"
 #include "util/util_variant_overloaded.hpp"
+#include "util/util_unit.hpp"
+#include "util/util_endian.hpp"
 #include <iostream>
 
 namespace freewebrtc::stun {
