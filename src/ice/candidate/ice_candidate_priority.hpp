@@ -27,6 +27,8 @@ public:
 
     bool operator==(const Priority&) const noexcept = default;
 
+    uint32_t value() const noexcept;
+
 private:
     explicit Priority(uint32_t);
     uint32_t m_value;
@@ -38,5 +40,9 @@ private:
 inline Priority::Priority(uint32_t v)
     : m_value(v)
 {}
+
+inline uint32_t Priority::value() const noexcept {
+    return m_value;
+}
 
 }

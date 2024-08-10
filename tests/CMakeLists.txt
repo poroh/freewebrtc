@@ -23,6 +23,7 @@ set(TEST_SOURCES
     ice_candidate_address_tests.cpp
     ice_candidate_sdp_tests.cpp
     ice_candidate_preference_tests.cpp
+    ice_pair_state_tests.cpp
 )
 
 include(FetchContent)
